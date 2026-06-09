@@ -39,8 +39,8 @@ it, the web branch is skipped gracefully but you'll get no results.
 
 The app needs AWS credentials in its environment for Bedrock, so source `creds.txt` first:
 
-```bash
-bash -c 'set -a; source ../creds.txt; set +a; uv run uvicorn app.main:app --reload'
+```
+uv run uvicorn app.main:app --reload'
 ```
 
 - Server: **http://localhost:8000**
