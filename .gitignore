@@ -1,0 +1,6 @@
+# OS
+.DS_Store
+
+# Handoff / design bundles
+hackathon-handoff.zip
+*.zip
