@@ -5,13 +5,17 @@ import { Card, EmptyState } from "../primitives";
 export function ThemesCard({
   themes,
   onOpenDebate,
+  discovering = false,
 }: {
   themes: Theme[];
   onOpenDebate: () => void;
+  discovering?: boolean;
 }) {
   const riskC: Record<string, string> = { Low: "var(--up)", Med: "var(--amber)", High: "var(--down)" };
+  const isEmpty = themes.length === 0;
   return (
     <Card title="Thematic Portfolios" sub="Winston · final baskets" className="span12"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}
       action={<button onClick={onOpenDebate} style={{ fontSize: 11, color: "var(--blue-bright)", background: "none", border: "none" }}>View debate →</button>}>
       {themes.length === 0 ? (
         <EmptyState label="No thematic baskets yet" sub="Run a discovery to group themes · conviction & returns await Winston (Tier 5)" />

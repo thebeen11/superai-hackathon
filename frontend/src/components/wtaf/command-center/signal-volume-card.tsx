@@ -2,9 +2,11 @@
 import type { SignalVolume } from "@/lib/types";
 import { Card, BarChart, EmptyState } from "../primitives";
 
-export function SignalVolumeCard({ signalVolume }: { signalVolume: SignalVolume }) {
+export function SignalVolumeCard({ signalVolume, discovering = false }: { signalVolume: SignalVolume; discovering?: boolean }) {
+  const isEmpty = signalVolume.bars.length === 0;
   return (
-    <Card title="Signal Volume" sub="this week" className="span3">
+    <Card title="Signal Volume" sub="this week" className="span3"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}>
       {signalVolume.bars.length === 0 ? (
         <EmptyState label="No signal volume yet" sub="run a discovery" minHeight={158} />
       ) : (

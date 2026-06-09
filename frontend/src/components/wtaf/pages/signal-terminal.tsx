@@ -2,7 +2,7 @@
 /* ============ WTAF — Signal & Tracker Terminal ============ */
 import { useState } from "react";
 import type { WtafData } from "@/lib/types";
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, Spark, EmptyState } from "../primitives";
 import { PageHead, Stat } from "../shared";
@@ -40,6 +40,7 @@ function Heatmap({ d }: { d: WtafData }) {
 
 export function SignalTerminal() {
   const d = useWtafData();
+  const { discovering } = useWtaf();
   const { onOpenContext, onNewTracker } = useShellActions();
   const [sel, setSel] = useState(0);
   const toneC: Record<string, string> = { up: "var(--up)", down: "var(--down)", flat: "var(--blue)" };
@@ -51,7 +52,8 @@ export function SignalTerminal() {
       <PageHead title="Signal & Tracker Terminal" sub="semantic concept tracking · channel-level"
         right={<button onClick={onNewTracker} className="primary-btn">+ New Tracker</button>} />
       <div className="grid12">
-        <Card title="Trackers" sub={`${d.trackers.length}/15`} className="span3" pad={false}>
+        <Card title="Trackers" sub={`${d.trackers.length}/15`} className="span3" pad={false}
+          loading={discovering && !hasTrackers} updating={discovering && hasTrackers}>
           <div style={{ padding: "4px 8px 10px" }}>
             {!hasTrackers && <EmptyState label="No trackers" sub="run a discovery" minHeight={120} />}
             {d.trackers.map((tr, i) => (
@@ -82,12 +84,13 @@ export function SignalTerminal() {
           <div style={{ marginTop: 8, fontSize: 11, color: "var(--t-lo)" }}>Click any spike to open the exact transcript moment · jump-to-timestamp source link.</div>
         </Card>
         ) : (
-        <Card title="Tracker detail" sub="no tracker selected" className="span9">
+        <Card title="Tracker detail" sub="no tracker selected" className="span9" loading={discovering}>
           <EmptyState label="No concept trackers yet" sub="Run a discovery from the topbar to populate trackers" minHeight={210} />
         </Card>
         )}
 
-        <Card title="Indicator Heatmap" sub="rubric scores · last 8 weeks" className="span12">
+        <Card title="Indicator Heatmap" sub="rubric scores · last 8 weeks" className="span12"
+          loading={discovering && d.indicators.length === 0} updating={discovering && d.indicators.length > 0}>
           <Heatmap d={d} />
         </Card>
       </div>

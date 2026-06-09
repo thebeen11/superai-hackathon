@@ -1,7 +1,7 @@
 "use client";
 /* ============ WTAF — Sources & Prediction Ledger ============ */
 import { useState } from "react";
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { setSourceLive } from "@/lib/api/wtaf";
 import { Card, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
@@ -10,15 +10,20 @@ import { SystemCard } from "../command-center/system-card";
 
 export function SourcesPage() {
   const d = useWtafData();
-  const [sources, setSources] = useState(d.sources);
+  const { discovering } = useWtaf();
+  // Toggled-liveness overrides by source name, merged onto the live snapshot during
+  // render — so a post-discovery refetch surfaces new sources without dropping an
+  // optimistic toggle, and without copying the array into state (no sync effect).
+  const [liveOverrides, setLiveOverrides] = useState<Record<string, boolean>>({});
+  const sources = d.sources.map((s) =>
+    s.name in liveOverrides ? { ...s, live: liveOverrides[s.name] } : s,
+  );
 
   const toggle = (name: string, next: boolean) => {
-    // optimistic update, then persist via API
-    setSources((s) => s.map((x) => (x.name === name ? { ...x, live: next } : x)));
-    setSourceLive(name, next).catch(() => {
-      // rollback on failure
-      setSources((s) => s.map((x) => (x.name === name ? { ...x, live: !next } : x)));
-    });
+    setLiveOverrides((o) => ({ ...o, [name]: next })); // optimistic
+    setSourceLive(name, next).catch(() =>
+      setLiveOverrides((o) => ({ ...o, [name]: !next })), // rollback on failure
+    );
   };
 
   return (
@@ -26,6 +31,7 @@ export function SourcesPage() {
       <PageHead title="Sources & Agent Management" sub="data feeds · prediction accuracy ledger" />
       <div className="grid12">
         <Card title="Data Sources" sub={`${sources.filter((s) => s.live).length} live`} className="span6"
+          loading={discovering && sources.length === 0} updating={discovering && sources.length > 0}
           action={<button className="primary-btn" style={{ padding: "6px 12px", fontSize: 11.5 }}>+ Add Source</button>}>
           {sources.length === 0 ? (
             <EmptyState label="No data sources yet" sub="Run a discovery to ingest sources" />
@@ -95,8 +101,8 @@ export function SourcesPage() {
         <div className="span12" style={{ marginTop: 4 }}>
           <div className="label-xs">System Health & Monitoring</div>
         </div>
-        <SignalVolumeCard signalVolume={d.signalVolume} />
-        <SystemCard system={d.system} />
+        <SignalVolumeCard signalVolume={d.signalVolume} discovering={discovering} />
+        <SystemCard system={d.system} discovering={discovering} />
       </div>
     </div>
   );

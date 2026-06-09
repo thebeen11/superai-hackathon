@@ -11,6 +11,7 @@ import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import { dataengProcess, discoverPost, listItems } from "./generated/sdk.gen";
 import type { DataEngReport } from "./generated/types.gen";
 import { itemsToWtafData } from "./adapter";
+import { streamSse, type ProgressEvent } from "./sse";
 
 /**
  * Full dashboard snapshot.
@@ -46,6 +47,26 @@ export async function discoverAndProcess(query: string): Promise<DataEngReport> 
     throwOnError: true,
   });
   return report!;
+}
+
+/**
+ * Streaming variant of {@link discoverAndProcess}. `/discover` stays a fast blocking
+ * call; the slow per-item Data Engineering runs against `/dataeng/process/stream` so
+ * `onProgress` fires for each stage (clean → label → theme → persist). Resolves with
+ * the terminal DataEngReport. Backend: POST /discover → POST /dataeng/process/stream
+ */
+export async function discoverAndProcessStream(
+  query: string,
+  onProgress: (evt: ProgressEvent) => void,
+): Promise<DataEngReport> {
+  const { data: discovery } = await discoverPost({
+    body: { query, mode: "auto_proceed" },
+    throwOnError: true,
+  });
+  if (!discovery || "questions" in discovery) {
+    throw new Error("Discovery returned clarifying questions instead of results");
+  }
+  return streamSse<DataEngReport>("/dataeng/process/stream", discovery, onProgress);
 }
 
 /** Context preview for a tracker. Backend: GET /api/trackers/:name/context */

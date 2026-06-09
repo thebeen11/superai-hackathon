@@ -1,7 +1,7 @@
 "use client";
 /* ============ WTAF — Watchlist (list + ticker detail routes) ============ */
 import Link from "next/link";
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, MiniBar, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
@@ -9,12 +9,15 @@ import { DebateCard } from "../command-center/debate-card";
 
 export function WatchlistPage() {
   const d = useWtafData();
+  const { discovering } = useWtaf();
+  const isEmpty = d.watchlist.length === 0;
 
   return (
     <div>
       <PageHead title="Watchlist" sub="bottom-up · click a ticker for detail" />
       <div className="grid12">
         <Card title="Tracked Tickers" sub={`${d.watchlist.length} names`} className="span12"
+          loading={discovering && isEmpty} updating={discovering && !isEmpty}
           action={<span className="mono" style={{ fontSize: 11, color: "var(--orange-bright)" }}>{d.watchlist.filter((w) => w.alert).length} alerts</span>}>
           {d.watchlist.length === 0 ? (
             <EmptyState label="No tickers tracked yet" sub="Run a discovery to resolve entities ($TICKER) from sources" minHeight={140} />

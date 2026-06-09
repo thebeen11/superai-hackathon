@@ -1,18 +1,19 @@
 "use client";
 /* ============ WTAF — Financial Indicator Dashboard ============ */
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { Card, Ring, MiniBar, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
 
 export function IndicatorsPage() {
   const d = useWtafData();
+  const { discovering } = useWtaf();
   const bandC: Record<string, string> = { Positive: "var(--up)", Neutral: "var(--amber)", Negative: "var(--down)" };
   return (
     <div>
       <PageHead title="Financial Indicator Dashboard" sub="industry signal coverage · evidence-backed" />
       <div className="grid12">
         {d.indicators.length === 0 && (
-          <Card className="span12">
+          <Card className="span12" loading={discovering}>
             <EmptyState label="No indicators yet" sub="Run a discovery to derive industry signals · rubric scores await Tier 3 (Andie)" />
           </Card>
         )}
@@ -29,7 +30,8 @@ export function IndicatorsPage() {
             </div>
           </Card>
         ))}
-        <Card title="Watchlist Snapshot" sub="US equities" className="span6">
+        <Card title="Watchlist Snapshot" sub="US equities" className="span6"
+          loading={discovering && d.watchlist.length === 0} updating={discovering && d.watchlist.length > 0}>
           {d.watchlist.length === 0 ? (
             <EmptyState label="No tickers yet" sub="run a discovery" />
           ) : (

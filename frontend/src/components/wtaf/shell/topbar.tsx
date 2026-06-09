@@ -4,14 +4,29 @@ import { useState, type FormEvent } from "react";
 import type { TickerItem } from "@/lib/types";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { USE_MOCK } from "@/lib/api/client";
-import { discoverAndProcess } from "@/lib/api/wtaf";
+import type { ProgressEvent } from "@/lib/api/sse";
+
+type DiscoveryStatus = { tone: "info" | "ok" | "warn" | "err"; text: string };
+
+/** Map a backend progress event to a short, live topbar label. */
+function progressLabel(evt: ProgressEvent): string {
+  if (evt.stage.startsWith("dataeng.item") && typeof evt.data.index === "number") {
+    const title = evt.message.replace(/^\[\d+\/\d+\]\s*/, "");
+    return `Cleaning ${evt.data.index}/${evt.data.total}${title ? ` · ${title}` : ""}`;
+  }
+  if (evt.stage === "dataeng") return "Processing…";
+  if (evt.stage.startsWith("discover")) return "Searching…";
+  if (evt.stage === "refine") return "Refining…";
+  return "Working…";
+}
 
 export function TopBar() {
   const d = useWtafData();
-  const { refresh } = useWtaf();
+  const { discover } = useWtaf();
   const [tickers, setTickers] = useState<TickerItem[]>(d.ticker);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<DiscoveryStatus | null>(null);
 
   const addTicker = (e: FormEvent) => {
     e.preventDefault();
@@ -26,16 +41,35 @@ export function TopBar() {
     }
     setQuery("");
 
-    // Live mode: treat the input as a discovery topic — ingest it, then refresh
-    // so the adapter repopulates Sources / Trackers / Watchlist from real items.
+    // Live mode: treat the input as a discovery topic. The provider's `discover`
+    // streams the ingest (cards show per-region loaders via `discovering`) then
+    // refetches the snapshot; here we drive the topbar badge + final outcome.
     if (!USE_MOCK) {
       setBusy(true);
-      discoverAndProcess(topic)
-        .then(() => refresh())
-        .catch((err) => console.warn("[wtaf] discovery failed:", err))
+      setStatus({ tone: "info", text: "Refining…" });
+      discover(topic, (evt) => setStatus({ tone: "info", text: progressLabel(evt) }))
+        .then((report) => {
+          const persisted = report.persisted ?? 0;
+          const failed = report.failed ?? 0;
+          if (persisted > 0) {
+            setStatus({ tone: failed > 0 ? "warn" : "ok", text: `Stored ${persisted}${failed > 0 ? ` · ${failed} dropped` : ""}` });
+          } else {
+            setStatus({ tone: "warn", text: failed > 0 ? `Nothing stored · ${failed} dropped` : "No new sources found" });
+          }
+        })
+        .catch((err) => {
+          console.warn("[wtaf] discovery failed:", err);
+          setStatus({ tone: "err", text: "Discovery failed" });
+        })
         .finally(() => setBusy(false));
     }
   };
+
+  const statusColor =
+    status?.tone === "ok" ? "var(--green, #34d399)"
+    : status?.tone === "err" ? "var(--red, #f87171)"
+    : status?.tone === "info" ? "var(--blue-bright, #60a5fa)"
+    : "var(--amber, #fbbf24)";
 
   return (
     <header style={{ height: 56, flexShrink: 0, display: "flex", alignItems: "center", gap: 16, padding: "0 20px", borderBottom: "1px solid var(--stroke)", background: "rgba(10,12,18,0.45)", backdropFilter: "blur(12px)", zIndex: 4 }}>
@@ -67,6 +101,13 @@ export function TopBar() {
         </div>
         <button type="submit" disabled={busy} title={USE_MOCK ? "Add ticker" : "Discover topic"} style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "color-mix(in oklch, var(--blue) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--blue) 45%, transparent)", color: "var(--blue-bright)", fontSize: 16, lineHeight: 1, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "+"}</button>
       </form>
+
+      {/* Discovery outcome — DataEngReport persisted/failed, or an error. */}
+      {!USE_MOCK && status && (
+        <span className="mono" role="status" style={{ fontSize: 11, color: statusColor, flexShrink: 0, whiteSpace: "nowrap" }}>
+          {status.text}
+        </span>
+      )}
 
       {/* push datetime to the right */}
       <div style={{ flex: 1 }} />

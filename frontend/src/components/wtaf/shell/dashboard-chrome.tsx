@@ -15,7 +15,9 @@ import { LoadingScreen, ErrorScreen } from "./status-screen";
 function Shell({ children }: { children: ReactNode }) {
   const { data, loading, error, refresh } = useWtaf();
 
-  if (loading) return <LoadingScreen />;
+  // Full-screen loader only on the initial load (no data yet). Refresh/discovery
+  // keep the dashboard mounted so cards can show per-region loaders instead.
+  if (loading && !data) return <LoadingScreen />;
   if (error || !data) return <ErrorScreen message={error?.message ?? "No data"} onRetry={refresh} />;
 
   return (

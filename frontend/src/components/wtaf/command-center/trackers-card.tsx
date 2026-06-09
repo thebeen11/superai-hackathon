@@ -6,13 +6,17 @@ import { Card, Spark, EmptyState } from "../primitives";
 export function TrackersCard({
   trackers,
   onOpenContext,
+  discovering = false,
 }: {
   trackers: Tracker[];
   onOpenContext: (trackerName: string) => void;
+  discovering?: boolean;
 }) {
   const toneC: Record<string, string> = { up: "var(--up)", down: "var(--down)", flat: "var(--t-lo)" };
+  const isEmpty = trackers.length === 0;
   return (
     <Card title="Concept Trackers" sub={`${trackers.length}/15 active`} className="span6"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}
       action={<Link href="/signals" style={{ fontSize: 11, color: "var(--blue-bright)" }}>Open terminal →</Link>}>
       {trackers.length === 0 ? (
         <EmptyState label="No concept trackers yet" sub="Run a discovery to surface themes" />

@@ -1,6 +1,6 @@
 "use client";
 /* ============ WTAF — Command Center (container) ============ */
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { useShellActions } from "@/providers/shell-ui-provider";
 import { CouncilCard } from "./council-card";
 import { BriefingCard } from "./briefing-card";
@@ -12,21 +12,22 @@ import { ThemesCard } from "./themes-card";
 
 export function CommandCenter() {
   const d = useWtafData();
+  const { discovering } = useWtaf();
   const actions = useShellActions();
   const chairman = d.tiers.find((t) => t.key === "chairman")?.squad[0] ?? d.agents[0];
 
   return (
     <div className="grid12">
-      {/* Promoted to top */}
-      <ThemesCard themes={d.themes} onOpenDebate={actions.onOpenDebate} />
+      {/* Promoted to top — themes are backend-backed (Layers 1–2) */}
+      <ThemesCard themes={d.themes} onOpenDebate={actions.onOpenDebate} discovering={discovering} />
       <CatalystsCard catalysts={d.catalysts} />
       <DebateCard debate={d.debate} tiers={d.tiers} onOpenDebate={actions.onOpenDebate} />
 
-      {/* Council & analysis */}
+      {/* Council & analysis — sentiment & trackers are backend-backed */}
       <CouncilCard tiers={d.tiers} onOpenAgent={actions.onOpenAgent} />
       <BriefingCard briefing={d.briefing} chairman={chairman} />
-      <SentimentCard sentiment={d.sentiment} />
-      <TrackersCard trackers={d.trackers} onOpenContext={actions.onOpenContext} />
+      <SentimentCard sentiment={d.sentiment} discovering={discovering} />
+      <TrackersCard trackers={d.trackers} onOpenContext={actions.onOpenContext} discovering={discovering} />
     </div>
   );
 }

@@ -2,10 +2,12 @@
 import type { Sentiment } from "@/lib/types";
 import { Card, Spark } from "../primitives";
 
-export function SentimentCard({ sentiment }: { sentiment: Sentiment }) {
+export function SentimentCard({ sentiment, discovering = false }: { sentiment: Sentiment; discovering?: boolean }) {
   const s = sentiment;
+  const isEmpty = s.wave.length === 0;
   return (
-    <Card title="Market Sentiment" sub="aggregate · 14 sources" className="span4">
+    <Card title="Market Sentiment" sub="aggregate · 14 sources" className="span4"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 6, gap: 8 }}>
         <div style={{ flexShrink: 0 }}>
           <div className="display" style={{ fontSize: 23, fontWeight: 600, color: "var(--up)", whiteSpace: "nowrap" }}>{s.mood}</div>
