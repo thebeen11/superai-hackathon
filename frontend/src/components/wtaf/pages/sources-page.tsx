@@ -1,15 +1,15 @@
 "use client";
-/* ============ RAIJIN — Sources & Prediction Ledger ============ */
+/* ============ WTAF — Sources & Prediction Ledger ============ */
 import { useState } from "react";
-import { useRaijinData } from "@/providers/raijin-provider";
-import { setSourceLive } from "@/lib/api/raijin";
+import { useWtafData } from "@/providers/wtaf-provider";
+import { setSourceLive } from "@/lib/api/wtaf";
 import { Card } from "../primitives";
 import { PageHead } from "../shared";
 import { SignalVolumeCard } from "../command-center/signal-volume-card";
 import { SystemCard } from "../command-center/system-card";
 
 export function SourcesPage() {
-  const d = useRaijinData();
+  const d = useWtafData();
   const [sources, setSources] = useState(d.sources);
 
   const toggle = (name: string, next: boolean) => {

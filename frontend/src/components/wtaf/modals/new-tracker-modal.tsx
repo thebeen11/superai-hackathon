@@ -1,11 +1,11 @@
 "use client";
 import { useState } from "react";
-import { useRaijinData } from "@/providers/raijin-provider";
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Field } from "../shared";
 import { Modal } from "./modal";
 
 export function NewTrackerModal({ onClose }: { onClose: () => void }) {
-  const d = useRaijinData();
+  const d = useWtafData();
   const [mode, setMode] = useState("forward");
   const [chans, setChans] = useState<string[]>(["Silicon Signal", "Macro Lens"]);
   const allChans = d.sources.filter((s) => s.kind === "YouTube" || s.kind === "Podcast" || s.kind === "RSS").map((s) => s.name);

@@ -1,10 +1,10 @@
 "use client";
 /**
- * RaijinProvider — loads the dashboard snapshot once and exposes it via context.
+ * WtafProvider — loads the dashboard snapshot once and exposes it via context.
  *
- * Components read their data slice with `useRaijinData()` (guaranteed non-null,
+ * Components read their data slice with `useWtafData()` (guaranteed non-null,
  * because the shell only mounts children after the snapshot has loaded).
- * `useRaijin()` exposes the raw async state for the loading gate.
+ * `useWtaf()` exposes the raw async state for the loading gate.
  */
 import {
   createContext,
@@ -14,20 +14,20 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { RaijinData } from "@/lib/types";
-import { getSnapshot } from "@/lib/api/raijin";
+import type { WtafData } from "@/lib/types";
+import { getSnapshot } from "@/lib/api/wtaf";
 
-interface RaijinState {
-  data: RaijinData | null;
+interface WtafState {
+  data: WtafData | null;
   loading: boolean;
   error: Error | null;
   refresh: () => void;
 }
 
-const RaijinContext = createContext<RaijinState | null>(null);
+const WtafContext = createContext<WtafState | null>(null);
 
-export function RaijinProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<RaijinData | null>(null);
+export function WtafProvider({ children }: { children: ReactNode }) {
+  const [data, setData] = useState<WtafData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -54,22 +54,22 @@ export function RaijinProvider({ children }: { children: ReactNode }) {
   }, [fetchData]);
 
   return (
-    <RaijinContext.Provider value={{ data, loading, error, refresh }}>
+    <WtafContext.Provider value={{ data, loading, error, refresh }}>
       {children}
-    </RaijinContext.Provider>
+    </WtafContext.Provider>
   );
 }
 
 /** Raw async state — for the loading/error gate. */
-export function useRaijin(): RaijinState {
-  const ctx = useContext(RaijinContext);
-  if (!ctx) throw new Error("useRaijin must be used within <RaijinProvider>");
+export function useWtaf(): WtafState {
+  const ctx = useContext(WtafContext);
+  if (!ctx) throw new Error("useWtaf must be used within <WtafProvider>");
   return ctx;
 }
 
 /** Loaded snapshot — safe to call from any component rendered past the gate. */
-export function useRaijinData(): RaijinData {
-  const { data } = useRaijin();
-  if (!data) throw new Error("Raijin data accessed before it finished loading");
+export function useWtafData(): WtafData {
+  const { data } = useWtaf();
+  if (!data) throw new Error("Wtaf data accessed before it finished loading");
   return data;
 }

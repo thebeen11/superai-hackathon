@@ -1,5 +1,5 @@
 "use client";
-/* ============ RAIJIN — agent council ============ */
+/* ============ WTAF — agent council ============ */
 import type { ReactNode } from "react";
 import type { Agent, PipelineStage, Tier } from "@/lib/types";
 import { ACCENTS, STATE_TONE } from "./accents";

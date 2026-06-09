@@ -1,12 +1,12 @@
 "use client";
-/* ============ RAIJIN — Signal & Tracker Terminal ============ */
+/* ============ WTAF — Signal & Tracker Terminal ============ */
 import { useState } from "react";
-import type { RaijinData } from "@/lib/types";
-import { useRaijinData } from "@/providers/raijin-provider";
+import type { WtafData } from "@/lib/types";
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Card, Spark } from "../primitives";
 import { PageHead, Stat } from "../shared";
 
-function Heatmap({ d }: { d: RaijinData }) {
+function Heatmap({ d }: { d: WtafData }) {
   const weeks = 8;
   const cellColor = (s: number) => {
     if (s > 0.05) return `color-mix(in oklch, var(--up) ${Math.min(85, 30 + s * 70)}%, transparent)`;
@@ -43,7 +43,7 @@ export function SignalTerminal({
   onOpenContext: (trackerName: string) => void;
   onNewTracker: () => void;
 }) {
-  const d = useRaijinData();
+  const d = useWtafData();
   const [sel, setSel] = useState(0);
   const t = d.trackers[sel];
   const toneC: Record<string, string> = { up: "var(--up)", down: "var(--down)", flat: "var(--blue)" };

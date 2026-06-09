@@ -1,12 +1,12 @@
-/* ============ RAIJIN — mock data layer ============ */
-import type { RaijinData } from "./types";
+/* ============ WTAF — mock data layer ============ */
+import type { WtafData } from "./types";
 
 const sentimentWave = [
   0.42, 0.45, 0.5, 0.58, 0.55, 0.6, 0.72, 0.68, 0.74, 0.82, 0.78, 0.7, 0.66,
   0.71, 0.79, 0.86, 0.8, 0.74,
 ];
 
-export const raijinMock: RaijinData = {
+export const wtafMock: WtafData = {
   now: "FRI 09 JUN 2026 · 14:21 ET",
   marketOpen: true,
 

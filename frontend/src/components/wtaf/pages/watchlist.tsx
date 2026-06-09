@@ -1,14 +1,14 @@
 "use client";
-/* ============ RAIJIN — Watchlist (standalone page) ============ */
+/* ============ WTAF — Watchlist (standalone page) ============ */
 import { useState } from "react";
 import type { WatchItem } from "@/lib/types";
-import { useRaijinData } from "@/providers/raijin-provider";
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Card, MiniBar } from "../primitives";
 import { PageHead } from "../shared";
 import { DebateCard } from "../command-center/debate-card";
 
 export function WatchlistPage({ onOpenDebate }: { onOpenDebate: () => void }) {
-  const d = useRaijinData();
+  const d = useWtafData();
   const [selected, setSelected] = useState<WatchItem | null>(null);
 
   if (selected) {
@@ -43,7 +43,7 @@ export function WatchlistPage({ onOpenDebate }: { onOpenDebate: () => void }) {
 }
 
 function TickerDetail({ item, onBack, onOpenDebate }: { item: WatchItem; onBack: () => void; onOpenDebate: () => void }) {
-  const d = useRaijinData();
+  const d = useWtafData();
   return (
     <div>
       <PageHead

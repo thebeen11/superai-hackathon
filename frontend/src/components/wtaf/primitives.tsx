@@ -1,5 +1,5 @@
 "use client";
-/* ============ RAIJIN — primitives ============ */
+/* ============ WTAF — primitives ============ */
 import { useState, useEffect, useRef, useId, type ReactNode, type CSSProperties } from "react";
 import type { AccentKey, SignalBar, TickerItem } from "@/lib/types";
 import { ACCENTS } from "./accents";

@@ -2,10 +2,10 @@
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import type { TickerItem } from "@/lib/types";
-import { useRaijinData } from "@/providers/raijin-provider";
+import { useWtafData } from "@/providers/wtaf-provider";
 
 export function TopBar() {
-  const d = useRaijinData();
+  const d = useWtafData();
   const [tickers, setTickers] = useState<TickerItem[]>(d.ticker);
   const [query, setQuery] = useState("");
 

@@ -1,4 +1,4 @@
-/* ============ RAIJIN — domain types ============ */
+/* ============ WTAF — domain types ============ */
 
 export type AccentKey = "blue" | "indigo" | "orange" | "green" | "red" | "amber" | "chair";
 export type AgentStatus = "active" | "thinking" | "idle";
@@ -203,7 +203,7 @@ export interface Source {
   items: number;
 }
 
-export interface RaijinData {
+export interface WtafData {
   now: string;
   marketOpen: boolean;
   ace: Ace;

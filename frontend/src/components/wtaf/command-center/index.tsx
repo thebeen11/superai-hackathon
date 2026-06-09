@@ -1,6 +1,6 @@
 "use client";
-/* ============ RAIJIN — Command Center (container) ============ */
-import { useRaijinData } from "@/providers/raijin-provider";
+/* ============ WTAF — Command Center (container) ============ */
+import { useWtafData } from "@/providers/wtaf-provider";
 import type { ShellActions } from "../shared";
 import { CouncilCard } from "./council-card";
 import { BriefingCard } from "./briefing-card";
@@ -11,7 +11,7 @@ import { DebateCard } from "./debate-card";
 import { ThemesCard } from "./themes-card";
 
 export function CommandCenter({ actions }: { actions: ShellActions }) {
-  const d = useRaijinData();
+  const d = useWtafData();
   const chairman = d.tiers.find((t) => t.key === "chairman")?.squad[0] ?? d.agents[0];
 
   return (

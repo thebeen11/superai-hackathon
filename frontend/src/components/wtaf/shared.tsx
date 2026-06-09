@@ -1,5 +1,5 @@
 "use client";
-/* ============ RAIJIN — small shared building blocks ============ */
+/* ============ WTAF — small shared building blocks ============ */
 import type { ReactNode } from "react";
 
 export function PageHead({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) {
