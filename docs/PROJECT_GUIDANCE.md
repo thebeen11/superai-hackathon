@@ -1,4 +1,4 @@
-# Project Raijin — Hedge Fund AI Agent Council
+# Hedge Fund AI Agent Council
 
 > **Project guidance** distilled from the planning conversation. This is the single
 > source of truth for what we're building, why, and how the pieces fit together.
@@ -21,6 +21,7 @@ Two research approaches must be supported:
 **Scope (v1):** US public equities only.
 
 **End outcome:**
+
 1. A dashboard monitoring financial-health indicators.
 2. Portfolio **themes** of recommendations (e.g. AI data-centre buildout, banking,
    space, advanced materials) + the individual stocks under each theme.
@@ -34,12 +35,12 @@ Two research approaches must be supported:
 A pipeline of four asynchronous agents. The user is the **"Commander"** — they set
 parameters and read outputs; the agents do the work in the background.
 
-| Agent | Role | One-liner |
-|-------|------|-----------|
-| **Wilfred** | Data Analyst / Scout | Discover & ingest raw data (YouTube, web, RSS, SEC) |
-| **Timo** | Data Engineer / Purifier | Clean, normalize, chunk & embed transcripts |
-| **Andie** | Hedge Fund Analyst / Brain | Score indicators, track signals, derive predictions |
-| **Freddy** | Hedge Fund Manager / Allocator | Synthesize, build themes, backtest, report |
+| Agent       | Role                           | One-liner                                           |
+| ----------- | ------------------------------ | --------------------------------------------------- |
+| **Wilfred** | Data Analyst / Scout           | Discover & ingest raw data (YouTube, web, RSS, SEC) |
+| **Timo**    | Data Engineer / Purifier       | Clean, normalize, chunk & embed transcripts         |
+| **Andie**   | Hedge Fund Analyst / Brain     | Score indicators, track signals, derive predictions |
+| **Freddy**  | Hedge Fund Manager / Allocator | Synthesize, build themes, backtest, report          |
 
 ### Pipeline
 
@@ -76,6 +77,7 @@ parameters and read outputs; the agents do the work in the background.
 ```
 
 ### Triggering model
+
 - **Wilfred & Timo** → Cron jobs (time-based, continuous background).
 - **Andie** → Event-driven (fires when Timo writes a new clean transcript).
 - **Freddy** → User action (login / backtest request) **and** Cron (weekly Friday thesis).
@@ -88,6 +90,7 @@ These map to `.md` system-prompt / config files per agent. Personality matters �
 shapes the system prompt.
 
 ### 3.1 Wilfred — The Tireless Hunter (`/agents/wilfred_scout.md`)
+
 **Persona:** Relentless, hyper-organized data-acquisition scout. Does NOT analyze —
 only fetches, transcribes, and routes pristine raw data into the pipeline.
 
@@ -95,6 +98,7 @@ only fetches, transcribes, and routes pristine raw data into the pipeline.
 `Playwright` (headless, paywall auth), `SEC_EDGAR_API`, `RSS_Feed_Parser`.
 
 **Skills:**
+
 - `skill_top_down_macro_scan` — poll macro channels/feeds every 60 min; emit webhook
   to Timo with `[URL, Source, Publish_Date, Raw_Text/Audio]`.
 - `skill_bottom_up_watchlist_monitor` — per-ticker Google News + SEC Edgar queries.
@@ -102,6 +106,7 @@ only fetches, transcribes, and routes pristine raw data into the pipeline.
   scrape subscriber-only articles.
 
 ### 3.2 Timo — The Obsessive Cleaner (`/agents/timo_purifier.md`)
+
 **Persona:** Ruthless data engineer. Despises noise/fluff. Bad data = losing trades.
 
 **Tools:** `SponsorBlock_API`, `spaCy` + `FinBERT_NER`,
@@ -109,6 +114,7 @@ only fetches, transcribes, and routes pristine raw data into the pipeline.
 `OpenAI text-embedding-3-small`, `Pinecone` / `Milvus`.
 
 **Skills:**
+
 - `skill_noise_redaction` — drop ad reads / filler ("use promo code", "smash like").
 - `skill_entity_resolution` — `["Zuck","Meta","FB","Facebook"] → $META`;
   `["Powell","J-Pow","The Fed","FOMC"] → Federal_Reserve`.
@@ -116,6 +122,7 @@ only fetches, transcribes, and routes pristine raw data into the pipeline.
   `{channel, date, timestamp_start, tickers_mentioned[]}`.
 
 ### 3.3 Andie — The Skeptical Brain (`/agents/andie_analyst.md`)
+
 **Persona:** Skeptical, objective, deeply analytical. Derives 2nd/3rd-order outcomes.
 Strictly follows the Commander's rubrics. Requires evidence for every claim.
 
@@ -123,6 +130,7 @@ Strictly follows the Commander's rubrics. Requires evidence for every claim.
 `Vector_DB_Query_Engine`.
 
 **Skills:**
+
 - `skill_semantic_keyword_tracker` — semantic (not literal) match for tracked phrases;
   count, filter by channel, output time-series JSON.
 - `skill_rubric_indicator_scoring` — score chunk vs user indicator. Output:
@@ -132,6 +140,7 @@ Strictly follows the Commander's rubrics. Requires evidence for every claim.
 - `skill_n_order_thinking` — `If X → Y impacted → Action Z required` decision trees.
 
 ### 3.4 Freddy — The Cold Allocator (`/agents/freddy_manager.md`)
+
 **Persona:** Decisive, risk-aware, focused on actionable alpha. No waffling — speaks
 in strategies, timelines, and quantitative backtests.
 
@@ -139,6 +148,7 @@ in strategies, timelines, and quantitative backtests.
 `Markdown_Reporting_Engine`.
 
 **Skills:**
+
 - `skill_ace_index_calculator` — compute normalized ACE composite (see §5).
 - `skill_portfolio_theme_generator` — group 3–5 correlated stocks into a basket with
   Strategy, Risk, Timeline (short/med/long).
@@ -152,6 +162,7 @@ in strategies, timelines, and quantitative backtests.
 ## 4. Core Features
 
 ### 4.1 Semantic Keyword & Concept Tracker
+
 - Track the **meaning** of a phrase (e.g. "AI bubble collapse" also matches
   "tech valuations are unsustainable"), not literal string matching.
 - Channel-level only (no single-transcript tracking — isolated datapoints are
@@ -162,6 +173,7 @@ in strategies, timelines, and quantitative backtests.
 - Start mode: **track forward-only** OR **run historically** across past transcripts.
 
 ### 4.2 Signal / Indicator Generator (Rubric Engine)
+
 User defines indicators + rubrics; Andie grades every transcript.
 
 Example indicators: Macroeconomic Outlook, Inflation Trajectory, Interest Rate Policy,
@@ -171,6 +183,7 @@ Market Sentiment, Sector Trends, Geopolitical Risk.
 - **Must include evidence** (quotes/facts + source timestamp).
 
 ### 4.3 Insight Generator
+
 - **Predictions** — special insights resolvable True/False after a time window
   (timing matters; user marks or auto-resolves). Track accuracy → **Prediction Ledger**
   leaderboard ranking which channels/analysts are most accurate (Brier-score style).
@@ -207,20 +220,24 @@ class CompositeSignalGenerator:
 ## 6. User Flows
 
 ### Flow 1 — Cold Start (configuration)
+
 1. **Agent Management & Sources:** add YouTube channel / video / web / RSS →
    Wilfred validates, fetches metadata, queues ingestion.
 2. **Watchlist (Bottom-Up):** import US tickers → Timo maps to entity-resolution dict.
 
 ### Flow 2 — Create a Signal/Tracker
+
 - Fork: **Concept/Keyword Tracker** (phrase + target channels + historical/forward
   toggle) **or** **Custom Indicator Rubric** (name + rubric definition).
 
 ### Flow 3 — Daily Consumption Loop (< 5 min)
+
 1. **Command Center:** Freddy's 3-bullet daily briefing + watchlist alerts.
 2. Tracker graphs (max 15) → hover a spike → click → **Context Preview** modal →
    "Go to Source" opens YouTube at exact `HH:MM:SS`.
 
 ### Flow 4 — Insight & Backtesting
+
 1. **Investment Thesis page:** generated portfolio themes (strategy, stocks, risk,
    timeline).
 2. **Backtest Sandbox:** set "$10k invested N months ago" → Freddy pulls historical
@@ -243,16 +260,16 @@ class CompositeSignalGenerator:
 
 ## 8. Tech Stack
 
-| Layer | Choice |
-|-------|--------|
-| Orchestration | LangGraph / Microsoft AutoGen (state graph, avoid infinite loops) |
-| Reasoning LLM | Claude Sonnet / GPT-4o (Andie, Freddy) |
-| Cheap bulk LLM | Llama-3 8B (Timo's high-volume cleaning) |
-| Relational DB | Supabase / PostgreSQL (users, keywords, predictions) |
-| Vector DB | Pinecone (transcript embeddings) |
-| Frontend | Next.js + TailwindCSS + Tremor.so (financial charts) |
-| Jobs/Compute | Celery + Redis or Inngest (async long-video processing) |
-| Market data | Polygon.io / YFinance |
+| Layer          | Choice                                                            |
+| -------------- | ----------------------------------------------------------------- |
+| Orchestration  | LangGraph / Microsoft AutoGen (state graph, avoid infinite loops) |
+| Reasoning LLM  | Claude Sonnet / GPT-4o (Andie, Freddy)                            |
+| Cheap bulk LLM | Llama-3 8B (Timo's high-volume cleaning)                          |
+| Relational DB  | Supabase / PostgreSQL (users, keywords, predictions)              |
+| Vector DB      | Pinecone (transcript embeddings)                                  |
+| Frontend       | Next.js + TailwindCSS + Tremor.so (financial charts)              |
+| Jobs/Compute   | Celery + Redis or Inngest (async long-video processing)           |
+| Market data    | Polygon.io / YFinance                                             |
 
 > This repo: `backend/` (Python) + `frontend/` (Next.js + TypeScript).
 
