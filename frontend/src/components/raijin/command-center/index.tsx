@@ -11,16 +11,17 @@ import { SignalVolumeCard } from "./signal-volume-card";
 import { TrackersCard } from "./trackers-card";
 import { SystemCard } from "./system-card";
 import { CatalystsCard } from "./catalysts-card";
+import { DebateCard } from "./debate-card";
 import { ThemesCard } from "./themes-card";
 
 export function CommandCenter({ actions }: { actions: ShellActions }) {
   const d = useRaijinData();
-  const freddy = d.agents.find((a) => a.id === "freddy") ?? d.agents[0];
+  const chairman = d.tiers.find((t) => t.key === "chairman")?.squad[0] ?? d.agents[0];
 
   return (
     <div className="grid12">
-      <CouncilCard agents={d.agents} pipeline={d.pipeline} onOpenAgent={actions.onOpenAgent} />
-      <BriefingCard briefing={d.briefing} freddy={freddy} />
+      <CouncilCard tiers={d.tiers} onOpenAgent={actions.onOpenAgent} />
+      <BriefingCard briefing={d.briefing} chairman={chairman} />
       <SentimentCard sentiment={d.sentiment} />
       <WatchlistCard watchlist={d.watchlist} />
       <ThesisQuickCard thesis={d.thesisCountdown} onNav={actions.onNav} onNewTracker={actions.onNewTracker} />
@@ -28,7 +29,8 @@ export function CommandCenter({ actions }: { actions: ShellActions }) {
       <TrackersCard trackers={d.trackers} onOpenContext={actions.onOpenContext} onNav={actions.onNav} />
       <SystemCard system={d.system} />
       <CatalystsCard catalysts={d.catalysts} />
-      <ThemesCard themes={d.themes} />
+      <DebateCard debate={d.debate} tiers={d.tiers} onOpenDebate={actions.onOpenDebate} />
+      <ThemesCard themes={d.themes} onOpenDebate={actions.onOpenDebate} />
     </div>
   );
 }

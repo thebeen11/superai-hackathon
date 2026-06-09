@@ -1,6 +1,6 @@
 /* ============ RAIJIN — domain types ============ */
 
-export type AccentKey = "blue" | "indigo" | "orange" | "green" | "red";
+export type AccentKey = "blue" | "indigo" | "orange" | "green" | "red" | "amber" | "chair";
 export type AgentStatus = "active" | "thinking" | "idle";
 export type PipelineState = "done" | "progress" | "pending";
 export type TrackerTone = "up" | "down" | "flat";
@@ -43,6 +43,45 @@ export interface Agent {
   tools: string[];
   skills: string[];
   log: string[];
+  /** Short label used in the tier/squad flow (e.g. "TMT", "Bull"). */
+  label?: string;
+}
+
+/* ---- 5-tier multi-agent system (fan-out → fan-in) ---- */
+export interface Tier {
+  n: number;
+  key: "discovery" | "routing" | "analysts" | "debate" | "chairman";
+  label: string;
+  sub: string;
+  accent: AccentKey;
+  status: AgentStatus;
+  statusText: string;
+  bypass?: boolean;
+  bypassIn?: boolean;
+  squad: Agent[];
+}
+
+/* ---- Tier 4: Bull vs Bear debate ---- */
+export interface DebateSide {
+  name: string;
+  model: string;
+  accent: AccentKey;
+  stance: string;
+}
+export interface DebateTurn {
+  who: "bull" | "bear" | "winston";
+  round: string;
+  label: string;
+  text: string;
+}
+export interface Debate {
+  topic: string;
+  round: number;
+  rounds: number;
+  bull: DebateSide;
+  bear: DebateSide;
+  verdict: string;
+  transcript: DebateTurn[];
 }
 
 export interface BriefingItem {
@@ -135,6 +174,9 @@ export interface Theme {
   stocks: string[];
   strat: string;
   conviction: number;
+  /** Chairman's verdict + hold period (Winston, fan-in). */
+  verdict?: string;
+  hold?: string;
 }
 
 export interface LedgerRow {
@@ -174,6 +216,8 @@ export interface RaijinData {
   ace: Ace;
   thesisCountdown: ThesisCountdown;
   agents: Agent[];
+  tiers: Tier[];
+  debate: Debate;
   briefing: BriefingItem[];
   watchlist: WatchItem[];
   ticker: TickerItem[];

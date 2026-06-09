@@ -3,13 +3,13 @@ import type { Agent, BriefingItem } from "@/lib/types";
 import { Card } from "../primitives";
 import { AgentAvatar } from "../agents";
 
-export function BriefingCard({ briefing, freddy }: { briefing: BriefingItem[]; freddy: Agent }) {
+export function BriefingCard({ briefing, chairman }: { briefing: BriefingItem[]; chairman: Agent }) {
   const toneColor: Record<string, string> = { up: "var(--up)", down: "var(--down)", neutral: "var(--amber)" };
   return (
-    <Card title="Daily Briefing" sub="60-sec read" className="span3">
+    <Card title="Chairman’s Briefing" sub="60-sec read" className="span3">
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
-        <AgentAvatar a={freddy} size={28} />
-        <div style={{ fontSize: 11.5, color: "var(--t-mid)" }}>Freddy · <span style={{ color: "var(--t-lo)" }}>allocator</span></div>
+        <AgentAvatar a={chairman} size={28} />
+        <div style={{ fontSize: 11.5, color: "var(--t-mid)" }}>Winston · <span style={{ color: "var(--t-lo)" }}>chairman</span></div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {briefing.map((b, i) => (

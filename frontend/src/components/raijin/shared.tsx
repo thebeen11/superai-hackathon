@@ -41,4 +41,5 @@ export interface ShellActions {
   onOpenAgent: (agentId: string) => void;
   onOpenContext: (trackerName: string) => void;
   onNewTracker: () => void;
+  onOpenDebate: () => void;
 }

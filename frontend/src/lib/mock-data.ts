@@ -116,6 +116,64 @@ export const raijinMock: RaijinData = {
     },
   ],
 
+  // ---- 5-tier Multi-Agent System (MapReduce fan-out → fan-in) ----
+  tiers: [
+    {
+      n: 1, key: "discovery", label: "Discovery", sub: "fan-out · per channel", accent: "blue",
+      status: "active", statusText: "14 sources syncing",
+      squad: [
+        { id: "wilfred-video", name: "Wilfred-Video", label: "Video", glyph: "WV", accent: "blue", role: "Discovery · YouTube / Audio", status: "active", statusText: "Transcribing 3 videos", queue: 4, throughput: "128 min/hr", tools: ["yt-dlp", "Whisper", "SponsorBlock"], skills: ["Audio ingestion", "Ad-read stripping", "Channel heartbeat"], log: ["Fetched 2 videos · Silicon Signal", "Whisper · 42 min transcribed", "SponsorBlock · 4 ads cut"] },
+        { id: "wilfred-news", name: "Wilfred-News", label: "News", glyph: "WN", accent: "blue", role: "Discovery · Google / RSS", status: "active", statusText: "Polling 22 RSS feeds", queue: 6, throughput: "90 items/hr", tools: ["Google SERP", "RSS parsers", "Programmable Search"], skills: ["Headline scan", "Dedup & cluster", "Top-down macro sweep"], log: ["RSS poll · 11 new items", 'SERP · "Fed Sept cut" trending', "Clustered 6 duplicates"] },
+        { id: "wilfred-premium", name: "Wilfred-Premium", label: "Premium", glyph: "WP", accent: "blue", role: "Discovery · Barron’s / WSJ", status: "thinking", statusText: "Auth Barron’s session", queue: 2, throughput: "40 art/hr", tools: ["Playwright", "Proxy rotation", "Anti-bot evasion"], skills: ["Paywall auth", "Columnist tracking", "Fault isolation"], log: ["Authenticated WSJ", "Pulled 2 Barron’s columns", "Proxy rotated · 1 retry"] },
+      ],
+    },
+    {
+      n: 2, key: "routing", label: "Engineering & Routing", sub: "Timo · semantic router", accent: "indigo",
+      status: "active", statusText: "Tagging 312 chunks", bypass: true,
+      squad: [
+        { id: "timo", name: "Timo", label: "Router", glyph: "T", accent: "indigo", role: "Data Engineer · Semantic Router", status: "active", statusText: "Routing 312 chunks", queue: 312, throughput: "1.2k chunks/hr", tools: ["Llama-3 8B", "FinBERT NER", "Pinecone"], skills: ["MACRO / MICRO / INDUSTRY tagging", "Watchlist sector routing", "Time-decay TTL stamping", "Macro bypass → Winston"], log: ["Tagged 188 MICRO · 74 MACRO", "Routed AAPL supply-chain → Andie-Tech", "MACRO → Winston (bypass)"] },
+      ],
+    },
+    {
+      n: 3, key: "analysts", label: "Sector Analysts", sub: "fan-out · 20 stocks each", accent: "orange",
+      status: "thinking", statusText: "3 desk notes scoring",
+      squad: [
+        { id: "andie-tech", name: "Andie-Tech", label: "TMT", glyph: "AT", accent: "orange", role: "Analyst · TMT (semis, software)", status: "thinking", statusText: "Scoring semis capex", queue: 20, throughput: "48 scores/hr", tools: ["Claude Sonnet", "Vector Query", "JSON Schema"], skills: ["Capex sensitivity", "Supply-chain reads", "Catalyst notes"], log: ["NVDA · DC re-accel flagged", "VRT · 3 power mentions", "Drafted TMT highlights note"] },
+        { id: "andie-physical", name: "Andie-Physical", label: "Energy", glyph: "AP", accent: "orange", role: "Analyst · Energy / Industrials / Materials", status: "active", statusText: "Grading power demand", queue: 20, throughput: "44 scores/hr", tools: ["Claude Sonnet", "Vector Query", "JSON Schema"], skills: ["Commodity reads", "Grid-load sensitivity", "Regulation tracking"], log: ["Power & cooling demand +19", "Copper deficit · industry tag", "Drafted Physical note"] },
+        { id: "andie-capital", name: "Andie-Capital", label: "Capital", glyph: "AC", accent: "orange", role: "Analyst · Financials / Consumer / RE", status: "idle", statusText: "Rate-sensitivity scan", queue: 20, throughput: "40 scores/hr", tools: ["Claude Sonnet", "Vector Query", "JSON Schema"], skills: ["Rate sensitivity", "Consumer credit reads", "Disinflation beneficiaries"], log: ["KRE · pivot beneficiary", "Consumer slowdown flat", "Drafted Capital note"] },
+      ],
+    },
+    {
+      n: 4, key: "debate", label: "Debate Chamber", sub: "adversarial · Bull vs Bear", accent: "amber",
+      status: "active", statusText: "Round 2 of 3",
+      squad: [
+        { id: "freddy-bull", name: "Freddy-Bull", label: "Bull", glyph: "↑", accent: "green", role: "PM · Momentum bias · Claude Sonnet", status: "active", statusText: "Defending long thesis", queue: 0, throughput: "round 3", tools: ["Claude Sonnet", "Backtrader"], skills: ["Momentum theses", "Long construction", "Capex narrative"], log: ["R1 · proposed Memory basket", "Cited Andie-Tech capex note", "R3 · defending MU long"] },
+        { id: "freddy-bear", name: "Freddy-Bear", label: "Bear", glyph: "↓", accent: "red", role: "PM · Risk bias · GPT-4o", status: "thinking", statusText: "Attacking valuation", queue: 0, throughput: "round 2", tools: ["GPT-4o", "Risk models"], skills: ["Risk attack", "Valuation critique", "Drawdown modeling"], log: ["R2 · MU overvalued", "Flagged capex slowdown H2", "Pushed half-position"] },
+      ],
+    },
+    {
+      n: 5, key: "chairman", label: "Chairman", sub: "fan-in · final judge", accent: "chair",
+      status: "thinking", statusText: "Weighing verdict", bypassIn: true,
+      squad: [
+        { id: "winston", name: "Winston", label: "Chairman", glyph: "♔", accent: "chair", role: "Chairman · Judge & Allocator", status: "thinking", statusText: "Weighing Bull/Bear verdict", queue: 1, throughput: "Fri 16:00", tools: ["Claude Opus", "Macro Vector DB", "Reporting"], skills: ["Debate adjudication", "ACE index weighting", "Final allocation & hold periods", "Macro-regime sanity check"], log: ["Read debate transcript", "MU → half position", "ACE weights · AI 40 / rates 30 / infl 30"] },
+      ],
+    },
+  ],
+
+  debate: {
+    topic: "Memory & AI-compute basket",
+    round: 2, rounds: 3,
+    bull: { name: "Freddy-Bull", model: "Claude Sonnet", accent: "green", stance: "Initiate 6-month long — MU, NVDA, AVGO ride the capex super-cycle; hyperscalers are power-constrained, not demand-constrained." },
+    bear: { name: "Freddy-Bear", model: "GPT-4o", accent: "red", stance: "MU looks overvalued — Andie-Tech notes capex slowing into H2. Size half, hedge with a cooling-supplier pair." },
+    verdict: "Bull thesis holds, but Bear’s valuation concern is valid — initiate a HALF position in MU, full weight in AVGO.",
+    transcript: [
+      { who: "bull", round: "R1", label: "Bull · proposes", text: "Across all three Andie desks the signal is one-directional: hyperscaler capex is going up, not down. I propose a Memory & AI-compute basket — MU, NVDA, AVGO — held ~6 months into the buildout." },
+      { who: "bear", round: "R2", label: "Bear · attacks", text: "MU is the weak link. Andie-Tech’s own note flags capex pacing slowing into H2, and memory is the most cyclical name in the basket. At this multiple you’re buying peak earnings. Half-size it." },
+      { who: "bull", round: "R3", label: "Bull · defends", text: "Fair on MU cyclicality — but AVGO’s custom-silicon backlog is contracted, not spot. I’ll concede a half-position on MU and keep AVGO at full weight; the power/cooling read from Andie-Physical de-risks the thesis." },
+      { who: "winston", round: "Verdict", label: "Winston · rules", text: "Bull’s structural thesis holds and is corroborated by the macro bypass — disinflation + dovish Fed = abundant capital (ACE +0.34). Bear’s MU caution is valid. Verdict: half MU, full AVGO, starter NVDA. Re-evaluate at the Sept CPI print." },
+    ],
+  },
+
   briefing: [
     {
       tone: "up",
@@ -127,7 +185,7 @@ export const raijinMock: RaijinData = {
     },
     {
       tone: "down",
-      text: "2 pending predictions resolve this week — semis seasonality bear case still unconfirmed.",
+      text: "Debate chamber split on memory — Winston ruled half-size MU on Bear’s valuation flag; 2 predictions resolve this week.",
     },
   ],
 
@@ -223,6 +281,8 @@ export const raijinMock: RaijinData = {
       stocks: ["NVDA", "AVGO", "VRT", "SMCI", "MSFT"],
       strat: "Own the power/cooling + compute supply chain feeding hyperscaler capex.",
       conviction: 0.82,
+      verdict: "Bull holds — full weight",
+      hold: "6–12M",
     },
     {
       name: "Disinflation Beneficiaries",
@@ -232,6 +292,8 @@ export const raijinMock: RaijinData = {
       stocks: ["XLF", "KRE", "IWM"],
       strat: "Rate-sensitive small caps & banks on a confirmed Fed pivot.",
       conviction: 0.61,
+      verdict: "Half-size — Bear rate risk",
+      hold: "6M",
     },
     {
       name: "Advanced Materials",
@@ -241,6 +303,8 @@ export const raijinMock: RaijinData = {
       stocks: ["MP", "ALB", "LAC"],
       strat: "Strategic minerals for grid + battery buildout. Volatile, policy-driven.",
       conviction: 0.48,
+      verdict: "Watch only — policy risk",
+      hold: "12M",
     },
   ],
 

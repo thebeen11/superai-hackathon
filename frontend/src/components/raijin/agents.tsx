@@ -1,16 +1,18 @@
 "use client";
 /* ============ RAIJIN — agent council ============ */
 import type { ReactNode } from "react";
-import type { Agent, PipelineStage } from "@/lib/types";
+import type { Agent, PipelineStage, Tier } from "@/lib/types";
 import { ACCENTS, STATE_TONE } from "./accents";
 import { Dot } from "./primitives";
 
 export function AgentAvatar({ a, size = 34 }: { a: Agent; size?: number }) {
   const ac = ACCENTS[a.accent] || ACCENTS.blue;
+  const txt = a.accent === "chair" ? "#16181f" : "#fff";
+  const glyphLen = (a.glyph || "").length;
   return (
     <div style={{
       width: size, height: size, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0,
-      fontFamily: "var(--font-display)", fontWeight: 700, fontSize: size * 0.42, color: "#fff",
+      fontFamily: "var(--font-display)", fontWeight: 700, fontSize: size * (glyphLen > 1 ? 0.34 : 0.44), color: txt,
       background: `linear-gradient(150deg, ${ac.g}, ${ac.c})`,
       boxShadow: `0 0 16px -4px ${ac.c}, inset 0 1px 0 rgba(255,255,255,0.3)`,
     }}>
@@ -141,6 +143,71 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent | null; onClose: 
           </div>
         </Section>
       </div>
+    </div>
+  );
+}
+
+/* ---- 5-tier squad flow (MapReduce fan-out → fan-in) ---- */
+function SquadMember({ a, onOpenAgent }: { a: Agent; onOpenAgent: (a: Agent) => void }) {
+  const tone = STATE_TONE[a.status] || "blue";
+  return (
+    <button onClick={() => onOpenAgent(a)} title={a.name + " · " + a.statusText}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "transparent", border: "none", padding: 0 }}>
+      <div style={{ position: "relative" }}>
+        <AgentAvatar a={a} size={30} />
+        <span style={{ position: "absolute", right: -2, bottom: -2, width: 9, height: 9, borderRadius: 99, background: ACCENTS[tone] ? ACCENTS[tone].c : tone, border: "2px solid var(--bg-1)", animation: a.status !== "idle" ? "pulse-dot 1.6s infinite" : "none" }} />
+      </div>
+      <span className="mono" style={{ fontSize: 9, color: "var(--t-lo)", whiteSpace: "nowrap" }}>{a.label}</span>
+    </button>
+  );
+}
+
+export function TierFlow({ tiers, onOpenAgent }: { tiers: Tier[]; onOpenAgent: (a: Agent) => void }) {
+  return (
+    <div style={{ position: "relative", paddingRight: 30 }}>
+      {/* macro bypass rail (Timo → Winston) lives in the reserved right gutter */}
+      <div style={{ position: "absolute", right: 6, top: 62, bottom: 54, width: 20, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 0, borderRight: "1.5px dashed color-mix(in oklch, var(--indigo) 60%, transparent)" }} />
+        <span style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)", fontSize: 11, color: "var(--indigo)" }}>↗</span>
+        <span style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", fontSize: 11, color: "var(--indigo)" }}>↘</span>
+        <span className="label-xs" style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%) rotate(180deg)", writingMode: "vertical-rl", fontSize: 7.5, color: "var(--indigo)", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>MACRO BYPASS</span>
+      </div>
+
+      {tiers.map((t, i) => {
+        const ac = ACCENTS[t.accent] || ACCENTS.blue;
+        const tone = STATE_TONE[t.status] || "blue";
+        return (
+          <div key={t.key}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: "grid", placeItems: "center", background: `color-mix(in oklch, ${ac.c} 14%, transparent)`, border: `1px solid color-mix(in oklch, ${ac.c} 45%, transparent)` }}>
+                <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: t.accent === "chair" ? "var(--t-hi)" : ac.c }}>T{t.n}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>{t.label}</span>
+                  {t.squad.length > 1 && <span className="chip" style={{ fontSize: 8.5, padding: "1px 5px" }}>×{t.squad.length}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                  <Dot tone={tone} pulse={t.status !== "idle"} />
+                  <span className="mono" style={{ fontSize: 10.5, color: "var(--t-lo)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.statusText}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexShrink: 0, paddingRight: 4 }}>
+                {t.squad.map((a) => (<SquadMember key={a.id} a={a} onOpenAgent={onOpenAgent} />))}
+              </div>
+            </div>
+            {i < tiers.length - 1 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, height: 14 }}>
+                <div style={{ width: 30, display: "grid", placeItems: "center" }}>
+                  <span style={{ width: 1.5, height: 14, background: "var(--stroke-hi)" }} />
+                </div>
+                <span className="mono" style={{ fontSize: 8.5, color: "var(--t-faint)", letterSpacing: "0.1em" }}>
+                  {t.n === 1 ? "fan-in → route" : t.n === 2 ? "fan-out → desks" : t.n === 3 ? "→ debate" : "fan-in → judge"}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

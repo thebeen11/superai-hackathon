@@ -13,6 +13,7 @@ import { TopBar } from "./shell/topbar";
 import { LoadingScreen, ErrorScreen } from "./shell/status-screen";
 import { ContextModal } from "./modals/context-modal";
 import { NewTrackerModal } from "./modals/new-tracker-modal";
+import { DebateModal } from "./modals/debate-modal";
 
 /** Inner shell — runs inside the provider, so it can read the snapshot. */
 function Shell() {
@@ -22,6 +23,7 @@ function Shell() {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [contextTracker, setContextTracker] = useState<string | null>(null);
   const [newTracker, setNewTracker] = useState(false);
+  const [debateOpen, setDebateOpen] = useState(false);
 
   const actions: ShellActions = useMemo(
     () => ({
@@ -29,6 +31,7 @@ function Shell() {
       onOpenAgent: setAgentId,
       onOpenContext: setContextTracker,
       onNewTracker: () => setNewTracker(true),
+      onOpenDebate: () => setDebateOpen(true),
     }),
     [],
   );
@@ -36,7 +39,9 @@ function Shell() {
   if (loading) return <LoadingScreen />;
   if (error || !data) return <ErrorScreen message={error?.message ?? "No data"} onRetry={refresh} />;
 
-  const agent = agentId ? data.agents.find((a) => a.id === agentId) ?? null : null;
+  // Agents live in both the legacy flat list and the 5-tier squads.
+  const allAgents = [...data.agents, ...data.tiers.flatMap((t) => t.squad)];
+  const agent = agentId ? allAgents.find((a) => a.id === agentId) ?? null : null;
 
   return (
     <div className="app-root" style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
@@ -53,6 +58,7 @@ function Shell() {
       {agent && <AgentDrawer agent={agent} onClose={() => setAgentId(null)} />}
       {contextTracker && <ContextModal trackerName={contextTracker} onClose={() => setContextTracker(null)} />}
       {newTracker && <NewTrackerModal onClose={() => setNewTracker(false)} />}
+      {debateOpen && <DebateModal debate={data.debate} onClose={() => setDebateOpen(false)} />}
     </div>
   );
 }
