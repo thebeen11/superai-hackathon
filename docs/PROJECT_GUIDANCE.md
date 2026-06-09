@@ -1,8 +1,26 @@
 # Hedge Fund AI Agent Council
 
+
 > **Project guidance** distilled from the planning conversation. This is the single
 > source of truth for **what** we're building and **why**. For the actionable build
 > order and milestones, see [`BUILD_PLAN.md`](./BUILD_PLAN.md).
+
+---
+
+## 0. Architecture Evolution (v1 → v2)
+
+The system evolved from a **4-agent linear council** into a **5-tier Multi-Agent
+System (MAS)**. The pattern is, formally:
+
+- **MapReduce / Fan-Out → Fan-In** — many specialist workers analyze in parallel, a
+  supervisor aggregates. (How a real hedge-fund analyst floor is structured: sector
+  desk analysts → portfolio manager → CIO.)
+- **Mixture of Experts (MoE)** — agents are domain-specialized, not generalists.
+- **Adversarial Reasoning (LLM Debate)** — a Bull and a Bear debate before a Chairman
+  judges, to defeat LLM **sycophancy** (the tendency to agree with whatever it's fed).
+
+The original four roles (Wilfred, Timo, Andie, Freddy) remain, but Wilfred/Andie/Freddy
+scale out into **squads**, and a new top tier — **Winston, the Chairman** — is added.
 
 ---
 
@@ -44,194 +62,200 @@ take-profit targets. Recommendations are expressed as:
 
 ---
 
-## 2. The Agent Council — a 5-Layer Hedge Fund Org
+## 2. The 5-Tier Agent Architecture
 
-Think of the system as a small hedge fund with five departments. Data flows **up**
-the hierarchy, and at Layer 2 it **forks** into two streams: **MACRO** (feeds the
-dashboard) and **MICRO** (feeds stock picks).
+The user is the **"Commander."** Agents do the work in the background as a strict
+pipeline (a DAG — see §6).
 
-```text
-                         DATA SOURCES
-              YouTube  ·  Google Search  ·  Barron's
-                              │
-        ┌─────────────────────┴─────────────────────┐
-        │  LAYER 1 — DISCOVERY  (3 Data Analysts)    │
-        │  Wilfred-YT · Wilfred-Web · Wilfred-Auth   │
-        │  + chats with HUMAN for new sources        │
-        │  + editable cron / sync schedule           │
-        └─────────────────────┬─────────────────────┘
-                              │  raw transcripts
-        ┌─────────────────────┴─────────────────────┐
-        │  LAYER 2 — DATA ENGINEERING  (Timo)        │
-        │  clean · label MACRO/MICRO/INDUSTRY        │
-        │  scan watchlist → assign THEMES            │
-        └──────────┬───────────────────┬────────────┘
-          MICRO    │                   │   MACRO
-        ┌──────────┴──────────┐        │
-        │ LAYER 3 — ANALYSTS  │        │
-        │ 3 pods × 20 cos = 60│        │
-        │ write highlights    │        │
-        └──────────┬──────────┘        │
-                   │ 60 reports        │
-        ┌──────────┴──────────┐        │
-        │ LAYER 4 — MANAGERS  │        │
-        │ 2–3 managers        │        │
-        │ thematic baskets +  │        │
-        │ holding period      │        │
-        │ LLM DEBATE × 3 rounds│       │
-        └──────────┬──────────┘        │
-                   │ verdict requests  │
-        ┌──────────┴───────────────────┴────────────┐
-        │  LAYER 5 — CHAIRMAN                         │
-        │  judge debates · build final portfolio     │
-        │  populate MACRO dashboard                  │
-        └─────────────────────┬──────────────────────┘
-                              │
-                       FRONTEND DASHBOARD
+| Tier  | Squad / Agent  | Role                                    | Fan |
+| ----- | -------------- | --------------------------------------- | --- |
+| **1** | **Wilfred** ×3 | Discovery / ingestion (per channel)     | OUT |
+| **2** | **Timo**       | Data engineer **& semantic router**     | 1   |
+| **3** | **Andie** ×3   | Sector analysts (20 stocks each)        | OUT |
+| **4** | **Freddy** ×2  | Portfolio managers — **debate chamber** | —   |
+| **5** | **Winston**    | **Chairman** — final judge & allocator  | IN  |
+
+### Workflow diagram (Mermaid)
+
+```mermaid
+graph TD
+    classDef user fill:#1e1e1e,stroke:#f5a623,color:#fff;
+    classDef discovery fill:#1a365d,stroke:#63b3ed,color:#fff;
+    classDef pipeline fill:#276749,stroke:#68d391,color:#fff;
+    classDef analyst fill:#702459,stroke:#f687b3,color:#fff;
+    classDef debate fill:#744210,stroke:#f6e05e,color:#fff;
+    classDef chairman fill:#000000,stroke:#ffffff,color:#fff;
+    classDef db fill:#2d3748,stroke:#a0aec0,color:#fff;
+
+    User((HUMAN COMMANDER)):::user
+    User <-->|Onboarding Chat & Setup| WilfredChat[Wilfred Chat UI: Sources & CRON]
+
+    subgraph T1[Tier 1: Discovery]
+        WilfredChat --> W1[Wilfred-Video<br>YouTube/Audio]:::discovery
+        WilfredChat --> W2[Wilfred-News<br>Google/RSS]:::discovery
+        WilfredChat --> W3[Wilfred-Premium<br>Barron's/WSJ]:::discovery
+    end
+
+    W1 & W2 & W3 -->|Raw Ingestion| RawDB[(Raw Data DB)]:::db
+    RawDB -.->|AIR GAP: local DB only, no internet| T1B[Timo]
+
+    subgraph T2[Tier 2: Data Engineering & Routing]
+        T1B[Timo - Data Engineer]:::pipeline
+        T1B -->|clean + classify| Tagging{Tagging & Routing Engine}
+        Tagging -->|MACRO| MacroDB[(Macro Vector DB)]:::db
+        Tagging -->|MICRO/INDUSTRY| MicroDB[(Micro Vector DB)]:::db
+    end
+
+    subgraph T3[Tier 3: Sector Analysts - 20 stocks each]
+        MicroDB -->|Tech| A1[Andie-Tech<br>TMT]:::analyst
+        MicroDB -->|Physical| A2[Andie-Physical<br>Energy/Materials]:::analyst
+        MicroDB -->|Capital| A3[Andie-Capital<br>Financials/Consumer]:::analyst
+        A1 & A2 & A3 --> SectorReports[3x Sector Insight Reports]
+    end
+
+    subgraph T4[Tier 4: Portfolio Managers - Debate]
+        SectorReports --> F1[Freddy-Bull<br>Momentum bias]:::debate
+        SectorReports --> F2[Freddy-Bear<br>Risk bias]:::debate
+        F1 <-->|3-round LLM debate| F2
+        F1 & F2 --> DebateTranscript[Debate Transcript + Proposals]
+    end
+
+    subgraph T5[Tier 5: Chairman]
+        MacroDB -->|macro context| C1[Winston - Chairman]:::chairman
+        DebateTranscript --> C1
+        C1 -->|Verdict| Portfolios[Final Thematic Portfolios + hold periods]
+        C1 -->|Macro| Dash[Financial Indicators Dashboard]
+    end
+
+    Portfolios --> UI{Dashboard UI}:::user
+    Dash --> UI
+    UI -->|Reviews verdicts & data| User
 ```
 
-### Mapping to the original personas
+### The Macro Bypass
 
-| Layer | Department | Persona(s) | Count |
-| ----- | ---------- | ---------- | ----- |
-| 1 | Discovery / Data Analyst | **Wilfred** (YT, Web, Auth) | 3 agents |
-| 2 | Data Engineering | **Timo** | 1 agent |
-| 3 | Investment Analyst | **Andie** (pods: TMT, HardAssets, Core) | 3 pods × 20 cos |
-| 4 | Investment Manager | **Freddy** (managers) | 2–3 agents |
-| 5 | Investment Chairman | **Freddy** (chairman) | 1 agent |
-
-### The two data streams
-
-Layer 2 forks every cleaned transcript by label:
-
-- **MICRO stream** → company-specific signal → Analysts → Managers → Chairman →
-  **stock recommendations** (thematic baskets + holding periods).
-- **MACRO stream** → economy-wide signal → **skips the analysts** → straight to the
-  Chairman → **Financial/Economic Indicator Dashboard**.
-
-_Example:_ a Fed-policy transcript flows up the MACRO side and lands on the dashboard;
-an Nvidia-earnings transcript flows up the MICRO side and influences a stock pick.
-
-### Triggering model
-
-- **Layer 1 (Discovery) & Layer 2 (Data Eng)** → Cron jobs (time-based, continuous).
-- **Layer 3 (Analysts)** → Event-driven (fires when Timo writes a new clean transcript).
-- **Layer 4 (Managers) & Layer 5 (Chairman)** → User action (login / backtest request)
-  **and** Cron (weekly Friday thesis).
+Timo routes `[MICRO]`/`[INDUSTRY]` data to the Andies, but routes `[MACRO]` data
+**around** the analysts directly to Winston. This keeps the Andies laser-focused on
+their 20 companies (no macro hallucination), while giving the Chairman the
+overarching view needed to sanity-check the portfolios against the macro regime.
 
 ---
 
-## 3. Layer Specifications
+## 3. Agent Specifications (by tier)
 
-These map to `.md` system-prompt / config files per agent. Personality matters — it
-shapes the system prompt.
+### Tier 1 — Wilfred Squad (Discovery)
 
-### 3.1 Layer 1 — Discovery (Wilfred ×3) — The Tireless Hunters
+Split into 3 agents, one per channel. **Why split:** fault isolation (a Barron's
+paywall change can't crash YouTube/Google ingestion), tool specialization, and ~3×
+concurrency.
 
-**Persona:** Relentless, hyper-organized data-acquisition scouts. They do NOT analyze
-— only fetch, transcribe, and route pristine raw data into the pipeline.
+| Agent               | Channel        | Tools                                          |
+| ------------------- | -------------- | ---------------------------------------------- |
+| **Wilfred-Video**   | YouTube/audio  | `yt-dlp`, Whisper, SponsorBlock                |
+| **Wilfred-News**    | Google / RSS   | Google SERP / Programmable Search, RSS parsers |
+| **Wilfred-Premium** | Barron's / WSJ | Playwright, anti-bot evasion, proxy rotation   |
 
-**Three specialized agents, one per channel:**
+- **Onboarding Chat (UI):** Wilfred greets the Commander on login — _"I'm tracking 40
+  channels. Any new YouTube channels, keywords, or Barron's columns to add today?"_
+- **Cron Manager (UI):** a table to view Wilfred's heartbeat and edit sync schedules
+  (e.g. "Barron's daily at 6 AM", "YouTube every 4 hours").
 
-| Agent | Channel | Primary tools |
-| ----- | ------- | ------------- |
-| **Wilfred-YT** | YouTube | `youtube-transcript-api`, `yt-dlp` + **Amazon Transcribe** (CC fallback) |
-| **Wilfred-Web** | Google Search / News | Exa search API, `RSS_Feed_Parser` |
-| **Wilfred-Auth** | Barron's (paywalled) | `Playwright` headless + **AWS Secrets Manager** cookie vault (mock API for v1) |
+### Tier 2 — Timo (Data Engineer & Semantic Router)
 
-**Shared responsibilities:**
+The traffic controller. Cleans transcripts (ads, filler, ticker normalization), then
+runs a fast/cheap LLM (e.g. Llama-3-8B) as a **classifier + router**:
 
-- `skill_top_down_macro_scan` — poll macro channels/feeds on schedule; emit webhook
-  to Timo with `[URL, Source, Publish_Date, Raw_Text/Audio]`.
-- `skill_bottom_up_watchlist_monitor` — per-ticker queries (Google News + SEC Edgar).
-- **Human-in-the-loop source chat** — a conversational surface where the HUMAN can
-  add/remove YouTube channels, articles, and feeds to track. Wilfred validates new
-  sources and fetches metadata.
-- **Sync schedule UI** — display and edit each agent's cron / sync schedule and view
-  queued ingestion tasks.
+- **Tagging** — every paragraph → `[MACRO]` (Fed, CPI, geopolitics), `[MICRO]`
+  (earnings, CEO quotes, product launches), or `[INDUSTRY]` (supply chain, "semi
+  cycle", "copper deficit").
+- **Watchlist routing** — groups the 60-stock watchlist by theme/sector; an Apple
+  supply-chain mention is tagged `[MICRO]` + `[TECH]` and routed **to Andie-Tech**.
+- **Time-decay embedding** — stamps every chunk for TTL (see §5).
 
-### 3.2 Layer 2 — Data Engineering (Timo) — The Obsessive Cleaner
+### Tier 3 — Andie Squad (Sector Analysts)
 
-**Persona:** Ruthless data engineer. Despises noise/fluff. Bad data = losing trades.
+3 agents, **20 companies each** (60 total). Capping at 20 avoids **context
+degradation** ("lost in the middle") and keeps the LLM's attention sharp.
 
-**Tools:** `SponsorBlock_API`, **Amazon Comprehend** (or spaCy + `FinBERT_NER` on Fargate),
-`LangChain RecursiveCharacterTextSplitter` (~1000-token chunks, 200 overlap),
-**Amazon Bedrock Titan Text Embeddings v2**, **Amazon OpenSearch Serverless** (vector),
-**Amazon S3** for cleaned-file object storage.
+> 🚨 **Critical rule — group by SECTOR/MACRO THEME, never alphabetically.** A random
+> split destroys contextual alpha; sector grouping makes each agent a domain expert.
 
-**Skills:**
+| Agent              | Desk                         | Becomes sensitive to…                         |
+| ------------------ | ---------------------------- | --------------------------------------------- |
+| **Andie-Tech**     | TMT (semis, software, comms) | capex spend, supply-chain constraints         |
+| **Andie-Physical** | Energy / Industrials / Mats  | commodity prices, regulation, power-grid load |
+| **Andie-Capital**  | Financials / Consumer / RE   | interest rates, consumer credit, inflation    |
 
-- `skill_noise_redaction` — drop ad reads / filler ("use promo code", "smash like").
-- `skill_entity_resolution` — `["Zuck","Meta","FB"] → $META`;
-  `["Powell","J-Pow","The Fed","FOMC"] → Federal_Reserve`.
-- `skill_label_assignment` — tag every transcript (and chunk) with:
-  - **MACRO** vs **MICRO** (which stream it feeds), and
-  - **INDUSTRY** (sector tag, see §10).
-- `skill_theme_assignment` — regularly scan the stock watchlist and assign **Themes**,
-  routing each to the Analyst pod that specializes in that theme.
-- `skill_vector_embedding_pipeline` — chunk, embed, write with metadata
-  `{channel, date, timestamp_start, tickers_mentioned[], labels[], theme}`.
+- **Input:** only the concentrated `[MICRO]`/`[INDUSTRY]` data for their 20 names.
+- **Output:** a daily **"Investment Highlights & Catalyst Note"** per desk → pushed to
+  the managers' inbox. (3 reports; 60 stocks covered.)
 
-### 3.3 Layer 3 — Investment Analysts (Andie ×3 pods) — The Skeptical Brains
+### Tier 4 — Freddy Squad (Debate Chamber)
 
-**Persona:** Skeptical, objective, deeply analytical. Derives 2nd/3rd-order outcomes.
-Strictly follows the Commander's rubrics. Requires evidence for every claim.
+Freddy splits into two adversarial personas to stress-test every thesis:
 
-**Structure:** 3 pods, each covering **20 companies (60 total)**:
+- **Freddy-Bull** (growth/momentum) — argues why the reports justify going Long.
+- **Freddy-Bear** (value/risk) — attacks the thesis: flaws, macro headwinds, failure.
 
-| Pod | Focus | Example coverage |
-| --- | ----- | ---------------- |
-| **Andie-TMT** | Tech / Media / Telecom | 20 tech names |
-| **Andie-HardAssets** | Industrials / Materials / Energy | 20 industrial names |
-| **Andie-Core** | Financials / Macro-sensitive | 20 financial names |
+**Debate protocol (3 rounds):** both read all 60 Andie reports →
+R1 Bull proposes a thematic portfolio (e.g. _Memory Chips: Micron, SK Hynix; ~6-month
+hold_) → R2 Bear attacks (_"Micron overvalued; Andie-Tech notes capex slowing"_) →
+R3 Bull defends/adjusts. The **full transcript is logged** and sent up to the Chairman.
 
-**Tools:** LLM orchestrator via **Amazon Bedrock** (Claude Sonnet), `JSON_Schema_Enforcer`,
-**Bedrock Knowledge Bases** query engine.
+### Tier 5 — Winston (Chairman)
 
-**Skills:**
+The ultimate judge & macro allocator.
 
-- Receive **cleaned MICRO transcripts** from Timo (event-driven).
-- `skill_rubric_indicator_scoring` — score each chunk against user indicators. Output:
-  `{Indicator, Score (-1..1), Reasoning, Source_Timestamp}`.
-- `skill_investment_highlights` — write per-company **investment highlights & notes**
-  for the Managers (the "60 reports").
-- `skill_prediction_ledger_extraction` — log forward-looking statements to
-  `predictions_db` with `PENDING` status + `resolve_by_date`.
-- `skill_n_order_thinking` — `If X → Y impacted → Action Z` decision trees.
+- **Verdict & final portfolio:** reads the Freddy debate transcripts; cold, objective,
+  capital-preserving. Issues a verdict (_"Bull's memory-chip thesis holds, but Bear's
+  valuation concern is valid → initiate a half-position in Micron"_) and constructs the
+  final stock baskets with hold periods.
+- **Macro dashboard:** consumes the `[MACRO]` data routed straight to him (the Macro
+  Bypass) to populate the Financial Indicator Dashboard (inflation, Fed rates,
+  sentiment), ensuring micro portfolios fit the macro environment.
 
-### 3.4 Layer 4 — Investment Managers (Freddy ×2–3) — The Debating Allocators
+---
 
-**Persona:** Decisive, risk-aware, focused on actionable alpha. No waffling — speaks
-in strategies, timelines, and conviction.
+## 4. Clean-Room Backtest Protocol
 
-**Skills:**
+To validate strategies on **Jun–Dec 2025** data without **look-ahead bias** (using
+future data to "predict" the past):
 
-- **Synthesize at scale** — ingest **all 60 analyst reports at once** (MICRO data).
-- `skill_portfolio_theme_generator` — group correlated stocks into a basket with
-  Strategy, Risk, and an **estimated holding period** (short/med/long). _Example:_
-  "Memory Chips for AI Buildout → Micron, SK Hynix, SanDisk; hold 6–12 months."
-- `skill_llm_debate_stress_test` — for each proposed basket, run a **bull-vs-bear
-  debate using 2 different Bedrock models for 3 rounds** (e.g. Claude Sonnet vs
-  Amazon Nova Pro / Llama 3), then forward the debate transcript to the Chairman for
-  verdict.
-- `skill_backtest_execution` — pull historical closes, simulate $10k buy-and-hold.
-  Output: `{total_return_pct, max_drawdown, equity_curve_array}`.
+1. **Prep:** scrape the full Jun–Dec 2025 dataset into the local stores first.
+2. **Air-gap Tiers 2–5:** Timo, all Andies, both Freddys, and Winston have web / SERP /
+   external-API tools **disabled** — local Vector DB access only.
+3. **Inject the simulation date** into every system prompt:
+   _"You are in a strict simulation. The current date is `[Injected_Date]`. Rely ONLY
+   on the provided vector database. Do not use pre-trained knowledge of events after
+   this date."_
+4. **Logic flow only** is allowed from the internet for Tier-1 discovery during real
+   (non-backtest) operation; backtest runs stay fully air-gapped.
 
-### 3.5 Layer 5 — Investment Chairman (Freddy) — The Final Judge
+---
 
-**Persona:** The CIO. Decisive arbiter. Owns the final book.
+## 5. Data Staleness & Time-Decay (TTL)
 
-**Skills:**
+A 3-month-old "inflation is peaking" take can produce confidently wrong advice today.
 
-- `skill_debate_verdict` — judge every Manager debate; issue a per-stock verdict:
-  `APPROVE / REJECT / RESIZE`, with reasoning.
-- `skill_portfolio_construction` — assemble approved stocks into the **final portfolio**
-  presented to the HUMAN (conviction + holding period + evidence, per Option A).
-- `skill_macro_dashboard_population` — receive the **MACRO data stream** and populate
-  the **Financial/Economic Indicator Dashboard**.
-- `skill_ace_index_calculator` — compute the normalized ACE composite (see §5).
-- `skill_weekly_thesis_synthesis` — Friday 4pm: aggregate findings, top-10 quotes,
-  ACE Index, pending predictions → one "Weekly Investment Thesis".
+- **Metadata stamping:** every chunk carries `publish_date` + `ingest_date`.
+- **Signal half-life:** `[MACRO]` data has a long shelf life (~3–6 months);
+  `[MICRO]` data is stale fast (~1 month).
+- **Windowed retrieval:** agents query with a dynamic time filter, e.g.
+  `WHERE ticker='MU' AND date > (CURRENT_SIMULATION_DATE - 30 days)`.
+- **UI staleness label:** backtested theses are tagged with age, e.g.
+  _"Thesis formulated 45 days ago — high risk of staleness."_
+
+---
+
+## 6. Orchestration — the Pipeline is a DAG
+
+The tiers form a strict **Directed Acyclic Graph**: Winston can't run until the Freddys
+finish debating; the Freddys can't run until all 3 Andies finish; the Andies can't run
+until Timo tags & routes; Timo can't run until Wilfred ingests.
+
+- Use a durable task queue / workflow engine — **Temporal, Celery+Redis, or Inngest**.
+- **Triggering:** Wilfred & Timo on **cron**; Andie on **event** (new clean transcript);
+  Freddy/Winston on **stage completion** + a weekly **cron** for the thesis drop.
 
 ### The debate mechanism (concrete)
 
@@ -248,43 +272,40 @@ in strategies, timelines, and conviction.
 
 ---
 
-## 4. Core Features
+## 7. Core Features
 
-### 4.1 Semantic Keyword & Concept Tracker
+### 7.1 Semantic Keyword & Concept Tracker
 
-- Track the **meaning** of a phrase (e.g. "AI bubble collapse" also matches
-  "tech valuations are unsustainable"), not literal string matching.
-- Channel-level only (no single-transcript tracking — isolated datapoints are
-  meaningless). Filter / weight by channel.
-- Graph: **mentions over time**, with per-channel breakdown and a **Context Preview**
-  (the exact sentence/paragraph + jump-to-timestamp link).
-- **Max 15 trackers.** At 16, warn user; deleting archives historical vector data.
-- Start mode: **track forward-only** OR **run historically** across past transcripts.
+- Track the **meaning** of a phrase (e.g. "AI bubble collapse" also matches "tech
+  valuations are unsustainable"), not literal string matching.
+- Channel-level only (isolated single-transcript datapoints are meaningless).
+- Graph: **mentions over time**, per-channel breakdown, **Context Preview** (exact
+  quote + jump-to-timestamp).
+- **Max 15 trackers.** At 16, warn; deleting archives historical vector data.
+- Start mode: **forward-only** OR **run historically**.
 
-### 4.2 Signal / Indicator Generator (Rubric Engine)
+### 7.2 Signal / Indicator Generator (Rubric Engine)
 
-User defines indicators + rubrics; the Analyst pods grade every transcript.
-
-Example indicators: Macroeconomic Outlook, Inflation Trajectory, Interest Rate Policy,
-Market Sentiment, Sector Trends, Geopolitical Risk.
+User defines indicators + rubrics; Andie grades every transcript.
+Examples: Macro Outlook, Inflation Trajectory, Interest Rate Policy, Market Sentiment,
+Sector Trends, Geopolitical Risk.
 
 - Output per indicator: Positive/Neutral/Negative OR High/Med/Low OR %Score.
 - **Must include evidence** (quotes/facts + source timestamp).
 
-### 4.3 Insight Generator
+### 7.3 Insight Generator
 
-- **Predictions** — insights resolvable True/False after a time window. Track accuracy
-  → **Prediction Ledger** leaderboard ranking which channels/analysts are most accurate
-  (Brier-score style).
+- **Predictions** — resolvable True/False after a time window → **Prediction Ledger**
+  leaderboard ranking channel/analyst accuracy (Brier-score style).
 - **Top 10 Quotes** of the week.
-- **Weekly Investment Thesis** — coherent market outlook synthesized from all content.
-- **Thematic Ideas** (broad) + **Stock-Specific Ideas**, each with Strategy / Risk /
-  **Holding Period**, plus AI follow-up questions critiquing assumptions and
-  2nd/3rd-order effects.
+- **Weekly Investment Thesis** — synthesized market outlook.
+- **Thematic + Stock-Specific Ideas** with Strategy / Risk / Timeline, plus AI
+  follow-up questions critiquing assumptions and 2nd/3rd-order effects.
+- **Debate transcripts** — the logged Bull-vs-Bear argument behind each verdict.
 
 ---
 
-## 5. Composite Signal — ACE Index
+## 8. Composite Signal — ACE Index
 
 **AI Capital Environment Index.** High ACE = favorable macro + dovish policy + bullish
 AI capex.
@@ -293,7 +314,7 @@ AI capex.
 class CompositeSignalGenerator:
     def calculate_ace_index(self, ai_sentiment, rate_expectations, inflation_drag):
         """
-        Weights dynamically adjustable by the Chairman based on macro regime.
+        Weights dynamically adjustable by Winston based on macro regime.
         Default: AI Sentiment 40%, Rates 30%, Inflation 30%.
         Returns float in [-1.0 (capital starved) .. +1.0 (capital abundant)].
         """
@@ -306,28 +327,14 @@ class CompositeSignalGenerator:
 
 ---
 
-## 6. Data Staleness & Freshness
-
-Time-relevance of data is a first-class concern across the whole system.
-
-- Every transcript carries `published_at` **and** `ingested_at`.
-- Every recommendation shows a **freshness badge**:
-  🟢 fresh (< 24h) · 🟡 aging (1–7d) · 🔴 stale (> 7d).
-- The **Chairman down-weights stale evidence** when constructing the final portfolio.
-- A live **sync status** indicator shows pipeline activity
-  ("Wilfred-YT processing 3 videos… Andie-TMT analyzing 5 transcripts…").
-
----
-
-## 7. User Flows
+## 9. User Flows
 
 ### Flow 1 — Cold Start (configuration)
 
-1. **Source & Agent Management:** add YouTube channel / video / web / RSS / Barron's
-   via the **source chat** → Wilfred validates, fetches metadata, queues ingestion.
-2. **Watchlist (Bottom-Up):** import US tickers → Timo maps to entity-resolution dict
-   and assigns Themes.
-3. **Schedule:** review/edit each agent's cron schedule.
+1. **Onboarding Chat:** converse with Wilfred to add sources (YouTube / RSS / Barron's)
+   and keywords; set CRON schedules in the Cron Manager.
+2. **Watchlist (Bottom-Up):** import US tickers → Timo groups by sector and assigns each
+   to the right Andie desk.
 
 ### Flow 2 — Create a Signal/Tracker
 
@@ -336,95 +343,68 @@ Time-relevance of data is a first-class concern across the whole system.
 
 ### Flow 3 — Daily Consumption Loop (< 5 min)
 
-1. **Command Center:** Chairman's 3-bullet daily briefing + watchlist alerts +
-   freshness badges.
-2. Tracker graphs (max 15) → hover a spike → click → **Context Preview** modal →
-   "Go to Source" opens YouTube at exact `HH:MM:SS`.
+1. **Command Center:** Winston's daily briefing + watchlist alerts.
+2. Tracker graphs → hover a spike → **Context Preview** → "Go to Source" opens the
+   video at the exact `HH:MM:SS`.
 
-### Flow 4 — Insight & Backtesting
+### Flow 4 — Thesis, Debate & Backtest
 
-1. **Investment Thesis page:** final portfolio themes (strategy, stocks, risk,
-   holding period) + the debate verdicts behind them.
-2. **Backtest Sandbox:** "$10k invested N months ago" → historical prices → equity
-   curve vs S&P 500 with ROI & max drawdown (buy-and-hold).
+1. **Investment Thesis page:** generated portfolio themes (strategy, stocks, risk,
+   timeline) + a **"View Debate Transcript"** dropdown to read the Bull/Bear argument.
+2. **Backtest:** Clean-Room run over Jun–Dec 2025 → equity curve vs S&P 500, ROI, max
+   drawdown, with a staleness label on the thesis.
 
 ---
 
-## 8. UI / Page Map
+## 10. UI / Page Map
 
-1. **Command Center (Dashboard)** — 60-second daily briefing, top macro shifts,
-   thematic portfolios, watchlist alerts, sync/freshness status.
+1. **Command Center (Dashboard)** — daily briefing, top macro shifts, thematic
+   portfolios, watchlist alerts.
 2. **Signal & Tracker Terminal** — keyword/semantic graphs + indicator heatmap.
-3. **Thematic Portfolio & Backtesting Sandbox** — themes, debate verdicts, run-backtest,
-   What-If scenario analysis ("what if inflation prints 3.5% tomorrow?").
-4. **Source & Agent Management** — source chat, toggle data sources, edit cron
-   schedules, Prediction Ledger leaderboard.
-5. **Financial Indicator Dashboard** — MACRO indicators, watchlist, key events
-   (past & upcoming).
+3. **Investment Thesis & Backtest** — themes, **View Debate Transcript**, backtest,
+   What-If scenarios ("what if inflation prints 3.5% tomorrow?").
+4. **Sources & Agents** — Onboarding Chat, **Cron Manager** table, agent heartbeat;
+   Prediction Ledger leaderboard.
+5. **Financial Indicator Dashboard** — macro indicators (Winston-driven), watchlist,
+   key events.
 
 ---
 
-## 9. Tech Stack
+## 11. Tech Stack
 
-**Hosting split:** the entire **backend runs on AWS**; the **frontend runs on Vercel**
-and uses the **Vercel AI Gateway** for its interactive AI features. No third-party
-backend SaaS (no Pinecone / Supabase / OpenAI / Celery-Redis) — everything server-side
-is an AWS managed service.
+| Layer            | Choice                                                               |
+| ---------------- | -------------------------------------------------------------------- |
+| Orchestration    | Temporal / LangGraph / AutoGen (strict DAG, durable workflows)       |
+| Reasoning LLM    | Claude Sonnet / GPT-4o (Andie, Freddy, Winston)                      |
+| Debate models    | **Two different model families** for Bull vs Bear (less collusion)   |
+| Cheap router LLM | Llama-3 8B (Timo's high-volume classify + clean)                     |
+| Relational DB    | Supabase / PostgreSQL (users, keywords, predictions, schedules)      |
+| Vector DB        | Pinecone — separate **Macro** and **Micro** namespaces, TTL metadata |
+| Frontend         | Next.js + TypeScript + Tailwind (this repo's `frontend/`)            |
+| Jobs/Compute     | Temporal / Celery + Redis / Inngest (async long-video processing)    |
+| Market data      | Polygon.io / YFinance                                                |
 
-### 9.1 Backend — AWS only
-
-| Concern | AWS choice | Notes |
-| ------- | ---------- | ----- |
-| Agent orchestration | **AWS Step Functions** (state graph) + **Lambda**; **Bedrock AgentCore** optional | Explicit state machine prevents infinite agent loops |
-| Reasoning LLM | **Amazon Bedrock** — Claude Sonnet (Analysts, Managers, Chairman) | Single API, IAM-governed |
-| Debate models | **Amazon Bedrock** — 2 distinct model families, e.g. **Claude Sonnet vs Amazon Nova Pro / Llama 3** | No OpenAI needed; bull-vs-bear stress test |
-| Cheap bulk LLM | **Amazon Bedrock** — **Amazon Nova Micro/Lite** or **Llama 3 8B** | Timo's high-volume cleaning |
-| Transcription | **Amazon Transcribe** | Replaces Whisper; CC fallback still applies |
-| Embeddings | **Amazon Bedrock Titan Text Embeddings v2** | Replaces OpenAI embeddings |
-| RAG | **Amazon Bedrock Knowledge Bases** | Managed chunk → embed → retrieve |
-| Entity resolution / NER | **Amazon Comprehend** or spaCy/FinBERT on **Fargate** | Slang → ticker mapping |
-| Relational DB | **Amazon Aurora Serverless v2 (PostgreSQL)** | users, keywords, predictions, reports |
-| Vector DB | **Amazon OpenSearch Serverless (vector engine)** or **Aurora `pgvector`** | Transcript embeddings; backs Knowledge Bases |
-| Object store | **Amazon S3** | Raw + cleaned transcript files |
-| Async / long jobs | **ECS Fargate** tasks via **Amazon SQS** | Long-video processing |
-| Event bus | **Amazon EventBridge** | Event-driven analyst triggers |
-| Scheduling (cron) | **Amazon EventBridge Scheduler** | Discovery & Data-Eng cron, Friday thesis |
-| API layer | **Amazon API Gateway** + **Lambda** (or ALB + Fargate) | Serves the Vercel frontend |
-| Secrets / cookie vault | **AWS Secrets Manager** | Barron's session cookies (mock in v1) |
-| Cache (optional) | **Amazon ElastiCache (Redis)** | If a fast shared cache is needed |
-| Market data | **Polygon.io / yfinance** (external API) | Called from Lambda/Fargate |
-
-### 9.2 Frontend — Vercel + AI Gateway
-
-| Concern | Choice | Notes |
-| ------- | ------ | ----- |
-| Hosting | **Vercel** | Next.js + TailwindCSS + Tremor.so (financial charts) |
-| Interactive AI | **Vercel AI SDK** over the **Vercel AI Gateway** | Unified multi-model access, observability, fallbacks, budgets |
-| Use cases | Source chat, follow-up Q&A, What-If scenarios | User-facing conversational features |
-
-> The AI Gateway powers **user-facing** AI (chat, follow-ups). The heavy multi-agent
-> pipeline (Discovery → Chairman) runs **server-side on Bedrock**.
-
-> This repo: `backend/` (Python on AWS) + `frontend/` (Next.js + TypeScript on Vercel).
+> This repo: `backend/` (Python) + `frontend/` (Next.js + TypeScript).
 
 ---
 
-## 10. Engineering Constraints & Guardrails
+## 12. Engineering Constraints & Guardrails
 
-1. **Option A only:** no price-level entry/exit triggers — conviction + holding period
-   + evidence only.
-2. **15-tracker limit:** 16th create → warning modal; delete archives the tracker's
-   historical vector search data.
-3. **Stale-data handling:** freshness badges everywhere; Chairman down-weights stale
-   evidence; live sync status (see §6).
-4. **Hallucination guardrails:** every Quote/Score MUST carry `source_url` +
-   `timestamp_start`. **No orphan data** — the user must always be able to audit AI logic.
-5. **Channel-level tracking only** — never track isolated single transcripts.
-6. **Not financial advice:** all outputs are research; surface this framing in the UI.
+1. **Air-gap for backtests** — Tiers 2–5 have no internet; inject the simulation date;
+   local Vector DB only. Prevents look-ahead bias.
+2. **20-stock cap per Andie** — keeps LLM attention sharp; group by sector, never
+   alphabetically.
+3. **Macro bypass** — `[MACRO]` data goes straight to Winston, not the Andies.
+4. **TTL / time-decay** — every datapoint stamped; windowed queries; staleness labels.
+5. **15-tracker limit** — 16th create warns; delete archives the tracker's vector data.
+6. **No orphan data** — every Quote/Score MUST carry `source_url` + `timestamp_start`;
+   the user must always be able to audit the AI's logic.
+7. **Channel-level tracking only** — never track isolated single transcripts.
+8. **Strict DAG** — downstream tiers wait for upstream completion (no partial runs).
 
 ---
 
-## 11. Reference — Sectors of Interest
+## 13. Reference — Sectors of Interest
 
 Technology · Consumer Discretionary · Healthcare · Industrials · Financials ·
 Communication Services · Consumer Staples · Energy · Real Estate · Utilities ·

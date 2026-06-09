@@ -1,26 +1,164 @@
-@import "tailwindcss";
+/* ============ WTAF Fund — design tokens ============ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ---- surfaces ---- */
+  --bg-0: oklch(0.165 0.018 264);
+  --bg-1: oklch(0.205 0.02 264);
+  --panel: rgba(255, 255, 255, 0.022);
+  --panel-2: rgba(255, 255, 255, 0.04);
+  --panel-hi: rgba(255, 255, 255, 0.06);
+  --stroke: rgba(255, 255, 255, 0.075);
+  --stroke-hi: rgba(255, 255, 255, 0.14);
+  --inset: rgba(0, 0, 0, 0.32);
+
+  /* ---- accents ---- */
+  --blue: oklch(0.74 0.15 240);
+  --blue-bright: oklch(0.82 0.13 222);
+  --indigo: oklch(0.64 0.19 285);
+  --orange: oklch(0.75 0.16 52);
+  --orange-bright: oklch(0.82 0.15 64);
+  --up: oklch(0.76 0.16 158);
+  --down: oklch(0.66 0.21 22);
+  --amber: oklch(0.83 0.15 85);
+
+  /* ---- text ---- */
+  --t-hi: oklch(0.975 0.004 250);
+  --t-mid: oklch(0.74 0.018 255);
+  --t-lo: oklch(0.56 0.02 258);
+  --t-faint: oklch(0.44 0.02 260);
+
+  /* ---- glows ---- */
+  --glow-blue: 0 0 24px -2px oklch(0.74 0.15 240 / 0.55);
+  --glow-orange: 0 0 24px -2px oklch(0.75 0.16 52 / 0.5);
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-ui: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html, body { height: 100%; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ui);
+  color: var(--t-hi);
+  background: var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
 }
+
+/* ambient background glows */
+.bg-field {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 100% 0%, oklch(0.75 0.16 52 / 0.10), transparent 42%),
+    radial-gradient(90% 70% at -5% 20%, oklch(0.74 0.15 240 / 0.10), transparent 45%),
+    radial-gradient(80% 60% at 60% 110%, oklch(0.64 0.19 285 / 0.08), transparent 50%),
+    linear-gradient(180deg, var(--bg-0), oklch(0.135 0.016 264));
+}
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 90%);
+}
+
+/* glass card */
+.card {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.04) inset, 0 18px 40px -28px rgba(0,0,0,0.9);
+  overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(160deg, rgba(255,255,255,0.05), transparent 38%);
+}
+.card-pad { padding: 16px 18px; }
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.display { font-family: var(--font-display); }
+
+/* scrollbars */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.up { color: var(--up); }
+.down { color: var(--down); }
+
+/* tiny utility chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--stroke); color: var(--t-mid);
+  letter-spacing: 0.02em;
+}
+
+.label-xs {
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--t-lo); font-weight: 600;
+}
+
+@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes draw-line { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+@keyframes grow-bar { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+
+button { font-family: inherit; cursor: pointer; color: inherit; }
+
+/* ============ app-level layout (from WTAF Fund.html <style>) ============ */
+.app-root { height: 100vh; }
+
+/* 12-col dense grid */
+.grid12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: 13px; align-content: start; }
+.span3 { grid-column: span 3; } .span4 { grid-column: span 4; } .span5 { grid-column: span 5; }
+.span6 { grid-column: span 6; } .span7 { grid-column: span 7; } .span8 { grid-column: span 8; }
+.span9 { grid-column: span 9; } .span12 { grid-column: span 12; }
+@media (max-width: 1180px) {
+  .span3,.span4,.span5 { grid-column: span 6; }
+  .span6,.span7,.span8,.span9 { grid-column: span 12; }
+}
+
+.primary-btn {
+  padding: 9px 16px; border-radius: 9px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em;
+  color: #fff; border: 1px solid color-mix(in oklch, var(--blue) 60%, transparent);
+  background: linear-gradient(160deg, var(--blue-bright), var(--blue));
+  box-shadow: 0 0 18px -6px var(--blue), inset 0 1px 0 rgba(255,255,255,0.25);
+  transition: filter .15s, transform .1s; white-space: nowrap;
+}
+.primary-btn:hover { filter: brightness(1.1); }
+.primary-btn:active { transform: translateY(1px); }
+
+.r-input, .r-select {
+  width: 100%; padding: 10px 12px; border-radius: 9px; font-family: var(--font-ui); font-size: 13px;
+  background: var(--inset); border: 1px solid var(--stroke); color: var(--t-hi); outline: none;
+}
+.r-input:focus, .r-select:focus { border-color: color-mix(in oklch, var(--blue) 50%, transparent); }
+.r-input::placeholder { color: var(--t-faint); }
+.r-select option { background: var(--bg-1); color: var(--t-hi); }
+
+.r-range { -webkit-appearance: none; appearance: none; flex: 1; height: 5px; border-radius: 99px;
+  background: rgba(255,255,255,0.1); outline: none; }
+.r-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 99px;
+  background: var(--blue-bright); box-shadow: 0 0 10px -1px var(--blue); cursor: pointer; border: 2px solid var(--bg-0); }
+.r-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 99px; background: var(--blue-bright);
+  box-shadow: 0 0 10px -1px var(--blue); cursor: pointer; border: 2px solid var(--bg-0); }
