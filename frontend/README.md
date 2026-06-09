@@ -11,13 +11,13 @@ Next.js (TypeScript) app for the SuperAI Hackathon project.
 ## Setup
 
 ```bash
-npm install
+pnpm install
 ```
 
 ## Running
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 The app runs at http://localhost:3000.
@@ -26,10 +26,10 @@ The app runs at http://localhost:3000.
 
 | Command         | Description           |
 | --------------- | --------------------- |
-| `npm run dev`   | Start the dev server  |
-| `npm run build` | Build for production  |
-| `npm run start` | Run the production build |
-| `npm run lint`  | Lint the codebase     |
+| `pnpm dev`      | Start the dev server  |
+| `pnpm build`    | Build for production  |
+| `pnpm start`    | Run the production build |
+| `pnpm lint`     | Lint the codebase     |
 
 ## Environment Variables
 
