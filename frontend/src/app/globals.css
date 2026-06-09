@@ -1,4 +1,4 @@
-/* ============ RAIJIN TERMINAL — design tokens ============ */
+/* ============ WTAF Fund — design tokens ============ */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
@@ -125,7 +125,7 @@ body {
 
 button { font-family: inherit; cursor: pointer; color: inherit; }
 
-/* ============ app-level layout (from Raijin Terminal.html <style>) ============ */
+/* ============ app-level layout (from WTAF Fund.html <style>) ============ */
 .app-root { height: 100vh; }
 
 /* 12-col dense grid */

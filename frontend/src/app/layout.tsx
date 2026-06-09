@@ -3,7 +3,7 @@ import { Locator } from "@/components/dev/locator";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Raijin Terminal",
+  title: "WTAF Fund",
   description: "Hedge Fund AI Agent Council — institutional research terminal.",
 };
 
