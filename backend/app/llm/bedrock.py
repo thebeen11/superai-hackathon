@@ -59,7 +59,16 @@ def _client():
     # Imported lazily so the app boots without AWS configured.
     import boto3
 
-    return boto3.client("bedrock-runtime", region_name=settings.aws_region)
+    # Pass credentials from settings (.env) when present; otherwise let boto3 fall back
+    # to its default credential chain (~/.aws, instance role, sourced env vars).
+    creds = {}
+    if settings.aws_access_key_id and settings.aws_secret_access_key:
+        creds["aws_access_key_id"] = settings.aws_access_key_id
+        creds["aws_secret_access_key"] = settings.aws_secret_access_key
+        if settings.aws_session_token:
+            creds["aws_session_token"] = settings.aws_session_token
+
+    return boto3.client("bedrock-runtime", region_name=settings.aws_region, **creds)
 
 
 def _extract_json(text: str) -> dict:

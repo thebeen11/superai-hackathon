@@ -14,6 +14,11 @@ class Settings(BaseSettings):
 
     # --- Bedrock (reasoning) ---
     aws_region: str = "us-west-2"
+    # AWS credentials. Loaded from .env / environment. If left unset, boto3 falls back
+    # to its default credential chain (~/.aws, instance role, sourced env vars).
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_session_token: str | None = None  # required for temporary STS credentials
     # Reasoning model. The workshop account allows Amazon Nova and Claude Opus.
     # Default: Claude Opus 4.6 via the us-west-2 cross-region inference profile.
     bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"

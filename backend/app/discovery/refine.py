@@ -26,9 +26,16 @@ MAX_CLARIFICATION_ROUNDS = 2
 
 _SYSTEM = (
     "You are a research query analyst for a US-equity investment research system. "
-    "Given a topic query, decide whether it is CLEAR enough to search for, or AMBIGUOUS. "
-    "Always produce a 'refined_query': a concise, search-optimized rewrite of the topic. "
-    "If AMBIGUOUS, also provide 1-3 short 'clarifying_questions' that would disambiguate it."
+    "Classify a topic query as CLEAR or AMBIGUOUS.\n"
+    "Mark it AMBIGUOUS ONLY if it has genuinely different possible interpretations or is "
+    "too vague to search (e.g. 'meta' could mean Meta Platforms or the concept 'meta'; "
+    "'apple' could be the company or the fruit).\n"
+    "Mark it CLEAR if it already names a specific company, ticker, sector, or topic — even "
+    "if it could be narrower. Do NOT ask the user to narrow scope (short-term vs long-term, "
+    "valuation vs earnings, etc.); breadth is fine and is handled downstream.\n"
+    "Always produce a 'refined_query': a concise, search-optimized rewrite. "
+    "If AMBIGUOUS, also provide 1-3 short 'clarifying_questions' that resolve the genuine "
+    "ambiguity."
 )
 
 

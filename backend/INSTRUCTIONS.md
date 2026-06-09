@@ -113,7 +113,26 @@ curl -s -X POST http://localhost:8000/discover/clarify \
 ```
 
 Returns a `DiscoveryResult`. (Clarification is capped at 2 rounds, after that it proceeds
-automatically.) Then run Steps 2–3 from Path A.
+automatically.)
+
+**Step 3 — Process** the clarified result into Postgres (pipe `/discover/clarify` straight
+into `/dataeng/process`):
+
+```bash
+curl -s -X POST http://localhost:8000/discover/clarify \
+  -H 'Content-Type: application/json' \
+  -d '{"clarified_query":"Meta Platforms (META) stock outlook","round":1,"mode":"interactive","max_results":5}' \
+| curl -s -X POST http://localhost:8000/dataeng/process \
+  -H 'Content-Type: application/json' --data-binary @-
+```
+
+Returns a `DataEngReport` `{persisted, failed, failures[]}`.
+
+**Step 4 — Read back** the stored rows:
+
+```bash
+curl -s 'http://localhost:8000/items?ticker=$META&limit=10'
+```
 
 ---
 
