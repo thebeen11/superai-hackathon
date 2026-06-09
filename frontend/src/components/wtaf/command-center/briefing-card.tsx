@@ -1,6 +1,6 @@
 "use client";
 import type { Agent, BriefingItem } from "@/lib/types";
-import { Card } from "../primitives";
+import { Card, EmptyState } from "../primitives";
 import { AgentAvatar } from "../agents";
 
 export function BriefingCard({ briefing, chairman }: { briefing: BriefingItem[]; chairman: Agent }) {
@@ -11,6 +11,7 @@ export function BriefingCard({ briefing, chairman }: { briefing: BriefingItem[];
         <AgentAvatar a={chairman} size={28} />
         <div style={{ fontSize: 11.5, color: "var(--t-mid)" }}>Winston · <span style={{ color: "var(--t-lo)" }}>chairman</span></div>
       </div>
+      {briefing.length === 0 && <EmptyState label="No briefing yet" sub="Awaiting Winston (Tier 5)" minHeight={120} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {briefing.map((b, i) => (
           <div key={i} style={{ display: "flex", gap: 10 }}>

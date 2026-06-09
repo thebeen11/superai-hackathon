@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# openapi codegen crash logs (@hey-api/openapi-ts)
+openapi-ts-error-*.log

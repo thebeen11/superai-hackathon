@@ -37,6 +37,19 @@ export function Card({
   );
 }
 
+/* empty / awaiting-data placeholder for a card or section */
+export function EmptyState({ label, sub, minHeight = 96 }: { label: string; sub?: string; minHeight?: number }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, minHeight, textAlign: "center", padding: "14px 12px" }}>
+      <div style={{ width: 30, height: 30, borderRadius: 9, display: "grid", placeItems: "center", border: "1px dashed var(--stroke-hi)", color: "var(--t-faint)", marginBottom: 4 }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--t-mid)", fontWeight: 500 }}>{label}</div>
+      {sub && <div className="mono" style={{ fontSize: 10.5, color: "var(--t-faint)" }}>{sub}</div>}
+    </div>
+  );
+}
+
 /* signed delta pill */
 export function Delta({ v, suffix = "%", size = 12 }: { v: number; suffix?: string; size?: number }) {
   const up = v >= 0;

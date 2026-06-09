@@ -1,7 +1,7 @@
 "use client";
 /* ============ WTAF — Financial Indicator Dashboard ============ */
 import { useWtafData } from "@/providers/wtaf-provider";
-import { Card, Ring, MiniBar } from "../primitives";
+import { Card, Ring, MiniBar, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
 
 export function IndicatorsPage() {
@@ -9,8 +9,13 @@ export function IndicatorsPage() {
   const bandC: Record<string, string> = { Positive: "var(--up)", Neutral: "var(--amber)", Negative: "var(--down)" };
   return (
     <div>
-      <PageHead title="Financial Indicator Dashboard" sub="macro signals graded by Andie · evidence-backed" />
+      <PageHead title="Financial Indicator Dashboard" sub="industry signal coverage · evidence-backed" />
       <div className="grid12">
+        {d.indicators.length === 0 && (
+          <Card className="span12">
+            <EmptyState label="No indicators yet" sub="Run a discovery to derive industry signals · rubric scores await Tier 3 (Andie)" />
+          </Card>
+        )}
         {d.indicators.map((ind, i) => (
           <Card key={i} className="span4" title={ind.name} sub={ind.band}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -25,6 +30,9 @@ export function IndicatorsPage() {
           </Card>
         ))}
         <Card title="Watchlist Snapshot" sub="US equities" className="span6">
+          {d.watchlist.length === 0 ? (
+            <EmptyState label="No tickers yet" sub="run a discovery" />
+          ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {d.watchlist.map((w, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < d.watchlist.length - 1 ? "1px solid var(--stroke)" : "none" }}>
@@ -34,8 +42,12 @@ export function IndicatorsPage() {
               </div>
             ))}
           </div>
+          )}
         </Card>
         <Card title="Key Events" sub="past & upcoming" className="span6">
+          {d.catalysts.length === 0 ? (
+            <EmptyState label="No events yet" sub="Awaiting Tier 3–5" />
+          ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {d.catalysts.map((c, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: i < d.catalysts.length - 1 ? "1px solid var(--stroke)" : "none" }}>
@@ -45,6 +57,7 @@ export function IndicatorsPage() {
               </div>
             ))}
           </div>
+          )}
         </Card>
       </div>
     </div>

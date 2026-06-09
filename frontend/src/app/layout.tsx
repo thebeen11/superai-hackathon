@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Locator } from "@/components/dev/locator";
+import { DashboardChrome } from "@/components/wtaf/shell/dashboard-chrome";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,11 +23,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>
+    // suppressHydrationWarning: browser extensions (Grammarly, Bitdefender, …)
+    // mutate <html>/<body> before React hydrates; this silences that benign noise.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <div className="bg-field" />
         <div className="bg-grid" />
-        {children}
+        <DashboardChrome>{children}</DashboardChrome>
         <Locator />
       </body>
     </html>

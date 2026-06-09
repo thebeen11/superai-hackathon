@@ -8,8 +8,16 @@
  * To go live: set NEXT_PUBLIC_API_URL in `.env.local` and implement the
  * matching routes on the backend. No UI code needs to change.
  */
+import { client } from "./generated/client.gen";
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 export const USE_MOCK = API_BASE.length === 0;
+
+// Point the generated (hey-api) client at the backend. When USE_MOCK we never
+// call it, so leaving the base URL unset is fine.
+if (!USE_MOCK) {
+  client.setConfig({ baseUrl: API_BASE });
+}
 
 /** Simulated latency for the mock layer so loading states are exercised. */
 export const MOCK_LATENCY_MS = 350;

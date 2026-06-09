@@ -1,12 +1,15 @@
 "use client";
 import type { Catalyst } from "@/lib/types";
-import { Card } from "../primitives";
+import { Card, EmptyState } from "../primitives";
 
 export function CatalystsCard({ catalysts }: { catalysts: Catalyst[] }) {
   const toneC: Record<string, string> = { orange: "var(--orange)", blue: "var(--blue-bright)", green: "var(--up)", indigo: "var(--indigo)" };
   return (
     <Card title="Upcoming Catalysts" sub="key events" className="span5"
       action={<span className="label-xs" style={{ fontSize: 9 }}>next 7 days</span>}>
+      {catalysts.length === 0 ? (
+        <EmptyState label="No catalysts scheduled" sub="Awaiting Tier 3–5 · Andie/Freddy/Winston" />
+      ) : (
       <div style={{ display: "flex", flexDirection: "column" }}>
         {catalysts.map((c, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 13, padding: "9px 0", borderBottom: i < catalysts.length - 1 ? "1px solid var(--stroke)" : "none" }}>
@@ -22,6 +25,7 @@ export function CatalystsCard({ catalysts }: { catalysts: Catalyst[] }) {
           </div>
         ))}
       </div>
+      )}
     </Card>
   );
 }

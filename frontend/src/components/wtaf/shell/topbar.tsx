@@ -2,22 +2,39 @@
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import type { TickerItem } from "@/lib/types";
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
+import { USE_MOCK } from "@/lib/api/client";
+import { discoverAndProcess } from "@/lib/api/wtaf";
 
 export function TopBar() {
   const d = useWtafData();
+  const { refresh } = useWtaf();
   const [tickers, setTickers] = useState<TickerItem[]>(d.ticker);
   const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const addTicker = (e: FormEvent) => {
     e.preventDefault();
-    const sym = query.trim().replace(/^\$/, "").toUpperCase();
-    if (!sym) return;
+    const topic = query.trim();
+    if (!topic || busy) return;
+
+    // Optimistic ticker chip (immediate feedback) when the input looks like a symbol.
+    const sym = topic.replace(/^\$/, "").toUpperCase();
     const symbol = `$${sym}`;
-    if (!tickers.some((t) => t.t.toUpperCase() === symbol.toUpperCase())) {
+    if (/^[A-Z.]{1,6}$/.test(sym) && !tickers.some((t) => t.t.toUpperCase() === symbol)) {
       setTickers((prev) => [{ t: symbol, px: "—", chg: 0 }, ...prev]);
     }
     setQuery("");
+
+    // Live mode: treat the input as a discovery topic — ingest it, then refresh
+    // so the adapter repopulates Sources / Trackers / Watchlist from real items.
+    if (!USE_MOCK) {
+      setBusy(true);
+      discoverAndProcess(topic)
+        .then(() => refresh())
+        .catch((err) => console.warn("[wtaf] discovery failed:", err))
+        .finally(() => setBusy(false));
+    }
   };
 
   return (
@@ -39,15 +56,16 @@ export function TopBar() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Add ticker…"
-            aria-label="Add stock ticker"
+            disabled={busy}
+            placeholder={busy ? "Discovering…" : USE_MOCK ? "Add ticker…" : "Discover topic…"}
+            aria-label={USE_MOCK ? "Add stock ticker" : "Discover a research topic"}
             className="mono"
-            style={{ width: 170, padding: "7px 10px 7px 28px", borderRadius: 8, fontSize: 12, background: "var(--inset)", border: "1px solid var(--stroke)", color: "var(--t-hi)", outline: "none" }}
+            style={{ width: 170, padding: "7px 10px 7px 28px", borderRadius: 8, fontSize: 12, background: "var(--inset)", border: "1px solid var(--stroke)", color: "var(--t-hi)", outline: "none", opacity: busy ? 0.6 : 1 }}
             onFocus={(e) => (e.currentTarget.style.borderColor = "color-mix(in oklch, var(--blue) 50%, transparent)")}
             onBlur={(e) => (e.currentTarget.style.borderColor = "var(--stroke)")}
           />
         </div>
-        <button type="submit" title="Add ticker" style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "color-mix(in oklch, var(--blue) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--blue) 45%, transparent)", color: "var(--blue-bright)", fontSize: 16, lineHeight: 1 }}>+</button>
+        <button type="submit" disabled={busy} title={USE_MOCK ? "Add ticker" : "Discover topic"} style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "color-mix(in oklch, var(--blue) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--blue) 45%, transparent)", color: "var(--blue-bright)", fontSize: 16, lineHeight: 1, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "+"}</button>
       </form>
 
       {/* push datetime to the right */}

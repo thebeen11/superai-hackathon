@@ -1,6 +1,6 @@
 "use client";
 import type { Debate, Tier } from "@/lib/types";
-import { Card } from "../primitives";
+import { Card, EmptyState } from "../primitives";
 import { AgentAvatar } from "../agents";
 
 export function DebateCard({
@@ -21,6 +21,14 @@ export function DebateCard({
     { ag: bull, side: db.bull, c: "var(--up)" },
     { ag: bear, side: db.bear, c: "var(--down)" },
   ];
+  const hasDebate = db.transcript.length > 0 || db.verdict !== "";
+  if (!hasDebate) {
+    return (
+      <Card title="Debate Chamber" sub="adversarial · Bull vs Bear" className="span7">
+        <EmptyState label="No debate yet" sub="Awaiting Tier 4 · Freddy (Bull vs Bear)" minHeight={180} />
+      </Card>
+    );
+  }
   return (
     <Card title="Debate Chamber" sub={`round ${db.round} / ${db.rounds}`} className="span7"
       action={<button onClick={onOpenDebate} style={{ fontSize: 11, color: "var(--blue-bright)", background: "none", border: "none" }}>View transcript →</button>}>

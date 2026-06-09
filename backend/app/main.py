@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -25,11 +26,22 @@ from .sse import sse_stream
 
 logging.basicConfig(level=logging.INFO)
 
+
+def _operation_id(route: APIRoute) -> str:
+    """Use the route's function name as the OpenAPI operationId.
+
+    Keeps the generated frontend SDK names clean (e.g. `listItems`,
+    `discoverPost`) instead of FastAPI's verbose `list_items_items_get`.
+    """
+    return route.name
+
+
 app = FastAPI(
     title="Hedge Fund AI Agent Council — API",
     version="0.1.0",
     docs_url="/docs",       # Swagger UI
     redoc_url=None,         # disabled here; served below from a self-hosted bundle
+    generate_unique_id_function=_operation_id,
 )
 
 # Serve static assets (self-hosted ReDoc bundle) so the API reference renders

@@ -1,19 +1,14 @@
 "use client";
-/* ============ WTAF — Watchlist (standalone page) ============ */
-import { useState } from "react";
-import type { WatchItem } from "@/lib/types";
+/* ============ WTAF — Watchlist (list + ticker detail routes) ============ */
+import Link from "next/link";
 import { useWtafData } from "@/providers/wtaf-provider";
-import { Card, MiniBar } from "../primitives";
+import { useShellActions } from "@/providers/shell-ui-provider";
+import { Card, MiniBar, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
 import { DebateCard } from "../command-center/debate-card";
 
-export function WatchlistPage({ onOpenDebate }: { onOpenDebate: () => void }) {
+export function WatchlistPage() {
   const d = useWtafData();
-  const [selected, setSelected] = useState<WatchItem | null>(null);
-
-  if (selected) {
-    return <TickerDetail item={selected} onBack={() => setSelected(null)} onOpenDebate={onOpenDebate} />;
-  }
 
   return (
     <div>
@@ -21,9 +16,12 @@ export function WatchlistPage({ onOpenDebate }: { onOpenDebate: () => void }) {
       <div className="grid12">
         <Card title="Tracked Tickers" sub={`${d.watchlist.length} names`} className="span12"
           action={<span className="mono" style={{ fontSize: 11, color: "var(--orange-bright)" }}>{d.watchlist.filter((w) => w.alert).length} alerts</span>}>
+          {d.watchlist.length === 0 ? (
+            <EmptyState label="No tickers tracked yet" sub="Run a discovery to resolve entities ($TICKER) from sources" minHeight={140} />
+          ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {d.watchlist.map((w, i) => (
-              <button key={w.t} onClick={() => setSelected(w)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 8px", margin: "0 -8px", background: "transparent", border: "none", borderBottom: i < d.watchlist.length - 1 ? "1px solid var(--stroke)" : "none", textAlign: "left", borderRadius: 8, transition: "background .15s", cursor: "pointer" }}
+              <Link key={w.t} href={`/watchlist/${encodeURIComponent(w.t)}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 8px", margin: "0 -8px", background: "transparent", borderBottom: i < d.watchlist.length - 1 ? "1px solid var(--stroke)" : "none", textAlign: "left", borderRadius: 8, transition: "background .15s", cursor: "pointer" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--panel-2)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                 <span className="mono" style={{ fontSize: 13, fontWeight: 600, width: 56 }}>{w.t}</span>
@@ -33,26 +31,44 @@ export function WatchlistPage({ onOpenDebate }: { onOpenDebate: () => void }) {
                 <span className="mono" style={{ fontSize: 12.5, width: 68, textAlign: "right" }}>{w.px.toFixed(2)}</span>
                 <span className="mono" style={{ fontSize: 12, width: 58, textAlign: "right", color: w.chg >= 0 ? "var(--up)" : "var(--down)" }}>{w.chg >= 0 ? "+" : ""}{w.chg.toFixed(2)}%</span>
                 <span style={{ color: "var(--t-faint)", flexShrink: 0 }}>›</span>
-              </button>
+              </Link>
             ))}
           </div>
+          )}
         </Card>
       </div>
     </div>
   );
 }
 
-function TickerDetail({ item, onBack, onOpenDebate }: { item: WatchItem; onBack: () => void; onOpenDebate: () => void }) {
+export function TickerDetailPage({ ticker }: { ticker: string }) {
   const d = useWtafData();
+  const { onOpenDebate } = useShellActions();
+  const item = d.watchlist.find((w) => w.t.toUpperCase() === ticker.toUpperCase());
+
+  if (!item) {
+    return (
+      <div>
+        <PageHead title={ticker} sub="ticker detail"
+          right={<Link href="/watchlist" className="primary-btn" style={{ padding: "8px 14px" }}>‹ Back to Watchlist</Link>} />
+        <div className="grid12">
+          <Card className="span12">
+            <EmptyState label={`No data for ${ticker}`} sub="This ticker is not in the current watchlist" minHeight={140} />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHead
         title={`${item.t} · ${item.n}`}
         sub="ticker detail · debate & sources"
         right={
-          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9, fontSize: 12.5, background: "var(--panel-2)", border: "1px solid var(--stroke)", color: "var(--t-mid)" }}>
+          <Link href="/watchlist" style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9, fontSize: 12.5, background: "var(--panel-2)", border: "1px solid var(--stroke)", color: "var(--t-mid)" }}>
             ‹ Back to Watchlist
-          </button>
+          </Link>
         }
       />
       <div className="grid12">
@@ -75,6 +91,9 @@ function TickerDetail({ item, onBack, onOpenDebate }: { item: WatchItem; onBack:
 
         {/* All sources related to this ticker */}
         <Card title="Related Sources" sub={`feeding ${item.t}`} className="span5">
+          {d.sources.length === 0 ? (
+            <EmptyState label="No sources yet" sub="run a discovery" />
+          ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {d.sources.map((s, i) => (
               <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < d.sources.length - 1 ? "1px solid var(--stroke)" : "none" }}>
@@ -87,6 +106,7 @@ function TickerDetail({ item, onBack, onOpenDebate }: { item: WatchItem; onBack:
               </div>
             ))}
           </div>
+          )}
         </Card>
       </div>
     </div>

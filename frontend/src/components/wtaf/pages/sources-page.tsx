@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useWtafData } from "@/providers/wtaf-provider";
 import { setSourceLive } from "@/lib/api/wtaf";
-import { Card } from "../primitives";
+import { Card, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
 import { SignalVolumeCard } from "../command-center/signal-volume-card";
 import { SystemCard } from "../command-center/system-card";
@@ -27,6 +27,9 @@ export function SourcesPage() {
       <div className="grid12">
         <Card title="Data Sources" sub={`${sources.filter((s) => s.live).length} live`} className="span6"
           action={<button className="primary-btn" style={{ padding: "6px 12px", fontSize: 11.5 }}>+ Add Source</button>}>
+          {sources.length === 0 ? (
+            <EmptyState label="No data sources yet" sub="Run a discovery to ingest sources" />
+          ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {sources.map((s, i) => (
               <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < sources.length - 1 ? "1px solid var(--stroke)" : "none" }}>
@@ -41,9 +44,14 @@ export function SourcesPage() {
               </div>
             ))}
           </div>
+          )}
         </Card>
 
         <Card title="Prediction Ledger" sub="channel accuracy · Brier-scored" className="span6">
+          {d.ledger.length === 0 ? (
+            <EmptyState label="No prediction ledger yet" sub="Awaiting Tier 3 · Andie (rubric scoring)" />
+          ) : (
+          <>
           <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 56px 56px 50px", gap: 8, padding: "0 0 8px", borderBottom: "1px solid var(--stroke)" }}>
             {["#", "Channel", "Acc", "Pred", "Brier"].map((h, i) => (<span key={i} className="label-xs" style={{ fontSize: 8.5, textAlign: i > 1 ? "right" : "left" }}>{h}</span>))}
           </div>
@@ -57,9 +65,14 @@ export function SourcesPage() {
               <span className="mono" style={{ fontSize: 11.5, textAlign: "right", color: "var(--t-lo)" }}>{l.brier}</span>
             </div>
           ))}
+          </>
+          )}
         </Card>
 
         <Card title="Pending Predictions" sub="awaiting resolution" className="span12">
+          {d.predictions.length === 0 ? (
+            <EmptyState label="No pending predictions" sub="Awaiting Tier 3 · Andie (prediction ledger)" />
+          ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
             {d.predictions.map((p, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 10, background: "var(--inset)", border: "1px solid var(--stroke)" }}>
@@ -75,6 +88,7 @@ export function SourcesPage() {
               </div>
             ))}
           </div>
+          )}
         </Card>
 
         {/* System health & monitoring */}
