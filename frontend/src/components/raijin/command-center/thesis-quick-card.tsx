@@ -15,7 +15,7 @@ export function ThesisQuickCard({
 }) {
   const actions: { label: string; fn: () => void; tone: keyof typeof ACCENTS }[] = [
     { label: "New Tracker", fn: onNewTracker, tone: "blue" },
-    { label: "Run Backtest", fn: () => onNav("backtest"), tone: "green" },
+    { label: "Indicators", fn: () => onNav("indicators"), tone: "green" },
     { label: "Signals", fn: () => onNav("signals"), tone: "indigo" },
     { label: "Sources", fn: () => onNav("sources"), tone: "orange" },
   ];

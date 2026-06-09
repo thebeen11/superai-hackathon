@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Locator } from "@/components/dev/locator";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
         <div className="bg-field" />
         <div className="bg-grid" />
         {children}
+        <Locator />
       </body>
     </html>
   );

@@ -6,7 +6,6 @@ import type { PageId, ShellActions } from "./shared";
 import { AgentDrawer } from "./agents";
 import { CommandCenter } from "./command-center";
 import { SignalTerminal } from "./pages/signal-terminal";
-import { BacktestSandbox } from "./pages/backtest-sandbox";
 import { SourcesPage } from "./pages/sources-page";
 import { IndicatorsPage } from "./pages/indicators-page";
 import { Sidebar } from "./shell/sidebar";
@@ -23,7 +22,6 @@ function Shell() {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [contextTracker, setContextTracker] = useState<string | null>(null);
   const [newTracker, setNewTracker] = useState(false);
-  const [presetTheme, setPresetTheme] = useState<string | null>(null);
 
   const actions: ShellActions = useMemo(
     () => ({
@@ -31,10 +29,6 @@ function Shell() {
       onOpenAgent: setAgentId,
       onOpenContext: setContextTracker,
       onNewTracker: () => setNewTracker(true),
-      onRunBacktest: (themeName?: string) => {
-        setPresetTheme(themeName ?? null);
-        setPage("backtest");
-      },
     }),
     [],
   );
@@ -52,7 +46,6 @@ function Shell() {
         <main style={{ flex: 1, overflowY: "auto", padding: "18px 20px 28px" }}>
           {page === "command" && <CommandCenter actions={actions} />}
           {page === "signals" && <SignalTerminal onOpenContext={setContextTracker} onNewTracker={() => setNewTracker(true)} />}
-          {page === "backtest" && <BacktestSandbox presetTheme={presetTheme} />}
           {page === "sources" && <SourcesPage />}
           {page === "indicators" && <IndicatorsPage />}
         </main>

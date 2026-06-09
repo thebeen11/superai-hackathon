@@ -168,21 +168,6 @@ export interface Source {
   items: number;
 }
 
-/* ---- backtest (dynamic / computed by the backend) ---- */
-export interface BacktestParams {
-  theme: string;
-  amount: number;
-  months: number;
-}
-export interface BacktestResult {
-  curve: number[];
-  spx: number[];
-  ret: number;
-  dd: number;
-  final: number;
-  alpha: number;
-}
-
 export interface RaijinData {
   now: string;
   marketOpen: boolean;

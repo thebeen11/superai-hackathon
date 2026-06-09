@@ -2,17 +2,11 @@
 import type { Theme } from "@/lib/types";
 import { Card } from "../primitives";
 
-export function ThemesCard({
-  themes,
-  onRunBacktest,
-}: {
-  themes: Theme[];
-  onRunBacktest: (themeName?: string) => void;
-}) {
+export function ThemesCard({ themes }: { themes: Theme[] }) {
   const riskC: Record<string, string> = { Low: "var(--up)", Med: "var(--amber)", High: "var(--down)" };
   return (
     <Card title="Thematic Portfolios" sub="Freddy · baskets" className="span7"
-      action={<button onClick={() => onRunBacktest(themes[0]?.name)} style={{ fontSize: 11, color: "var(--blue-bright)", background: "none", border: "none" }}>Backtest sandbox →</button>}>
+      action={<span className="label-xs" style={{ fontSize: 9 }}>conviction-ranked</span>}>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {themes.map((t, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 13px", borderRadius: 11, background: "var(--inset)", border: "1px solid var(--stroke)" }}>
@@ -30,7 +24,6 @@ export function ThemesCard({
               <div className="mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--up)" }}>+{t.ret}%</div>
               <div className="label-xs" style={{ fontSize: 8 }}>12M sim</div>
             </div>
-            <button onClick={() => onRunBacktest(t.name)} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 500, background: "color-mix(in oklch, var(--blue) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--blue) 45%, transparent)", color: "var(--blue-bright)" }}>Backtest</button>
           </div>
         ))}
       </div>
