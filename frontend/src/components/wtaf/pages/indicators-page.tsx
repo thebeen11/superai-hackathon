@@ -1,11 +1,11 @@
 "use client";
-/* ============ RAIJIN — Financial Indicator Dashboard ============ */
-import { useRaijinData } from "@/providers/raijin-provider";
+/* ============ WTAF — Financial Indicator Dashboard ============ */
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Card, Ring, MiniBar } from "../primitives";
 import { PageHead } from "../shared";
 
 export function IndicatorsPage() {
-  const d = useRaijinData();
+  const d = useWtafData();
   const bandC: Record<string, string> = { Positive: "var(--up)", Neutral: "var(--amber)", Negative: "var(--down)" };
   return (
     <div>

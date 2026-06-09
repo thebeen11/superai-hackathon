@@ -3,7 +3,7 @@
  *
  * The base URL comes from NEXT_PUBLIC_API_URL. When it is unset (e.g. local
  * dev before the backend exists) USE_MOCK is true and the endpoint layer in
- * `raijin.ts` resolves to the in-repo mock data instead of hitting the network.
+ * `wtaf.ts` resolves to the in-repo mock data instead of hitting the network.
  *
  * To go live: set NEXT_PUBLIC_API_URL in `.env.local` and implement the
  * matching routes on the backend. No UI code needs to change.

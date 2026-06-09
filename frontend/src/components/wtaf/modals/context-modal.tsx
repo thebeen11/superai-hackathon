@@ -2,7 +2,7 @@
 /* Context Preview — fetched per-tracker from the API (own loading state). */
 import { useEffect, useState } from "react";
 import type { ContextPreview } from "@/lib/types";
-import { getContextPreview } from "@/lib/api/raijin";
+import { getContextPreview } from "@/lib/api/wtaf";
 import { Dot } from "../primitives";
 import { Modal } from "./modal";
 

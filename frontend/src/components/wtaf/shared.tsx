@@ -1,5 +1,5 @@
 "use client";
-/* ============ RAIJIN — small shared building blocks ============ */
+/* ============ WTAF — small shared building blocks ============ */
 import type { ReactNode } from "react";
 
 export function PageHead({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) {
@@ -33,7 +33,7 @@ export function Stat({ label, value, color }: { label: string; value: ReactNode;
 }
 
 /** Shared navigation target ids — single source of truth for routing within the SPA. */
-export type PageId = "command" | "signals" | "sources" | "indicators";
+export type PageId = "command" | "watchlist" | "signals" | "sources" | "indicators";
 
 /** Callbacks the shell hands down to pages/cards (modals + navigation). */
 export interface ShellActions {

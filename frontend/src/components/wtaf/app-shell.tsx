@@ -1,10 +1,11 @@
 "use client";
-/* ============ RAIJIN — app shell (root) ============ */
+/* ============ WTAF — app shell (root) ============ */
 import { useMemo, useState } from "react";
-import { RaijinProvider, useRaijin } from "@/providers/raijin-provider";
+import { WtafProvider, useWtaf } from "@/providers/wtaf-provider";
 import type { PageId, ShellActions } from "./shared";
 import { AgentDrawer } from "./agents";
 import { CommandCenter } from "./command-center";
+import { WatchlistPage } from "./pages/watchlist";
 import { SignalTerminal } from "./pages/signal-terminal";
 import { SourcesPage } from "./pages/sources-page";
 import { IndicatorsPage } from "./pages/indicators-page";
@@ -17,7 +18,7 @@ import { DebateModal } from "./modals/debate-modal";
 
 /** Inner shell — runs inside the provider, so it can read the snapshot. */
 function Shell() {
-  const { data, loading, error, refresh } = useRaijin();
+  const { data, loading, error, refresh } = useWtaf();
 
   const [page, setPage] = useState<PageId>("command");
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -50,6 +51,7 @@ function Shell() {
         <TopBar />
         <main style={{ flex: 1, overflowY: "auto", padding: "18px 20px 28px" }}>
           {page === "command" && <CommandCenter actions={actions} />}
+          {page === "watchlist" && <WatchlistPage onOpenDebate={() => setDebateOpen(true)} />}
           {page === "signals" && <SignalTerminal onOpenContext={setContextTracker} onNewTracker={() => setNewTracker(true)} />}
           {page === "sources" && <SourcesPage />}
           {page === "indicators" && <IndicatorsPage />}
@@ -63,10 +65,10 @@ function Shell() {
   );
 }
 
-export function RaijinApp() {
+export function WtafApp() {
   return (
-    <RaijinProvider>
+    <WtafProvider>
       <Shell />
-    </RaijinProvider>
+    </WtafProvider>
   );
 }

@@ -1,5 +1,5 @@
-import { RaijinApp } from "@/components/raijin/app-shell";
+import { WtafApp } from "@/components/wtaf/app-shell";
 
 export default function Home() {
-  return <RaijinApp />;
+  return <WtafApp />;
 }

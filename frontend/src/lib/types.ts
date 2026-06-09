@@ -1,4 +1,4 @@
-/* ============ RAIJIN — domain types ============ */
+/* ============ WTAF — domain types ============ */
 
 export type AccentKey = "blue" | "indigo" | "orange" | "green" | "red" | "amber" | "chair";
 export type AgentStatus = "active" | "thinking" | "idle";
@@ -21,13 +21,6 @@ export interface Ace {
   delta: number;
   components: AceComponent[];
   overlay: { ace: number[]; smh: number[] };
-}
-
-export interface ThesisCountdown {
-  label: string;
-  sub: string;
-  target: string;
-  pct: number;
 }
 
 export interface Agent {
@@ -210,11 +203,10 @@ export interface Source {
   items: number;
 }
 
-export interface RaijinData {
+export interface WtafData {
   now: string;
   marketOpen: boolean;
   ace: Ace;
-  thesisCountdown: ThesisCountdown;
   agents: Agent[];
   tiers: Tier[];
   debate: Debate;
