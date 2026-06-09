@@ -1,0 +1,34 @@
+"""SQLAlchemy table definitions (Req 14, 15). Plain Postgres — no embeddings."""
+from __future__ import annotations
+
+from sqlalchemy import Column, DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class CleanedItemRow(Base):
+    __tablename__ = "cleaned_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_url = Column(Text, nullable=False, unique=True)   # upsert key (Req 15.5)
+    source_type = Column(String, nullable=False)             # 'web' | 'youtube'
+    title = Column(Text, nullable=False)
+    clean_text = Column(Text, nullable=False)
+    stream = Column(String, nullable=False)                  # 'MACRO' | 'MICRO'
+    industry = Column(String, nullable=False)                # sector or 'Unclassified'
+    entities = Column(JSONB, nullable=False, default=list)   # [{canonical, mentions[]}]
+    themes = Column(JSONB, nullable=False, default=list)     # ["Technology", ...]
+    segments = Column(JSONB, nullable=False, default=list)   # [{start, text}]
+    published_at = Column(DateTime(timezone=True), nullable=True)   # nullable (Req 14)
+    ingested_at = Column(DateTime(timezone=True), nullable=False)   # UTC (Req 14)
+
+
+# Indexes so later layers can query by stream/industry/ticker/theme without a vector DB.
+Index("idx_cleaned_items_stream", CleanedItemRow.stream)
+Index("idx_cleaned_items_industry", CleanedItemRow.industry)
+Index("idx_cleaned_items_entities", CleanedItemRow.entities, postgresql_using="gin")
+Index("idx_cleaned_items_themes", CleanedItemRow.themes, postgresql_using="gin")

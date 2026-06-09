@@ -1,0 +1,27 @@
+[ Data Sources ]
+   │
+   ├─► Wilfred-YT (Video Pipeline)
+   ├─► Wilfred-Web (Google/News API) - exa search
+   └─► Wilfred-Auth (Playwright/Barrons) - make mock api. 
+         │
+         ▼
+[ TIMO - Data Purifier DB ] (Normalizes, Embeds, Cleans)
+sqlite -> labels them and use it as an Index
+S3 Object store for cleaned file storage.
+         │
+         ▼
+[ THE ANDIE ANALYST PODS (Event-Driven) ]
+   │
+   ├─► Andie-TMT (Evaluates 20 Tech stocks vs Rubrics)
+   ├─► Andie-HardAssets (Evaluates 20 Industrial stocks vs Rubrics)
+   └─► Andie-Core (Evaluates 20 Financial/Macro stocks vs Rubrics)
+         │
+         ▼
+[ FREDDY - The CIO Orchestrator ]
+  - Ingests all 3 Andie reports.
+  - Identifies Cross-Sector correlations.
+  - Generates ACE Index & Final Thematic Baskets.
+  - Executes Backtests.
+         │
+         ▼
+[ FRONTEND DASHBOARD ]

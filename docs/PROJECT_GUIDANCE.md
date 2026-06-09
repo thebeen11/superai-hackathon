@@ -1,8 +1,9 @@
 # Hedge Fund AI Agent Council
 
-> **Project guidance** distilled from the planning conversations. This is the single
-> source of truth for what we're building, why, and how the pieces fit together.
-> Hand the relevant sections to engineers building the orchestrator and workers.
+
+> **Project guidance** distilled from the planning conversation. This is the single
+> source of truth for **what** we're building and **why**. For the actionable build
+> order and milestones, see [`BUILD_PLAN.md`](./BUILD_PLAN.md).
 
 ---
 
@@ -37,13 +38,27 @@ Two research approaches must be supported:
 
 **Scope (v1):** US public equities only.
 
+### Output philosophy — Option A (Sentiment & Timing, not Price Triggers)
+
+This system is a **research and conviction engine**, not a trade-signal engine.
+It tells the user *what* to look at, *how strong the conviction is*, and *over what
+time horizon* — it does **not** emit precise entry/exit prices, stop-losses, or
+take-profit targets. Recommendations are expressed as:
+
+- **Conviction** (e.g. High / Medium / Low, or a composite score),
+- **Holding period / timing window** (short / medium / long term),
+- **Evidence** (source quotes + timestamps).
+
+> Every recommendation is research, **not financial advice**, and must be auditable
+> back to a source quote at a timestamp.
+
 **End outcome:**
 
-1. A dashboard monitoring financial-health indicators.
-2. Portfolio **themes** of recommendations (e.g. AI data-centre buildout, banking,
-   space, advanced materials) + the individual stocks under each theme.
+1. A **Financial/Economic Indicator Dashboard** (fed by the MACRO data stream).
+2. **Thematic portfolios** of stock recommendations (e.g. "Memory Chips for the AI
+   Buildout: Micron, SK Hynix, SanDisk") each with an **estimated holding period**.
 3. **Backtest** validation: "if you invested $10,000 in this theme, how much would
-   you have made over 3 / 6 / 12 months?"
+   you have made over 3 / 6 / 12 months?" (buy-and-hold, no price triggers).
 
 ---
 
@@ -241,6 +256,19 @@ until Timo tags & routes; Timo can't run until Wilfred ingests.
 - Use a durable task queue / workflow engine — **Temporal, Celery+Redis, or Inngest**.
 - **Triggering:** Wilfred & Timo on **cron**; Andie on **event** (new clean transcript);
   Freddy/Winston on **stage completion** + a weekly **cron** for the thesis drop.
+
+### The debate mechanism (concrete)
+
+1. A Manager proposes a basket — e.g. *"Memory chips for AI buildout: Micron, SK Hynix,
+   SanDisk; holding period 6–12 months."*
+2. **Two different Bedrock models** (e.g. Claude Sonnet vs Amazon Nova Pro) argue
+   **bull vs bear** for **3 rounds**.
+3. The debate transcript goes to the **Chairman**, who issues a per-stock verdict
+   (`APPROVE / REJECT / RESIZE`).
+4. Approved stocks are assembled into the final portfolio shown to the HUMAN.
+
+> Per Option A, every output is **conviction + holding period + timing window** —
+> never a price target.
 
 ---
 
