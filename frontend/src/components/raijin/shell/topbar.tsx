@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import type { TickerItem } from "@/lib/types";
 import { useRaijinData } from "@/providers/raijin-provider";
@@ -22,7 +23,10 @@ export function TopBar() {
   return (
     <header style={{ height: 56, flexShrink: 0, display: "flex", alignItems: "center", gap: 16, padding: "0 20px", borderBottom: "1px solid var(--stroke)", background: "rgba(10,12,18,0.45)", backdropFilter: "blur(12px)", zIndex: 4 }}>
       {/* App name */}
-      <span className="display" style={{ fontSize: 17, fontWeight: 700, letterSpacing: "0.03em", flexShrink: 0 }}>WTAF Fund</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
+        <Image src="/logo.jpg" alt="WTAF Fund" width={26} height={26} priority style={{ borderRadius: 7, objectFit: "cover" }} />
+        <span className="display" style={{ fontSize: 17, fontWeight: 700, letterSpacing: "0.03em" }}>WTAF Fund</span>
+      </div>
 
       <div style={{ width: 1, height: 24, background: "var(--stroke)", flexShrink: 0 }} />
 

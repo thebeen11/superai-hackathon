@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import type { PageId } from "../shared";
 
 const ICONS: Record<string, string> = {
@@ -26,9 +27,9 @@ function NavIcon({ d, active }: { d: string; active: boolean }) {
 export function Sidebar({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   return (
     <aside style={{ width: 66, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "16px 0", borderRight: "1px solid var(--stroke)", background: "rgba(255,255,255,0.012)", zIndex: 5 }}>
-      <div style={{ width: 38, height: 38, borderRadius: 11, display: "grid", placeItems: "center", marginBottom: 22, background: "linear-gradient(150deg, var(--blue-bright), var(--indigo))", boxShadow: "0 0 18px -4px var(--blue)" }}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L4 14h6l-1 8 9-12h-6z" /></svg>
-      </div>
+      <Image src="/logo.jpg" alt="WTAF Fund" width={38} height={38} priority
+        style={{ borderRadius: 11, marginBottom: 22, objectFit: "cover", boxShadow: "0 0 18px -4px var(--blue)" }} />
+
       <nav style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
         {NAV.map((n) => {
           const active = page === n.id;
