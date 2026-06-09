@@ -27,7 +27,7 @@ superai-hackathon/
 
 - Python 3.11+
 - Node.js 18+
-- npm / pnpm / yarn
+- pnpm
 
 ### Backend
 
@@ -45,8 +45,8 @@ pip install -r requirements.txt
 
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 The app will be available at http://localhost:3000.
@@ -67,8 +67,8 @@ Create a `.env` file in each package as needed:
 
 | Location  | Command          | Description              |
 | --------- | ---------------- | ------------------------ |
-| frontend  | `npm run dev`    | Start the dev server     |
-| frontend  | `npm run build`  | Build for production     |
+| frontend  | `pnpm dev`       | Start the dev server     |
+| frontend  | `pnpm build`     | Build for production     |
 | backend   | `uvicorn ...`    | Start the API server     |
 
 ## Team
