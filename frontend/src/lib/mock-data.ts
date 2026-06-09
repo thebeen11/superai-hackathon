@@ -25,13 +25,6 @@ export const raijinMock: RaijinData = {
     },
   },
 
-  thesisCountdown: {
-    label: "WEEKLY THESIS",
-    sub: "Freddy · synthesis",
-    target: "FRI 16:00",
-    pct: 0.71,
-  },
-
   agents: [
     {
       id: "wilfred",

@@ -5,6 +5,7 @@ import { RaijinProvider, useRaijin } from "@/providers/raijin-provider";
 import type { PageId, ShellActions } from "./shared";
 import { AgentDrawer } from "./agents";
 import { CommandCenter } from "./command-center";
+import { WatchlistPage } from "./pages/watchlist";
 import { SignalTerminal } from "./pages/signal-terminal";
 import { SourcesPage } from "./pages/sources-page";
 import { IndicatorsPage } from "./pages/indicators-page";
@@ -50,6 +51,7 @@ function Shell() {
         <TopBar />
         <main style={{ flex: 1, overflowY: "auto", padding: "18px 20px 28px" }}>
           {page === "command" && <CommandCenter actions={actions} />}
+          {page === "watchlist" && <WatchlistPage onOpenDebate={() => setDebateOpen(true)} />}
           {page === "signals" && <SignalTerminal onOpenContext={setContextTracker} onNewTracker={() => setNewTracker(true)} />}
           {page === "sources" && <SourcesPage />}
           {page === "indicators" && <IndicatorsPage />}

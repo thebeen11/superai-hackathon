@@ -23,13 +23,6 @@ export interface Ace {
   overlay: { ace: number[]; smh: number[] };
 }
 
-export interface ThesisCountdown {
-  label: string;
-  sub: string;
-  target: string;
-  pct: number;
-}
-
 export interface Agent {
   id: string;
   name: string;
@@ -214,7 +207,6 @@ export interface RaijinData {
   now: string;
   marketOpen: boolean;
   ace: Ace;
-  thesisCountdown: ThesisCountdown;
   agents: Agent[];
   tiers: Tier[];
   debate: Debate;

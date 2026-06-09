@@ -5,6 +5,8 @@ import { useRaijinData } from "@/providers/raijin-provider";
 import { setSourceLive } from "@/lib/api/raijin";
 import { Card } from "../primitives";
 import { PageHead } from "../shared";
+import { SignalVolumeCard } from "../command-center/signal-volume-card";
+import { SystemCard } from "../command-center/system-card";
 
 export function SourcesPage() {
   const d = useRaijinData();
@@ -74,6 +76,13 @@ export function SourcesPage() {
             ))}
           </div>
         </Card>
+
+        {/* System health & monitoring */}
+        <div className="span12" style={{ marginTop: 4 }}>
+          <div className="label-xs">System Health & Monitoring</div>
+        </div>
+        <SignalVolumeCard signalVolume={d.signalVolume} />
+        <SystemCard system={d.system} />
       </div>
     </div>
   );

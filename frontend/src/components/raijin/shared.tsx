@@ -33,7 +33,7 @@ export function Stat({ label, value, color }: { label: string; value: ReactNode;
 }
 
 /** Shared navigation target ids — single source of truth for routing within the SPA. */
-export type PageId = "command" | "signals" | "sources" | "indicators";
+export type PageId = "command" | "watchlist" | "signals" | "sources" | "indicators";
 
 /** Callbacks the shell hands down to pages/cards (modals + navigation). */
 export interface ShellActions {
