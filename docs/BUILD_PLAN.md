@@ -66,6 +66,36 @@ OpenSearch Serverless, S3). Frontend = **Vercel** + **Vercel AI Gateway**.
 
 ---
 
+## Agent framework — DECISION
+
+**Locked:** **plain Python + the Bedrock `converse` API (boto3)** for all reasoning
+layers, with **LangGraph used *only* for the debate → chairman loop** if/when that
+loop needs explicit state and a stop condition. **No general agent framework.**
+
+Why:
+- Most of the pipeline is a **deterministic flow** (fan-out, clean, score, synthesize),
+  not open-ended agent autonomy — plain functions + loops are faster and easier to debug
+  under hackathon time pressure.
+- Bedrock `converse` gives a single, AWS-native call for every model (Claude, Nova,
+  Llama); **Pydantic** enforces structured JSON output.
+- The one genuinely agentic part — the **bull-vs-bear debate** — is where a state graph
+  earns its keep (explicit rounds + a guaranteed termination), so LangGraph is scoped to
+  *just that* via `langchain-aws`.
+
+Conventions per layer:
+- **Reasoning layers** (Analyst, Manager, Chairman) → a shared `bedrock.converse()`
+  wrapper + a Pydantic schema per output.
+- **Non-reasoning plumbing** (Discovery fan-out/merge/dedupe, Data Eng plumbing) → plain
+  Python, **no LLM framework** (Discovery's fan-out is already built this way: a
+  `ThreadPoolExecutor` fan-out). Discovery additionally has **one** LLM-backed step — the
+  query refinement/clarification skill — via `bedrock.converse()` + a Pydantic schema.
+- **Debate loop** → LangGraph nodes (bull / bear / chairman) with a round cap.
+
+> Supersedes the earlier "LangGraph / AutoGen" note. AutoGen and Bedrock AgentCore were
+> considered and dropped as too heavy for the MVP.
+
+---
+
 ## Hackathon MVP scope (build THIS first)
 
 > The 5-department design above is the **north star**. For the hackathon we build a
@@ -103,7 +133,7 @@ reports = [bedrock_call(analyst_prompt, transcripts_for(co)) for co in watchlist
 | Transcription | Amazon Transcribe + `yt-dlp` | **YouTube captions** via `youtube-transcript-api` (no audio, no Transcribe) |
 | Data sources | YouTube + Exa + Barron's | **One topic query → fans out to Exa (web) + YouTube (transcripts)**; Barron's dropped |
 | Input model | Paste specific URLs / channels | **Single research-topic query**; Discovery finds the sources itself |
-| Orchestration | Step Functions + Fargate + SQS + EventBridge | **One FastAPI service + a "Run pipeline" button** |
+| Orchestration | Step Functions + Fargate + SQS + EventBridge | **One FastAPI service + a "Run" button**; plain Python + Bedrock `converse` (LangGraph only for the debate) |
 | Database | Aurora Serverless v2 | **RDS Postgres** (single small instance) |
 | Compute | Lambda + Fargate | **AWS App Runner** (or 1 small EC2) |
 | Companies | 60 (3 pods × 20) | **~8**, chosen to tell one clean thematic story |
@@ -247,7 +277,7 @@ guardrails we already designed as explicit recovery mechanisms.
 Do **not** build all 5 layers wide at once. Prove one thin path end-to-end, then widen.
 
 ### Milestone 0 — Scaffolding
-- [ ] Backend skeleton (`backend/`): **FastAPI on AWS App Runner** (north star: Lambda + API Gateway); config; IAM roles.
+- [x] Backend skeleton (`backend/`): **FastAPI**, managed with **uv** (`pyproject.toml`); env-backed config. _(Deploy target: App Runner; north star Lambda + API Gateway.)_
 - [ ] **AWS foundation (MVP):** **RDS Postgres** + Bedrock model access enabled; S3 bucket optional.
       _(North star adds OpenSearch Serverless + Aurora Serverless v2.)_
 - [ ] DB schema v1 (Postgres): `sources`, `transcripts`, `companies`, `analyst_reports`,
@@ -258,7 +288,7 @@ Do **not** build all 5 layers wide at once. Prove one thin path end-to-end, then
 
 ### Milestone 1 — The vertical slice (ONE path, end to end)
 Goal: a single rendered recommendation that flows through every layer.
-- [ ] **Layer 1:** Discovery takes a **topic query** → **Exa search + crawl** (web) and **YouTube search + `youtube-transcript-api`** (video). Start with one branch, then fan out.
+- [~] **Layer 1 — Discovery (in progress):** topic query fans out to **Exa (web)** + **YouTube transcripts** in parallel, merges + dedupes, skips-with-reason. Built behind `/discover` + a CLI. **TODO:** plug in API keys and validate against live results.
 - [ ] **Layer 2:** Timo — clean + label MACRO/MICRO/INDUSTRY; store transcript/article rows in **Postgres** (no embedding).
 - [ ] **Layer 3:** the analyst prompt — looped over **~8 companies** to produce highlights (**Bedrock** Claude).
 - [ ] **Layer 4:** the manager prompt — produce one thematic basket + holding period.

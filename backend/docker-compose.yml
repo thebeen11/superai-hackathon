@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: hedgefund-postgres
+    environment:
+      POSTGRES_USER: council
+      POSTGRES_PASSWORD: council
+      POSTGRES_DB: council
+    ports:
+      - "5433:5432"
+    volumes:
+      - council_pgdata:/var/lib/postgresql/data
+
+volumes:
+  council_pgdata:
