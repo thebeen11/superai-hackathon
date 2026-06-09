@@ -4,34 +4,19 @@ import { useState, type FormEvent } from "react";
 import type { TickerItem } from "@/lib/types";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { USE_MOCK } from "@/lib/api/client";
-import type { ProgressEvent } from "@/lib/api/sse";
-
-type DiscoveryStatus = { tone: "info" | "ok" | "warn" | "err"; text: string };
-
-/** Map a backend progress event to a short, live topbar label. */
-function progressLabel(evt: ProgressEvent): string {
-  if (evt.stage.startsWith("dataeng.item") && typeof evt.data.index === "number") {
-    const title = evt.message.replace(/^\[\d+\/\d+\]\s*/, "");
-    return `Cleaning ${evt.data.index}/${evt.data.total}${title ? ` · ${title}` : ""}`;
-  }
-  if (evt.stage === "dataeng") return "Processing…";
-  if (evt.stage.startsWith("discover")) return "Searching…";
-  if (evt.stage === "refine") return "Refining…";
-  return "Working…";
-}
 
 export function TopBar() {
   const d = useWtafData();
-  const { discover } = useWtaf();
+  // Discovery state is owned by the provider so it survives a page reload (the
+  // provider reconnects to the in-flight backend job on mount).
+  const { discover, discovering, discoveryStatus } = useWtaf();
   const [tickers, setTickers] = useState<TickerItem[]>(d.ticker);
   const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<DiscoveryStatus | null>(null);
 
   const addTicker = (e: FormEvent) => {
     e.preventDefault();
     const topic = query.trim();
-    if (!topic || busy) return;
+    if (!topic || discovering) return;
 
     // Optimistic ticker chip (immediate feedback) when the input looks like a symbol.
     const sym = topic.replace(/^\$/, "").toUpperCase();
@@ -41,34 +26,18 @@ export function TopBar() {
     }
     setQuery("");
 
-    // Live mode: treat the input as a discovery topic. The provider's `discover`
-    // streams the ingest (cards show per-region loaders via `discovering`) then
-    // refetches the snapshot; here we drive the topbar badge + final outcome.
+    // Live mode: treat the input as a discovery topic. The provider streams the
+    // ingest (cards show per-region loaders via `discovering`), drives the badge
+    // below, and refetches the snapshot. Errors surface in `discoveryStatus`.
     if (!USE_MOCK) {
-      setBusy(true);
-      setStatus({ tone: "info", text: "Refining…" });
-      discover(topic, (evt) => setStatus({ tone: "info", text: progressLabel(evt) }))
-        .then((report) => {
-          const persisted = report.persisted ?? 0;
-          const failed = report.failed ?? 0;
-          if (persisted > 0) {
-            setStatus({ tone: failed > 0 ? "warn" : "ok", text: `Stored ${persisted}${failed > 0 ? ` · ${failed} dropped` : ""}` });
-          } else {
-            setStatus({ tone: "warn", text: failed > 0 ? `Nothing stored · ${failed} dropped` : "No new sources found" });
-          }
-        })
-        .catch((err) => {
-          console.warn("[wtaf] discovery failed:", err);
-          setStatus({ tone: "err", text: "Discovery failed" });
-        })
-        .finally(() => setBusy(false));
+      discover(topic).catch(() => { /* status already reflects the failure */ });
     }
   };
 
   const statusColor =
-    status?.tone === "ok" ? "var(--green, #34d399)"
-    : status?.tone === "err" ? "var(--red, #f87171)"
-    : status?.tone === "info" ? "var(--blue-bright, #60a5fa)"
+    discoveryStatus?.tone === "ok" ? "var(--green, #34d399)"
+    : discoveryStatus?.tone === "err" ? "var(--red, #f87171)"
+    : discoveryStatus?.tone === "info" ? "var(--blue-bright, #60a5fa)"
     : "var(--amber, #fbbf24)";
 
   return (
@@ -90,22 +59,22 @@ export function TopBar() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            disabled={busy}
-            placeholder={busy ? "Discovering…" : USE_MOCK ? "Add ticker…" : "Discover topic…"}
+            disabled={discovering}
+            placeholder={discovering ? "Discovering…" : USE_MOCK ? "Add ticker…" : "Discover topic…"}
             aria-label={USE_MOCK ? "Add stock ticker" : "Discover a research topic"}
             className="mono"
-            style={{ width: 170, padding: "7px 10px 7px 28px", borderRadius: 8, fontSize: 12, background: "var(--inset)", border: "1px solid var(--stroke)", color: "var(--t-hi)", outline: "none", opacity: busy ? 0.6 : 1 }}
+            style={{ width: 170, padding: "7px 10px 7px 28px", borderRadius: 8, fontSize: 12, background: "var(--inset)", border: "1px solid var(--stroke)", color: "var(--t-hi)", outline: "none", opacity: discovering ? 0.6 : 1 }}
             onFocus={(e) => (e.currentTarget.style.borderColor = "color-mix(in oklch, var(--blue) 50%, transparent)")}
             onBlur={(e) => (e.currentTarget.style.borderColor = "var(--stroke)")}
           />
         </div>
-        <button type="submit" disabled={busy} title={USE_MOCK ? "Add ticker" : "Discover topic"} style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "color-mix(in oklch, var(--blue) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--blue) 45%, transparent)", color: "var(--blue-bright)", fontSize: 16, lineHeight: 1, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "+"}</button>
+        <button type="submit" disabled={discovering} title={USE_MOCK ? "Add ticker" : "Discover topic"} style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "color-mix(in oklch, var(--blue) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--blue) 45%, transparent)", color: "var(--blue-bright)", fontSize: 16, lineHeight: 1, cursor: discovering ? "default" : "pointer", opacity: discovering ? 0.6 : 1 }}>{discovering ? "…" : "+"}</button>
       </form>
 
-      {/* Discovery outcome — DataEngReport persisted/failed, or an error. */}
-      {!USE_MOCK && status && (
+      {/* Discovery progress / outcome — survives a reload via the provider's job reconnect. */}
+      {!USE_MOCK && discoveryStatus && (
         <span className="mono" role="status" style={{ fontSize: 11, color: statusColor, flexShrink: 0, whiteSpace: "nowrap" }}>
-          {status.text}
+          {discoveryStatus.text}
         </span>
       )}
 

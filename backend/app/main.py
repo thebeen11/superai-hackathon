@@ -22,7 +22,8 @@ from .models import (
     DataEngReport,
     DiscoveryResult,
 )
-from .sse import sse_stream
+from .jobs import create_job, get_job, list_jobs
+from .sse import sse_from_subscribe, sse_stream
 
 logging.basicConfig(level=logging.INFO)
 
@@ -181,8 +182,29 @@ def discover_clarify_stream(body: ClarifyRequest):
 
 @app.post("/dataeng/process/stream")
 def dataeng_process_stream(result: DiscoveryResult):
-    """Streaming version of POST /dataeng/process (per-item progress)."""
-    return sse_stream(lambda emit: process_discovery_result(result, emit=emit))
+    """Streaming version of POST /dataeng/process (per-item progress).
+
+    Registers a Job so a client that reloads mid-run can reconnect via
+    /dataeng/jobs/{id}/stream. The job id is sent as a leading `job` SSE frame.
+    """
+    label = result.query or result.original_query or "discovery"
+    job = create_job("dataeng", label)
+    return sse_stream(lambda emit: process_discovery_result(result, emit=emit), job=job)
+
+
+@app.get("/dataeng/jobs")
+def dataeng_jobs(status: str | None = Query("running", description="Filter by job status")):
+    """List tracked discovery jobs (running by default) so a reloaded client can find one."""
+    return list_jobs(status=status)
+
+
+@app.get("/dataeng/jobs/{job_id}/stream")
+def dataeng_job_stream(job_id: str):
+    """Reconnect to a job: replay its progress so far, then stream live to completion."""
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")
+    return sse_from_subscribe(job.subscribe())
 
 
 @app.get("/items/stream")

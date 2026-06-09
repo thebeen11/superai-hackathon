@@ -18,19 +18,31 @@ export interface ProgressEvent {
   ts?: number;
 }
 
+export interface SseInit {
+  method?: "POST" | "GET";
+  /** JSON request body (POST only). */
+  body?: unknown;
+}
+
 /**
- * POST `body` to an SSE endpoint, invoking `onProgress` for each `progress` frame and
- * resolving with the `result` frame's payload. An `error` frame rejects.
+ * Open an SSE endpoint, invoking `onProgress` for each `progress` frame and resolving
+ * with the `result` frame's payload. A leading `job` frame (if any) is reported via
+ * `onJob`. An `error` frame rejects.
  */
 export async function streamSse<TResult>(
   path: string,
-  body: unknown,
+  init: SseInit,
   onProgress: (evt: ProgressEvent) => void,
+  onJob?: (jobId: string) => void,
 ): Promise<TResult> {
+  const method = init.method ?? "POST";
   const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify(body),
+    method,
+    headers: {
+      Accept: "text/event-stream",
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    },
+    body: method === "POST" ? JSON.stringify(init.body) : undefined,
   });
   if (!res.ok || !res.body) {
     throw new ApiError(`Stream failed: ${path} (${res.status})`, res.status);
@@ -52,8 +64,11 @@ export async function streamSse<TResult>(
     if (dataLines.length === 0) return;
     const payload = JSON.parse(dataLines.join("\n"));
     if (event === "progress") onProgress(payload as ProgressEvent);
+    else if (event === "job") onJob?.((payload as { id: string }).id);
     else if (event === "result") result = payload as TResult;
-    else if (event === "error") throw new Error(payload?.message ?? "stream error");
+    // A server `error` frame is a TERMINAL failure (tagged so callers can tell it
+    // apart from a navigation/network abort, which is NOT terminal).
+    else if (event === "error") throw Object.assign(new Error(payload?.message ?? "stream error"), { terminal: true });
   };
 
   for (;;) {
@@ -71,4 +86,14 @@ export async function streamSse<TResult>(
 
   if (result === undefined) throw new Error("Stream ended without a result");
   return result;
+}
+
+/**
+ * Did a stream error represent a TERMINAL outcome (the run truly failed or is gone) vs
+ * a transient abort (page reload / network drop, where the job may still be running)?
+ * Terminal = a non-OK HTTP status (`ApiError`, e.g. a reconnect 404) or a server `error`
+ * frame (tagged `terminal`). Used to decide whether to drop the saved job marker.
+ */
+export function isTerminalStreamError(e: unknown): boolean {
+  return e instanceof ApiError || (e as { terminal?: boolean } | null)?.terminal === true;
 }

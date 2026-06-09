@@ -58,6 +58,7 @@ export async function discoverAndProcess(query: string): Promise<DataEngReport> 
 export async function discoverAndProcessStream(
   query: string,
   onProgress: (evt: ProgressEvent) => void,
+  onJob?: (jobId: string) => void,
 ): Promise<DataEngReport> {
   const { data: discovery } = await discoverPost({
     body: { query, mode: "auto_proceed" },
@@ -66,7 +67,38 @@ export async function discoverAndProcessStream(
   if (!discovery || "questions" in discovery) {
     throw new Error("Discovery returned clarifying questions instead of results");
   }
-  return streamSse<DataEngReport>("/dataeng/process/stream", discovery, onProgress);
+  return streamSse<DataEngReport>(
+    "/dataeng/process/stream",
+    { method: "POST", body: discovery },
+    onProgress,
+    onJob,
+  );
+}
+
+/** A tracked discovery job (backend in-memory registry). */
+export interface JobSummary {
+  id: string;
+  kind: string;
+  query: string;
+  status: "running" | "done" | "error";
+  created_at: number;
+}
+
+/** Reconnect to a running/finished job: replays progress, resolves with its DataEngReport. */
+export function reconnectJobStream(
+  jobId: string,
+  onProgress: (evt: ProgressEvent) => void,
+): Promise<DataEngReport> {
+  return streamSse<DataEngReport>(
+    `/dataeng/jobs/${encodeURIComponent(jobId)}/stream`,
+    { method: "GET" },
+    onProgress,
+  );
+}
+
+/** List tracked jobs (running by default). Backend: GET /dataeng/jobs */
+export function listRunningJobs(): Promise<JobSummary[]> {
+  return apiFetch<JobSummary[]>("/dataeng/jobs");
 }
 
 /** Context preview for a tracker. Backend: GET /api/trackers/:name/context */
