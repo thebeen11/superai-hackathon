@@ -48,13 +48,32 @@ import type {
 } from "./generated/types.gen";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"] as const;
+const MONTHS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+] as const;
 
 /** Neutral live-mode base: every slice empty/neutral; tiers carry the real topology. */
 export const emptyLiveData: WtafData = {
   now: "",
   marketOpen: false,
-  ace: { value: 0, label: "—", delta: 0, components: [], overlay: { ace: [], smh: [] } },
+  ace: {
+    value: 0,
+    label: "—",
+    delta: 0,
+    components: [],
+    overlay: { ace: [], smh: [] },
+  },
   agents: [],
   tiers: tierTopology,
   debate: {
@@ -71,11 +90,24 @@ export const emptyLiveData: WtafData = {
   ticker: [],
   sentiment: { mood: "—", moodTone: "flat", vol: "—", wave: [] },
   pipeline: [],
-  signalVolume: { title: "Signal Volume", sub: "items ingested", bars: [], peakLabel: "" },
+  signalVolume: {
+    title: "Signal Volume",
+    sub: "items ingested",
+    bars: [],
+    peakLabel: "",
+  },
   catalysts: [],
   system: { coverage: 0, bars: [] },
   trackers: [],
-  contextPreview: { tracker: "", channel: "", date: "", timestamp: "", quote: "", speaker: "", score: 0 },
+  contextPreview: {
+    tracker: "",
+    channel: "",
+    date: "",
+    timestamp: "",
+    quote: "",
+    speaker: "",
+    score: 0,
+  },
   themes: [],
   backtestThemes: [],
   ledger: [],
@@ -114,46 +146,83 @@ function countsByDay(items: CleanedItem[]): [string, number][] {
 function deriveSources(items: CleanedItem[]): Source[] {
   const byHost = new Map<string, { kind: string; count: number }>();
   for (const it of items) {
-    const name = it.source_type === "youtube" ? "YouTube" : hostOf(it.source_url);
+    const name =
+      it.source_type === "youtube" ? "YouTube" : hostOf(it.source_url);
     const kind = it.source_type === "youtube" ? "YouTube" : "Web";
     const cur = byHost.get(name) ?? { kind, count: 0 };
     cur.count += 1;
     byHost.set(name, cur);
   }
   return [...byHost.entries()]
-    .map(([name, { kind, count }]) => ({ name, kind, freq: "live", live: true, items: count }))
+    .map(([name, { kind, count }]) => ({
+      name,
+      kind,
+      freq: "live",
+      live: true,
+      items: count,
+    }))
     .sort((a, b) => b.items - a.items);
 }
 
 function deriveTrackers(items: CleanedItem[]): Tracker[] {
   // Common day axis across all items, so every tracker's sparkline shares one grid.
-  const allDays = [...new Set(items.map((it) => dayKey(it.ingested_at ?? it.published_at)).filter((k): k is string => !!k))].sort();
+  const allDays = [
+    ...new Set(
+      items
+        .map((it) => dayKey(it.ingested_at ?? it.published_at))
+        .filter((k): k is string => !!k),
+    ),
+  ].sort();
 
-  const byTheme = new Map<string, { mentions: number; hosts: Set<string>; byDay: Map<string, number> }>();
+  const byTheme = new Map<
+    string,
+    { mentions: number; hosts: Set<string>; byDay: Map<string, number> }
+  >();
   for (const it of items) {
     const host = hostOf(it.source_url);
     const day = dayKey(it.ingested_at ?? it.published_at);
     for (const theme of it.themes ?? []) {
-      const cur = byTheme.get(theme) ?? { mentions: 0, hosts: new Set<string>(), byDay: new Map<string, number>() };
+      const cur = byTheme.get(theme) ?? {
+        mentions: 0,
+        hosts: new Set<string>(),
+        byDay: new Map<string, number>(),
+      };
       cur.mentions += 1;
       cur.hosts.add(host);
       if (day) cur.byDay.set(day, (cur.byDay.get(day) ?? 0) + 1);
       byTheme.set(theme, cur);
     }
   }
-  const rows = [...byTheme.entries()].sort((a, b) => b[1].mentions - a[1].mentions);
+  const rows = [...byTheme.entries()].sort(
+    (a, b) => b[1].mentions - a[1].mentions,
+  );
   return rows.slice(0, 15).map(([name, { mentions, hosts, byDay }]) => {
     // Real per-day mention counts on the shared axis (zero-filled). Spark auto-normalizes.
     const series = allDays.map((day) => byDay.get(day) ?? 0);
     if (series.length < 2) {
       // Sparse history — pad to a flat 2-point line so the chart renders, not NaN.
-      return { name, mentions, chg: 0, channels: hosts.size, spark: [mentions, mentions], tone: "flat" as const };
+      return {
+        name,
+        mentions,
+        chg: 0,
+        channels: hosts.size,
+        spark: [mentions, mentions],
+        tone: "flat" as const,
+      };
     }
     const mid = Math.floor(series.length / 2);
     const a = series.slice(0, mid).reduce((s, v) => s + v, 0);
     const b = series.slice(mid).reduce((s, v) => s + v, 0);
-    const tone: Tracker["tone"] = b > a * 1.15 ? "up" : b < a * 0.85 ? "down" : "flat";
-    return { name, mentions, chg: b - a, channels: hosts.size, spark: series, tone };
+    const tone: Tracker["tone"] =
+      b > a * 1.15 ? "up" : b < a * 0.85 ? "down" : "flat";
+    return {
+      name,
+      mentions,
+      chg: b - a,
+      channels: hosts.size,
+      spark: series,
+      tone,
+    };
   });
 }
 
@@ -170,7 +239,7 @@ function tickerCounts(items: CleanedItem[]): [string, number][] {
 }
 
 function deriveWatchlist(items: CleanedItem[]): WatchItem[] {
-  const rows = tickerCounts(items).slice(0, 8);
+  const rows = tickerCounts(items);
   const max = rows.length ? rows[0][1] : 1;
   return rows.map(([canonical, count]) => ({
     t: canonical.replace(/^\$/, ""),
@@ -182,7 +251,9 @@ function deriveWatchlist(items: CleanedItem[]): WatchItem[] {
   }));
 }
 
-function deriveSignalVolume(items: CleanedItem[]): WtafData["signalVolume"] | null {
+function deriveSignalVolume(
+  items: CleanedItem[],
+): WtafData["signalVolume"] | null {
   const counts = countsByDay(items);
   if (counts.length === 0) return null;
   const days = counts.slice(-7);
@@ -194,7 +265,12 @@ function deriveSignalVolume(items: CleanedItem[]): WtafData["signalVolume"] | nu
     peak: v === max,
   }));
   const todayCount = counts.find(([k]) => k === todayKey)?.[1] ?? 0;
-  return { title: "Signal Volume", sub: "items ingested", bars, peakLabel: `+${todayCount} today` };
+  return {
+    title: "Signal Volume",
+    sub: "items ingested",
+    bars,
+    peakLabel: `+${todayCount} today`,
+  };
 }
 
 function deriveIndicators(items: CleanedItem[]): Indicator[] {
@@ -207,7 +283,9 @@ function deriveIndicators(items: CleanedItem[]): Indicator[] {
     cur.hosts.add(hostOf(it.source_url));
     byIndustry.set(ind, cur);
   }
-  const rows = [...byIndustry.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 6);
+  const rows = [...byIndustry.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 6);
   if (rows.length === 0) return [];
   const max = rows[0][1].count;
   return rows.map(([name, { count, hosts }]) => {
@@ -230,7 +308,12 @@ function deriveSentiment(items: CleanedItem[]): Sentiment {
   }
   const total = micro + macro || 1;
   const microShare = micro / total;
-  const mood = microShare > 0.6 ? "RISK-ON" : microShare < 0.4 ? "MACRO-DRIVEN" : "BALANCED";
+  const mood =
+    microShare > 0.6
+      ? "RISK-ON"
+      : microShare < 0.4
+        ? "MACRO-DRIVEN"
+        : "BALANCED";
   const moodTone = microShare > 0.6 ? "up" : microShare < 0.4 ? "down" : "flat";
   const counts = countsByDay(items).slice(-16);
   const maxDay = Math.max(1, ...counts.map(([, v]) => v));
@@ -242,28 +325,53 @@ function deriveSystem(items: CleanedItem[], sources: Source[]): SystemStatus {
   const latest = items
     .map((it) => new Date(it.ingested_at ?? it.published_at ?? 0).getTime())
     .filter((t) => t > 0);
-  const minsAgo = latest.length ? Math.round((Date.now() - Math.max(...latest)) / 60000) : null;
-  const freshTxt = minsAgo === null ? "—" : minsAgo < 60 ? `${minsAgo} min ago` : `${Math.round(minsAgo / 60)}h ago`;
+  const minsAgo = latest.length
+    ? Math.round((Date.now() - Math.max(...latest)) / 60000)
+    : null;
+  const freshTxt =
+    minsAgo === null
+      ? "—"
+      : minsAgo < 60
+        ? `${minsAgo} min ago`
+        : `${Math.round(minsAgo / 60)}h ago`;
   const freshV = minsAgo === null ? 0 : clamp01(1 - minsAgo / (60 * 24)); // decays over a day
   return {
     coverage: clamp01(sources.length / 8),
     bars: [
-      { k: "Sources live", v: clamp01(sources.length / 8), txt: `${sources.length}` },
-      { k: "Items stored", v: clamp01(items.length / 100), txt: `${items.length}` },
+      {
+        k: "Sources live",
+        v: clamp01(sources.length / 8),
+        txt: `${sources.length}`,
+      },
+      {
+        k: "Items stored",
+        v: clamp01(items.length / 100),
+        txt: `${items.length}`,
+      },
       { k: "Freshness", v: freshV, txt: freshTxt },
     ],
   };
 }
 
 function deriveThemes(items: CleanedItem[]): Theme[] {
-  const byTheme = new Map<string, { count: number; tickers: Map<string, number>; hosts: Set<string> }>();
+  const byTheme = new Map<
+    string,
+    { count: number; tickers: Map<string, number>; hosts: Set<string> }
+  >();
   for (const it of items) {
-    const tickers = (it.entities ?? []).filter((e) => e.canonical.startsWith("$")).map((e) => e.canonical.replace(/^\$/, ""));
+    const tickers = (it.entities ?? [])
+      .filter((e) => e.canonical.startsWith("$"))
+      .map((e) => e.canonical.replace(/^\$/, ""));
     for (const theme of it.themes ?? []) {
-      const cur = byTheme.get(theme) ?? { count: 0, tickers: new Map<string, number>(), hosts: new Set<string>() };
+      const cur = byTheme.get(theme) ?? {
+        count: 0,
+        tickers: new Map<string, number>(),
+        hosts: new Set<string>(),
+      };
       cur.count += 1;
       cur.hosts.add(hostOf(it.source_url));
-      for (const tk of tickers) cur.tickers.set(tk, (cur.tickers.get(tk) ?? 0) + 1);
+      for (const tk of tickers)
+        cur.tickers.set(tk, (cur.tickers.get(tk) ?? 0) + 1);
       byTheme.set(theme, cur);
     }
   }
@@ -275,7 +383,10 @@ function deriveThemes(items: CleanedItem[]): Theme[] {
       risk: "Med" as const,
       horizon: "—",
       ret: 0, // backtest is Tier 5 — shown as pending in the card
-      stocks: [...tickers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t),
+      stocks: [...tickers.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([t]) => t),
       strat: `${count} item${count === 1 ? "" : "s"} across ${hosts.size} source${hosts.size === 1 ? "" : "s"}`,
       conviction: 0, // pending Chairman
       verdict: "Awaiting Chairman verdict",
@@ -297,14 +408,17 @@ function deriveContextPreview(items: CleanedItem[]): ContextPreview | null {
   // Snapshot fallback used only when the /api/trackers/:t/context endpoint is unavailable.
   // Derive an honest coverage score (share of items carrying this theme) instead of a
   // hardcoded placeholder, so it never shows a fake +0.00 / +0.50.
-  const coverage = items.filter((it) => (it.themes ?? []).includes(tracker)).length / items.length;
+  const coverage =
+    items.filter((it) => (it.themes ?? []).includes(tracker)).length /
+    items.length;
   return {
     tracker,
     channel: hostOf(withSegment.source_url),
     date: ts ? new Date(ts).toISOString().slice(0, 10) : "",
     timestamp: `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`,
     quote: `"${seg.text}"`,
-    speaker: withSegment.source_type === "youtube" ? "Video transcript" : "Article",
+    speaker:
+      withSegment.source_type === "youtube" ? "Video transcript" : "Article",
     score: Number(coverage.toFixed(2)),
   };
 }
@@ -328,7 +442,9 @@ function asRisk(s?: string): RiskBand {
   return "Med";
 }
 function asBand(s?: string): IndicatorBand {
-  return INDICATOR_BANDS.includes(s as IndicatorBand) ? (s as IndicatorBand) : "Neutral";
+  return INDICATOR_BANDS.includes(s as IndicatorBand)
+    ? (s as IndicatorBand)
+    : "Neutral";
 }
 function asBriefingTone(s?: string): BriefingTone {
   return s === "up" || s === "down" ? s : "neutral";
@@ -359,15 +475,27 @@ function councilDebate(report: CouncilReport): Debate | null {
     topic: d.topic ?? "",
     round: d.round ?? 0,
     rounds: d.rounds ?? 3,
-    bull: { name: d.bull.name, model: d.bull.model, accent: "green", stance: d.bull.stance ?? "" },
-    bear: { name: d.bear.name, model: d.bear.model, accent: "red", stance: d.bear.stance ?? "" },
+    bull: {
+      name: d.bull.name,
+      model: d.bull.model,
+      accent: "green",
+      stance: d.bull.stance ?? "",
+    },
+    bear: {
+      name: d.bear.name,
+      model: d.bear.model,
+      accent: "red",
+      stance: d.bear.stance ?? "",
+    },
     verdict: d.verdict ?? "",
-    transcript: (d.transcript ?? []).map((t: ApiDebateTurn): DebateTurn => ({
-      who: asWho(t.who),
-      round: t.round,
-      label: t.label,
-      text: t.text,
-    })),
+    transcript: (d.transcript ?? []).map(
+      (t: ApiDebateTurn): DebateTurn => ({
+        who: asWho(t.who),
+        round: t.round,
+        label: t.label,
+        text: t.text,
+      }),
+    ),
   };
 }
 
@@ -393,7 +521,10 @@ function councilAce(report: CouncilReport): Ace | null {
 }
 
 function councilBriefing(report: CouncilReport): BriefingItem[] {
-  return (report.briefing ?? []).map((b) => ({ tone: asBriefingTone(b.tone), text: b.text }));
+  return (report.briefing ?? []).map((b) => ({
+    tone: asBriefingTone(b.tone),
+    text: b.text,
+  }));
 }
 
 function councilPredictions(report: CouncilReport): Prediction[] {
@@ -431,8 +562,13 @@ function splitResolve(resolve?: string): { d: string; m: string } {
     return { d: String(Number(iso[3])).padStart(2, "0"), m: MONTHS[mi] ?? "" };
   }
   const day = raw.match(/\b(\d{1,2})\b/);
-  const mon = raw.toUpperCase().match(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)/);
-  return { d: day ? day[1].padStart(2, "0") : raw.slice(0, 5), m: mon ? mon[1] : "" };
+  const mon = raw
+    .toUpperCase()
+    .match(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)/);
+  return {
+    d: day ? day[1].padStart(2, "0") : raw.slice(0, 5),
+    m: mon ? mon[1] : "",
+  };
 }
 
 /** Upcoming key events, derived from the Chairman's resolvable predictions. */
@@ -458,7 +594,11 @@ function activatedTiers(): Tier[] {
           ...t,
           status: "active",
           statusText: "online",
-          squad: t.squad.map((a) => ({ ...a, status: "active", statusText: "online" })),
+          squad: t.squad.map((a) => ({
+            ...a,
+            status: "active",
+            statusText: "online",
+          })),
         },
   );
 }
@@ -492,7 +632,10 @@ export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
  * 3–5 slices come from the council snapshot when one exists; otherwise they stay
  * empty and the cards show their "awaiting Tier 3–5" state.
  */
-export function itemsToWtafData(items: CleanedItem[], council?: CouncilReport | null): WtafData {
+export function itemsToWtafData(
+  items: CleanedItem[],
+  council?: CouncilReport | null,
+): WtafData {
   const sources = deriveSources(items);
   const trackers = deriveTrackers(items);
   const watchlist = deriveWatchlist(items);
