@@ -9,7 +9,7 @@ export function SentimentCard({ sentiment, discovering = false }: { sentiment: S
   // High volatility = caution (red), low = calm (green).
   const volColor = s.vol === "HIGH" ? "var(--down)" : s.vol === "LOW" ? "var(--up)" : "var(--t-mid)";
   return (
-    <Card title="Market Sentiment" sub="aggregate · 14 sources" className="span4"
+    <Card title="Market Sentiment" sub="aggregate · 14 sources" className="span5"
       loading={discovering && isEmpty} updating={discovering && !isEmpty}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 6, gap: 8 }}>
         <div style={{ flexShrink: 0 }}>

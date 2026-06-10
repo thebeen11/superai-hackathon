@@ -15,7 +15,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ShellActions } from "@/components/wtaf/shared";
-import { useWtafData } from "@/providers/wtaf-provider";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { AgentDrawer } from "@/components/wtaf/agents";
 import { ContextModal } from "@/components/wtaf/modals/context-modal";
 import { NewTrackerModal } from "@/components/wtaf/modals/new-tracker-modal";
@@ -82,14 +82,17 @@ export function useShellActions(): ShellActions {
 export function ShellModals() {
   const ui = useShellUI();
   const data = useWtafData();
+  const { activity, liveStatus } = useWtaf();
 
   // Agents live in both the legacy flat list and the 5-tier squads.
   const allAgents = [...data.agents, ...data.tiers.flatMap((t) => t.squad)];
   const agent = ui.agentId ? allAgents.find((a) => a.id === ui.agentId) ?? null : null;
+  const entries = ui.agentId ? activity.filter((e) => e.agentId === ui.agentId) : [];
+  const live = ui.agentId ? liveStatus[ui.agentId] : undefined;
 
   return (
     <>
-      {agent && <AgentDrawer agent={agent} onClose={ui.closeAgent} />}
+      {agent && <AgentDrawer agent={agent} entries={entries} live={live} onClose={ui.closeAgent} />}
       {ui.contextTracker && (
         <ContextModal trackerName={ui.contextTracker} onClose={ui.closeContext} />
       )}

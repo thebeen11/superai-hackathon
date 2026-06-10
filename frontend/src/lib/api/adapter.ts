@@ -291,14 +291,19 @@ function deriveContextPreview(items: CleanedItem[]): ContextPreview | null {
   const seg = withSegment.segments![0];
   const s = Math.floor(seg.start);
   const ts = withSegment.ingested_at ?? withSegment.published_at;
+  const tracker = withSegment.themes?.[0] ?? withSegment.industry;
+  // Snapshot fallback used only when the /api/trackers/:t/context endpoint is unavailable.
+  // Derive an honest coverage score (share of items carrying this theme) instead of a
+  // hardcoded placeholder, so it never shows a fake +0.00 / +0.50.
+  const coverage = items.filter((it) => (it.themes ?? []).includes(tracker)).length / items.length;
   return {
-    tracker: withSegment.themes?.[0] ?? withSegment.industry,
+    tracker,
     channel: hostOf(withSegment.source_url),
     date: ts ? new Date(ts).toISOString().slice(0, 10) : "",
     timestamp: `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`,
     quote: `"${seg.text}"`,
     speaker: withSegment.source_type === "youtube" ? "Video transcript" : "Article",
-    score: 0.5,
+    score: Number(coverage.toFixed(2)),
   };
 }
 

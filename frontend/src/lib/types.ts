@@ -40,6 +40,32 @@ export interface Agent {
   label?: string;
 }
 
+/* ---- Live agent activity (streamed from backend SSE progress) ---- */
+export interface ActivityEntry {
+  /** Stable React key, `${ts}-${seq}`. */
+  id: string;
+  /** Epoch seconds (from the progress frame, else client clock). */
+  ts: number;
+  /** Concrete agent id (e.g. "andie-tech") or null for council-wide / unrouted. */
+  agentId: string | null;
+  /** Display name, e.g. "Andie-TMT", "Timo", "Council". */
+  agentName: string;
+  /** Owning tier key, or null when unrouted. */
+  tierKey: Tier["key"] | null;
+  /** Human-readable line (the `[n/m]` prefix stripped). */
+  message: string;
+  /** Backend status: start | progress | ok | skip | error | info. */
+  status: string;
+  /** Raw progress stage (for filtering/debug). */
+  stage: string;
+}
+
+/** Live status override for an agent, layered over its static snapshot status. */
+export interface LiveAgentStatus {
+  status: AgentStatus;
+  statusText: string;
+}
+
 /* ---- 5-tier multi-agent system (fan-out → fan-in) ---- */
 export interface Tier {
   n: number;

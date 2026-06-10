@@ -3,6 +3,7 @@
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { Card, Ring, MiniBar, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
+import { fmtChange, hasQuote } from "@/lib/format";
 
 export function IndicatorsPage() {
   const d = useWtafData();
@@ -40,7 +41,7 @@ export function IndicatorsPage() {
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < d.watchlist.length - 1 ? "1px solid var(--stroke)" : "none" }}>
                 <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, width: 54 }}>{w.t}</span>
                 <div style={{ flex: 1 }}><MiniBar v={(w.sig + 1) / 2} color={w.sig >= 0 ? "var(--up)" : "var(--down)"} h={4} /></div>
-                <span className="mono" style={{ fontSize: 11.5, width: 54, textAlign: "right", color: w.chg >= 0 ? "var(--up)" : "var(--down)" }}>{w.chg >= 0 ? "+" : ""}{w.chg.toFixed(2)}%</span>
+                <span className="mono" style={{ fontSize: 11.5, width: 54, textAlign: "right", color: !hasQuote(w) ? "var(--t-faint)" : w.chg >= 0 ? "var(--up)" : "var(--down)" }}>{fmtChange(w)}</span>
               </div>
             ))}
           </div>

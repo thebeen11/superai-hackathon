@@ -19,9 +19,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { WtafData } from "@/lib/types";
+import type { ActivityEntry, LiveAgentStatus, WtafData } from "@/lib/types";
 import { discoverAndProcessStream, getSnapshot, reconnectJobStream } from "@/lib/api/wtaf";
 import { isTerminalStreamError, type ProgressEvent } from "@/lib/api/sse";
+import { toEntry, toLiveStatus } from "@/lib/activity";
 import type { DataEngReport } from "@/lib/api/generated/types.gen";
 
 /** Topbar status badge state, driven from streaming progress + the final report. */
@@ -32,6 +33,9 @@ export interface DiscoveryStatus {
 
 /** sessionStorage key holding the in-flight job so a reload can reconnect. */
 const ACTIVE_JOB_KEY = "wtaf:activeDiscovery";
+
+/** Cap on the rolling in-memory activity feed (newest kept). */
+const ACTIVITY_CAP = 200;
 
 interface ActiveJob {
   jobId: string;
@@ -90,6 +94,10 @@ interface WtafState {
   discovering: boolean;
   /** Live topbar badge for the current/resumed discovery, or null when idle. */
   discoveryStatus: DiscoveryStatus | null;
+  /** Rolling per-agent activity feed (newest last), built from streamed progress. */
+  activity: ActivityEntry[];
+  /** Live status override per agent id, layered over the static snapshot status. */
+  liveStatus: Record<string, LiveAgentStatus>;
   error: Error | null;
   refresh: () => void;
   /** Run a live discovery, then refetch the snapshot. */
@@ -103,7 +111,12 @@ export function WtafProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [discovering, setDiscovering] = useState(false);
   const [discoveryStatus, setDiscoveryStatus] = useState<DiscoveryStatus | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [liveStatus, setLiveStatus] = useState<Record<string, LiveAgentStatus>>({});
   const [error, setError] = useState<Error | null>(null);
+
+  // Monotonic counter for stable, unique activity-entry keys across a session.
+  const activitySeqRef = useRef(0);
 
   // Fetch the snapshot. `silent` skips the loading flip and swallows errors —
   // used by post-discovery refetches so the dashboard never blanks (cards stay in
@@ -133,6 +146,14 @@ export function WtafProvider({ children }: { children: ReactNode }) {
   // persisted (`dataeng.item` ok) refetch so its data lands in the cards mid-stream.
   const handleProgress = useCallback((evt: ProgressEvent) => {
     setDiscoveryStatus(labelFromProgress(evt));
+    // Append to the per-agent activity feed and update the routed agent's live dot.
+    const entry = toEntry(evt, activitySeqRef.current++);
+    setActivity((prev) => {
+      const next = prev.length >= ACTIVITY_CAP ? prev.slice(prev.length - ACTIVITY_CAP + 1) : prev;
+      return [...next, entry];
+    });
+    const live = toLiveStatus(evt);
+    if (live && entry.agentId) setLiveStatus((prev) => ({ ...prev, [entry.agentId!]: live }));
     // Refetch as items persist (Layer 2) and once the council snapshot is ready
     // (Tier 5), so the Tier 3–5 cards fill in the same live pass.
     if (evt.stage === "dataeng.item" && evt.status === "ok") refetchSoon();
@@ -152,6 +173,9 @@ export function WtafProvider({ children }: { children: ReactNode }) {
     async (query: string): Promise<DataEngReport> => {
       setDiscovering(true);
       setDiscoveryStatus({ tone: "info", text: "Refining…" });
+      // A new run = a fresh log; clear prior activity + live statuses.
+      setActivity([]);
+      setLiveStatus({});
       try {
         const report = await discoverAndProcessStream(
           query,
@@ -207,7 +231,7 @@ export function WtafProvider({ children }: { children: ReactNode }) {
   }, [loadSnapshot, handleProgress]);
 
   return (
-    <WtafContext.Provider value={{ data, loading, discovering, discoveryStatus, error, refresh, discover }}>
+    <WtafContext.Provider value={{ data, loading, discovering, discoveryStatus, activity, liveStatus, error, refresh, discover }}>
       {children}
     </WtafContext.Provider>
   );

@@ -319,6 +319,46 @@
         }
       }
     },
+    "/api/trackers/{tracker}/context": {
+      "get": {
+        "summary": "Tracker Context Endpoint",
+        "description": "Best evidence quote for a tracker (theme) + a real 0..1 relevance score (\u00a77.1).",
+        "operationId": "tracker_context_endpoint",
+        "parameters": [
+          {
+            "name": "tracker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tracker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/discover/stream": {
       "get": {
         "summary": "Discover Get Stream",
@@ -951,6 +991,50 @@
         ],
         "title": "CleanedItem",
         "description": "The unit persisted to Postgres after Data Engineering (Req 14, 15)."
+      },
+      "ContextPreview": {
+        "properties": {
+          "tracker": {
+            "type": "string",
+            "title": "Tracker"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "quote": {
+            "type": "string",
+            "title": "Quote"
+          },
+          "speaker": {
+            "type": "string",
+            "title": "Speaker"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracker",
+          "channel",
+          "date",
+          "timestamp",
+          "quote",
+          "speaker",
+          "score"
+        ],
+        "title": "ContextPreview",
+        "description": "Best evidence quote for a tracker (theme) + a relevance score (Core Feature \u00a77.1).\n\nSurfaced by `GET /api/trackers/{tracker}/context`. `score` is a real 0..1 semantic\nrelevance of the quote to the tracker concept \u2014 never a placeholder. Every preview is\nanchored to a real `source_url`-backed item (no-orphan guardrail \u00a712.6)."
       },
       "CouncilReport": {
         "properties": {

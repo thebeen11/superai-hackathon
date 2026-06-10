@@ -17,10 +17,12 @@ from .db.repository import list_cleaned_items
 from .discovery import discover, discover_with_refinement
 from .discovery.refine import QueryValidationError
 from .events import Emit, noop_emit
+from .insights.context import tracker_context
 from .models import (
     CleanedItem,
     Clarify,
     ClarificationMode,
+    ContextPreview,
     CouncilReport,
     DataEngReport,
     DiscoveryResult,
@@ -156,6 +158,15 @@ def list_items(
 ) -> list[CleanedItem]:
     """Read persisted, cleaned + labelled items (newest first), with optional filters."""
     return list_cleaned_items(stream=stream, theme=theme, ticker=ticker, limit=limit)
+
+
+@app.get("/api/trackers/{tracker}/context", response_model=ContextPreview)
+def tracker_context_endpoint(tracker: str) -> ContextPreview:
+    """Best evidence quote for a tracker (theme) + a real 0..1 relevance score (§7.1)."""
+    preview = tracker_context(tracker)
+    if preview is None:
+        raise HTTPException(status_code=404, detail=f"No stored items for tracker {tracker!r}")
+    return preview
 
 
 # --- SSE streaming variants -------------------------------------------------

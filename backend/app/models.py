@@ -149,6 +149,23 @@ class DataEngReport(BaseModel):
     failures: list[ProcessingFailure] = Field(default_factory=list)
 
 
+class ContextPreview(BaseModel):
+    """Best evidence quote for a tracker (theme) + a relevance score (Core Feature §7.1).
+
+    Surfaced by `GET /api/trackers/{tracker}/context`. `score` is a real 0..1 semantic
+    relevance of the quote to the tracker concept — never a placeholder. Every preview is
+    anchored to a real `source_url`-backed item (no-orphan guardrail §12.6).
+    """
+
+    tracker: str
+    channel: str            # host of the source (e.g. "youtube.com")
+    date: str               # YYYY-MM-DD, or "" if unknown
+    timestamp: str          # HH:MM:SS into the transcript, "00:00:00" for articles
+    quote: str
+    speaker: str            # "Video transcript" | "Article"
+    score: float            # 0..1 relevance to the tracker concept
+
+
 # --- The Council (Tiers 3–5: Andie analysts, Freddy debate, Winston chairman) ---
 #
 # Every score the council emits must trace back to a real source quote (no-orphan

@@ -1,7 +1,7 @@
 "use client";
 /* ============ WTAF — agent council ============ */
 import type { ReactNode } from "react";
-import type { Agent, PipelineStage, Tier } from "@/lib/types";
+import type { ActivityEntry, Agent, LiveAgentStatus, PipelineStage, Tier } from "@/lib/types";
 import { ACCENTS, STATE_TONE } from "./accents";
 import { Dot } from "./primitives";
 
@@ -90,11 +90,32 @@ export function Section({ label, children }: { label: string; children: ReactNod
   );
 }
 
+/** Format an epoch-seconds timestamp as HH:MM:SS for the live activity log. */
+function fmtClock(ts: number): string {
+  return new Date(ts * 1000).toLocaleTimeString("en-GB", { hour12: false });
+}
+
 /* slide-in detail drawer */
-export function AgentDrawer({ agent, onClose }: { agent: Agent | null; onClose: () => void }) {
+export function AgentDrawer({
+  agent,
+  entries,
+  live,
+  onClose,
+}: {
+  agent: Agent | null;
+  /** Live activity for this agent (overrides the static `agent.log` when present). */
+  entries?: ActivityEntry[];
+  /** Live status override for the header dot. */
+  live?: LiveAgentStatus;
+  onClose: () => void;
+}) {
   if (!agent) return null;
   const ac = ACCENTS[agent.accent] || ACCENTS.blue;
-  const tone = STATE_TONE[agent.status];
+  const status = live?.status ?? agent.status;
+  const statusText = live?.statusText ?? agent.statusText;
+  const tone = STATE_TONE[status];
+  const liveEntries = entries ?? [];
+  const hasLive = liveEntries.length > 0;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(5,7,12,0.55)", backdropFilter: "blur(3px)", display: "flex", justifyContent: "flex-end", animation: "rise .2s" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 380, maxWidth: "92vw", height: "100%", background: "var(--bg-1)", borderLeft: "1px solid var(--stroke-hi)", boxShadow: "-30px 0 60px -20px rgba(0,0,0,0.7)", overflowY: "auto", padding: 22, animation: "rise .28s" }}>
@@ -108,8 +129,8 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent | null; onClose: 
         </div>
 
         <div className="card card-pad" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <Dot tone={tone} pulse={agent.status !== "idle"} />
-          <span style={{ fontSize: 13, fontWeight: 500 }}>{agent.statusText}</span>
+          <Dot tone={tone} pulse={status !== "idle"} />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>{statusText}</span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 16 }}>
             <div style={{ textAlign: "right" }}><div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{agent.queue}</div><div className="label-xs" style={{ fontSize: 8 }}>queue</div></div>
             <div style={{ textAlign: "right" }}><div className="mono" style={{ fontSize: 15, fontWeight: 600, color: ac.c }}>{agent.throughput}</div><div className="label-xs" style={{ fontSize: 8 }}>rate</div></div>
@@ -132,15 +153,34 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent | null; onClose: 
           </div>
         </Section>
 
-        <Section label="Activity log">
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {agent.log.map((l, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < agent.log.length - 1 ? "1px solid var(--stroke)" : "none" }}>
-                <span className="mono" style={{ fontSize: 10.5, color: "var(--t-faint)", flexShrink: 0, paddingTop: 1 }}>{String(i * 3 + 1).padStart(2, "0")}m</span>
-                <span className="mono" style={{ fontSize: 11.5, color: "var(--t-mid)" }}>{l}</span>
-              </div>
-            ))}
-          </div>
+        <Section label={hasLive ? "Activity log · live" : "Activity log"}>
+          {hasLive ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {liveEntries.map((e, i) => {
+                const etone = ACCENTS[STATE_TONE[e.status]] ? STATE_TONE[e.status] : null;
+                const color =
+                  e.status === "error" || e.status === "skip" ? "var(--down)"
+                  : e.status === "ok" ? "var(--up)"
+                  : "var(--t-mid)";
+                return (
+                  <div key={e.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < liveEntries.length - 1 ? "1px solid var(--stroke)" : "none" }}>
+                    <span className="mono" style={{ fontSize: 10.5, color: "var(--t-faint)", flexShrink: 0, paddingTop: 1 }}>{fmtClock(e.ts)}</span>
+                    <span className="mono" style={{ fontSize: 11.5, color }}>{e.message}</span>
+                    {etone && <span style={{ marginLeft: "auto", paddingTop: 4 }}><Dot tone={etone} pulse={false} /></span>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {agent.log.map((l, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < agent.log.length - 1 ? "1px solid var(--stroke)" : "none" }}>
+                  <span className="mono" style={{ fontSize: 10.5, color: "var(--t-faint)", flexShrink: 0, paddingTop: 1 }}>{String(i * 3 + 1).padStart(2, "0")}m</span>
+                  <span className="mono" style={{ fontSize: 11.5, color: "var(--t-mid)" }}>{l}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
       </div>
     </div>
@@ -148,21 +188,23 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent | null; onClose: 
 }
 
 /* ---- 5-tier squad flow (MapReduce fan-out → fan-in) ---- */
-function SquadMember({ a, onOpenAgent }: { a: Agent; onOpenAgent: (a: Agent) => void }) {
-  const tone = STATE_TONE[a.status] || "blue";
+function SquadMember({ a, live, onOpenAgent }: { a: Agent; live?: LiveAgentStatus; onOpenAgent: (a: Agent) => void }) {
+  const status = live?.status ?? a.status;
+  const statusText = live?.statusText ?? a.statusText;
+  const tone = STATE_TONE[status] || "blue";
   return (
-    <button onClick={() => onOpenAgent(a)} title={a.name + " · " + a.statusText}
+    <button onClick={() => onOpenAgent(a)} title={a.name + " · " + statusText}
       style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "transparent", border: "none", padding: 0 }}>
       <div style={{ position: "relative" }}>
         <AgentAvatar a={a} size={30} />
-        <span style={{ position: "absolute", right: -2, bottom: -2, width: 9, height: 9, borderRadius: 99, background: ACCENTS[tone] ? ACCENTS[tone].c : tone, border: "2px solid var(--bg-1)", animation: a.status !== "idle" ? "pulse-dot 1.6s infinite" : "none" }} />
+        <span style={{ position: "absolute", right: -2, bottom: -2, width: 9, height: 9, borderRadius: 99, background: ACCENTS[tone] ? ACCENTS[tone].c : tone, border: "2px solid var(--bg-1)", animation: status !== "idle" ? "pulse-dot 1.6s infinite" : "none" }} />
       </div>
       <span className="mono" style={{ fontSize: 9, color: "var(--t-lo)", whiteSpace: "nowrap" }}>{a.label}</span>
     </button>
   );
 }
 
-export function TierFlow({ tiers, onOpenAgent }: { tiers: Tier[]; onOpenAgent: (a: Agent) => void }) {
+export function TierFlow({ tiers, onOpenAgent, liveStatus }: { tiers: Tier[]; onOpenAgent: (a: Agent) => void; liveStatus?: Record<string, LiveAgentStatus> }) {
   return (
     <div style={{ position: "relative", paddingRight: 30 }}>
       {/* macro bypass rail (Timo → Winston) lives in the reserved right gutter */}
@@ -175,7 +217,13 @@ export function TierFlow({ tiers, onOpenAgent }: { tiers: Tier[]; onOpenAgent: (
 
       {tiers.map((t, i) => {
         const ac = ACCENTS[t.accent] || ACCENTS.blue;
-        const tone = STATE_TONE[t.status] || "blue";
+        // Derive the tier's live status from its squad: any non-idle live member drives
+        // the tier dot; once members have reported but all are idle, the tier is done.
+        const liveMembers = t.squad.map((a) => liveStatus?.[a.id]).filter(Boolean) as LiveAgentStatus[];
+        const activeLive = liveMembers.find((l) => l.status !== "idle");
+        const tStatus = activeLive ? activeLive.status : liveMembers.length ? "idle" : t.status;
+        const tStatusText = activeLive ? activeLive.statusText : liveMembers.length ? "done" : t.statusText;
+        const tone = STATE_TONE[tStatus] || "blue";
         return (
           <div key={t.key}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0" }}>
@@ -188,12 +236,12 @@ export function TierFlow({ tiers, onOpenAgent }: { tiers: Tier[]; onOpenAgent: (
                   {t.squad.length > 1 && <span className="chip" style={{ fontSize: 8.5, padding: "1px 5px" }}>×{t.squad.length}</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                  <Dot tone={tone} pulse={t.status !== "idle"} />
-                  <span className="mono" style={{ fontSize: 10.5, color: "var(--t-lo)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.statusText}</span>
+                  <Dot tone={tone} pulse={tStatus !== "idle"} />
+                  <span className="mono" style={{ fontSize: 10.5, color: "var(--t-lo)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tStatusText}</span>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, flexShrink: 0, paddingRight: 4 }}>
-                {t.squad.map((a) => (<SquadMember key={a.id} a={a} onOpenAgent={onOpenAgent} />))}
+                {t.squad.map((a) => (<SquadMember key={a.id} a={a} live={liveStatus?.[a.id]} onOpenAgent={onOpenAgent} />))}
               </div>
             </div>
             {i < tiers.length - 1 && (

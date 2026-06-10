@@ -6,6 +6,7 @@ import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, MiniBar, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
 import { DebateCard } from "../command-center/debate-card";
+import { fmtChange, fmtPrice, hasQuote } from "@/lib/format";
 
 export function WatchlistPage() {
   const d = useWtafData();
@@ -31,8 +32,8 @@ export function WatchlistPage() {
                 <span style={{ fontSize: 12, color: "var(--t-mid)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.n}</span>
                 <div style={{ width: 90, flexShrink: 0 }}><MiniBar v={(w.sig + 1) / 2} color={w.sig >= 0 ? "var(--up)" : "var(--down)"} h={4} /></div>
                 {w.alert && <span className="chip" style={{ fontSize: 9.5, padding: "2px 6px", borderColor: "color-mix(in oklch, var(--orange) 40%, transparent)", color: "var(--orange-bright)" }}>{w.alert}</span>}
-                <span className="mono" style={{ fontSize: 12.5, width: 68, textAlign: "right" }}>{w.px.toFixed(2)}</span>
-                <span className="mono" style={{ fontSize: 12, width: 58, textAlign: "right", color: w.chg >= 0 ? "var(--up)" : "var(--down)" }}>{w.chg >= 0 ? "+" : ""}{w.chg.toFixed(2)}%</span>
+                <span className="mono" style={{ fontSize: 12.5, width: 68, textAlign: "right", color: hasQuote(w) ? undefined : "var(--t-faint)" }}>{fmtPrice(w)}</span>
+                <span className="mono" style={{ fontSize: 12, width: 58, textAlign: "right", color: !hasQuote(w) ? "var(--t-faint)" : w.chg >= 0 ? "var(--up)" : "var(--down)" }}>{fmtChange(w)}</span>
                 <span style={{ color: "var(--t-faint)", flexShrink: 0 }}>›</span>
               </Link>
             ))}
@@ -77,8 +78,8 @@ export function TickerDetailPage({ ticker }: { ticker: string }) {
       <div className="grid12">
         <Card className="span12">
           <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
-            <Metric label="Price" value={`$${item.px.toFixed(2)}`} />
-            <Metric label="Change" value={`${item.chg >= 0 ? "+" : ""}${item.chg.toFixed(2)}%`} color={item.chg >= 0 ? "var(--up)" : "var(--down)"} />
+            <Metric label="Price" value={hasQuote(item) ? `$${item.px.toFixed(2)}` : "—"} />
+            <Metric label="Change" value={fmtChange(item)} color={!hasQuote(item) ? "var(--t-faint)" : item.chg >= 0 ? "var(--up)" : "var(--down)"} />
             <Metric label="Signal" value={`${item.sig >= 0 ? "+" : ""}${item.sig.toFixed(1)}`} color={item.sig >= 0 ? "var(--up)" : "var(--down)"} />
             {item.alert && (
               <div>

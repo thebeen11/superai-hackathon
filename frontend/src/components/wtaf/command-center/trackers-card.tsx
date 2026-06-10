@@ -15,7 +15,7 @@ export function TrackersCard({
   const toneC: Record<string, string> = { up: "var(--up)", down: "var(--down)", flat: "var(--t-lo)" };
   const isEmpty = trackers.length === 0;
   return (
-    <Card title="Concept Trackers" sub={`${trackers.length}/15 active`} className="span6"
+    <Card title="Concept Trackers" sub={`${trackers.length}/15 active`} className="span7"
       loading={discovering && isEmpty} updating={discovering && !isEmpty}
       action={<Link href="/signals" style={{ fontSize: 11, color: "var(--blue-bright)" }}>Open terminal →</Link>}>
       {trackers.length === 0 ? (
