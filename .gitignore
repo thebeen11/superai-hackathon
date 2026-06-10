@@ -25,4 +25,7 @@ __pycache__/
 # Handoff / design bundles
 hackathon-handoff.zip
 *.zip
+
+# Deploy scratch (contains secrets in user-data)
+.deploy/
 docs/SESSION_HANDOFF.md
