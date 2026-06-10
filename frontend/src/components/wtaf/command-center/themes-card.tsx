@@ -12,6 +12,9 @@ export function ThemesCard({
   discovering?: boolean;
 }) {
   const riskC: Record<string, string> = { Low: "var(--up)", Med: "var(--amber)", High: "var(--down)" };
+  // Conviction is a "higher is better" metric: high = green, mid = amber, low = red.
+  const convictionColor = (c: number) =>
+    c <= 0 ? "var(--t-faint)" : c >= 0.6 ? "var(--up)" : c >= 0.45 ? "var(--amber)" : "var(--down)";
   const isEmpty = themes.length === 0;
   return (
     <Card title="Thematic Portfolios" sub="Winston · final baskets" className="span12"
@@ -42,7 +45,7 @@ export function ThemesCard({
               <div className="label-xs" style={{ fontSize: 8 }}>12M sim</div>
             </div>
             <div style={{ width: 64, textAlign: "right" }}>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: t.conviction > 0 ? "var(--t-hi)" : "var(--t-faint)" }}>{t.conviction > 0 ? `${Math.round(t.conviction * 100)}%` : "—"}</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: convictionColor(t.conviction) }}>{t.conviction > 0 ? `${Math.round(t.conviction * 100)}%` : "—"}</div>
               <div className="label-xs" style={{ fontSize: 8 }}>conviction</div>
             </div>
           </div>
