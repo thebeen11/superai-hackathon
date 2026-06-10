@@ -15,12 +15,20 @@ class SourceUnavailable(Exception):
 
 
 def search(
-    query: str, max_results: int | None = None, emit: Emit = noop_emit
+    query: str,
+    max_results: int | None = None,
+    emit: Emit = noop_emit,
+    *,
+    start_published_date: str | None = None,
+    end_published_date: str | None = None,
 ) -> list[SourceItem]:
     """Search the web and return crawled article content as SourceItems.
 
     Raises SourceUnavailable if the Exa key is missing so the agent can record
     a skip reason rather than crashing the whole run.
+
+    `start_published_date`/`end_published_date` (ISO8601, e.g. "2025-06-01") restrict
+    results to a published-date window — used for time-bucketed backfills.
     """
     if not settings.exa_api_key:
         raise SourceUnavailable("EXA_API_KEY not set")
@@ -30,14 +38,17 @@ def search(
     # Imported lazily so the app still boots without the dependency installed.
     from exa_py import Exa
 
-    emit("discover.web", f"Searching the web via Exa (up to {limit})", status="start")
+    window = ""
+    if start_published_date or end_published_date:
+        window = f" [{start_published_date or '...'} → {end_published_date or '...'}]"
+    emit("discover.web", f"Searching the web via Exa (up to {limit}){window}", status="start")
     exa = Exa(api_key=settings.exa_api_key)
-    response = exa.search_and_contents(
-        query,
-        type="auto",
-        num_results=limit,
-        text=True,
-    )
+    search_kwargs: dict = {"type": "auto", "num_results": limit, "text": True}
+    if start_published_date:
+        search_kwargs["start_published_date"] = start_published_date
+    if end_published_date:
+        search_kwargs["end_published_date"] = end_published_date
+    response = exa.search_and_contents(query, **search_kwargs)
 
     raw_results = getattr(response, "results", []) or []
     emit("discover.web", f"Exa returned {len(raw_results)} hits; crawling content",

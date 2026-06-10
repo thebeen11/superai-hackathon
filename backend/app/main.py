@@ -101,10 +101,21 @@ def health() -> dict[str, str]:
 def discover_get(
     query: str = Query(..., description="Research topic, e.g. 'AI memory chip demand'"),
     max_results: int | None = Query(None, ge=1, le=50),
+    start_published_date: str | None = Query(
+        None, description="ISO date lower bound on published date, e.g. '2025-06-01'"
+    ),
+    end_published_date: str | None = Query(
+        None, description="ISO date upper bound on published date, e.g. '2025-06-30'"
+    ),
 ) -> DiscoveryResult:
-    """Plain fan-out without refinement — kept for the CLI / back-compat."""
+    """Plain fan-out without refinement — kept for the CLI / back-compat / backfills."""
     try:
-        return discover(query, max_results=max_results)
+        return discover(
+            query,
+            max_results=max_results,
+            start_published_date=start_published_date,
+            end_published_date=end_published_date,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

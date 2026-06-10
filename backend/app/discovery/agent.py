@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from ..events import Emit, call_maybe_emit, noop_emit
+from ..events import Emit, noop_emit
 from ..models import (
     Clarify,
     ClarificationMode,
@@ -75,9 +75,18 @@ def discover_with_refinement(
 
 
 def discover(
-    query: str, max_results: int | None = None, emit: Emit = noop_emit
+    query: str,
+    max_results: int | None = None,
+    emit: Emit = noop_emit,
+    *,
+    start_published_date: str | None = None,
+    end_published_date: str | None = None,
 ) -> DiscoveryResult:
-    """Run all source branches for a topic and return a merged result."""
+    """Run all source branches for a topic and return a merged result.
+
+    `start_published_date`/`end_published_date` (ISO8601) optionally restrict results
+    to a published-date window, enabling time-bucketed backfills.
+    """
     query = query.strip()
     if not query:
         raise ValueError("query must not be empty")
@@ -88,7 +97,11 @@ def discover(
 
     def _run(branch):
         source_type, fn = branch
-        return source_type, fn, _safe_call(fn, query, max_results, emit)
+        return source_type, fn, _safe_call(
+            fn, query, max_results, emit,
+            start_published_date=start_published_date,
+            end_published_date=end_published_date,
+        )
 
     branches = _branches()
     emit("discover", f"Fanning out to {len(branches)} sources", status="start",
@@ -121,10 +134,19 @@ def discover(
     return result
 
 
-def _safe_call(fn, query, max_results, emit: Emit = noop_emit) -> tuple[list[SourceItem], str | None]:
+def _safe_call(
+    fn, query, max_results, emit: Emit = noop_emit,
+    *,
+    start_published_date: str | None = None,
+    end_published_date: str | None = None,
+) -> tuple[list[SourceItem], str | None]:
     """Run a branch, converting failures into a skip reason."""
     try:
-        return call_maybe_emit(fn, query, max_results, emit=emit), None
+        return fn(
+            query, max_results, emit,
+            start_published_date=start_published_date,
+            end_published_date=end_published_date,
+        ), None
     except SourceUnavailable as exc:
         return [], str(exc)
     except Exception as exc:  # noqa: BLE001 - never let one branch kill the run

@@ -1,0 +1,62 @@
+Backfill: 'stock market investing news: AI, semiconductors, energy, and the economy'
+Range: 2025-06 .. 2026-06 (13 months), target 20/month
+
+  2025-06: 20 found, 20 new (running total 20)
+  2025-07: 20 found, 20 new (running total 40)
+  2025-08: 20 found, 20 new (running total 60)
+  2025-09: 20 found, 20 new (running total 80)
+  2025-10: 20 found, 20 new (running total 100)
+  2025-11: 20 found, 20 new (running total 120)
+  2025-12: 20 found, 19 new (running total 139)
+  2026-01: 20 found, 20 new (running total 159)
+  2026-02: 20 found, 20 new (running total 179)
+  2026-03: 20 found, 20 new (running total 199)
+  2026-04: 20 found, 20 new (running total 219)
+  2026-05: 20 found, 20 new (running total 239)
+  2026-06: 20 found, 20 new (running total 259)
+
+Discovery complete: 259 unique articles across 13 months.
+Saved merged discovery payload -> /Users/I542439/Documents/development/superai-hackathon/backend/backfill_discovery.json
+
+Processing 259 items via POST /dataeng/process (clean + label + theme + persist, then council). This is the slow part...
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/I542439/Documents/development/superai-hackathon/backend/scripts/crawl_backfill.py", line 145, in <module>
+    main()
+  File "/Users/I542439/Documents/development/superai-hackathon/backend/scripts/crawl_backfill.py", line 135, in main
+    report = _post_json(f"{BASE_URL}/dataeng/process", merged)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/Documents/development/superai-hackathon/backend/scripts/crawl_backfill.py", line 73, in _post_json
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/http/client.py", line 1430, in getresponse
+    response.begin()
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/http/client.py", line 292, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/I542439/.local/share/uv/python/cpython-3.12.11-macos-aarch64-none/lib/python3.12/socket.py", line 720, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: timed out

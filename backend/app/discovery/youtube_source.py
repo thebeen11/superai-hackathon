@@ -66,12 +66,20 @@ def _fetch_transcript(video_id: str) -> list[TranscriptSegment]:
 
 
 def search(
-    query: str, max_results: int | None = None, emit: Emit = noop_emit
+    query: str,
+    max_results: int | None = None,
+    emit: Emit = noop_emit,
+    *,
+    start_published_date: str | None = None,
+    end_published_date: str | None = None,
 ) -> list[SourceItem]:
     """Search YouTube and return transcript-backed SourceItems.
 
     Raises SourceUnavailable if the key is missing. Individual videos without
     captions are skipped (logged), not fatal.
+
+    Date-window kwargs are accepted for interface parity with the web branch; the
+    YouTube branch does not currently filter by published date.
     """
     if not settings.youtube_api_key:
         raise SourceUnavailable("YOUTUBE_API_KEY not set")
