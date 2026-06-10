@@ -42,11 +42,14 @@ export function ActivityLogCard() {
   const { activity, discovering } = useWtaf();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Keep the newest line in view as the feed streams.
+  // Newest-first: keep the top (freshest line) in view as the feed streams.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) el.scrollTop = 0;
   }, [activity.length]);
+
+  // Render latest entry first.
+  const ordered = activity.slice().reverse();
 
   return (
     <Card
@@ -65,7 +68,7 @@ export function ActivityLogCard() {
         <EmptyState label="No recent agent activity" sub="Run a discovery to watch the council work" minHeight={140} />
       ) : (
         <div ref={scrollRef} style={{ maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-          {activity.map((e) => (<Row key={e.id} e={e} />))}
+          {ordered.map((e) => (<Row key={e.id} e={e} />))}
         </div>
       )}
     </Card>

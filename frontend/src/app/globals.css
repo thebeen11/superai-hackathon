@@ -132,6 +132,7 @@ body {
 }
 
 button { font-family: inherit; cursor: pointer; color: inherit; }
+a { color: inherit; text-decoration: none; }
 
 /* ============ app-level layout (from WTAF Fund.html <style>) ============ */
 .app-root { height: 100vh; }
