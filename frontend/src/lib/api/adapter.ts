@@ -27,8 +27,10 @@ import type {
   DebateTurn,
   Indicator,
   IndicatorBand,
+  LedgerRow,
   Prediction,
   RiskBand,
+  Trend,
   Sentiment,
   Source,
   SystemStatus,
@@ -403,6 +405,22 @@ function councilPredictions(report: CouncilReport): Prediction[] {
   }));
 }
 
+function asTrend(s?: string): Trend {
+  return s === "up" || s === "down" ? s : "flat";
+}
+
+/** The per-channel Brier ledger — Tier 3 rubric scoring (§7.3). */
+function councilLedger(report: CouncilReport): LedgerRow[] {
+  return (report.ledger ?? []).map((l) => ({
+    rank: l.rank,
+    name: l.name,
+    acc: clamp01(l.acc),
+    n: l.n,
+    brier: clamp01(l.brier),
+    trend: asTrend(l.trend),
+  }));
+}
+
 /** Split a resolve date into a short day + month for the compact catalyst column.
  *  Handles ISO ("2025-12-15") and free-form ("15 DEC", "Dec 15") inputs. */
 function splitResolve(resolve?: string): { d: string; m: string } {
@@ -453,6 +471,7 @@ export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
   const ace = councilAce(report);
   const briefing = councilBriefing(report);
   const predictions = councilPredictions(report);
+  const ledger = councilLedger(report);
   const catalysts = councilCatalysts(report);
   return {
     tiers: activatedTiers(),
@@ -462,6 +481,7 @@ export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
     ...(ace ? { ace } : {}),
     ...(briefing.length ? { briefing } : {}),
     ...(predictions.length ? { predictions } : {}),
+    ...(ledger.length ? { ledger } : {}),
     ...(catalysts.length ? { catalysts } : {}),
   };
 }

@@ -155,6 +155,46 @@ export type CleanedItem = {
 };
 
 /**
+ * ContextPreview
+ *
+ * Best evidence quote for a tracker (theme) + a relevance score (Core Feature §7.1).
+ *
+ * Surfaced by `GET /api/trackers/{tracker}/context`. `score` is a real 0..1 semantic
+ * relevance of the quote to the tracker concept — never a placeholder. Every preview is
+ * anchored to a real `source_url`-backed item (no-orphan guardrail §12.6).
+ */
+export type ContextPreview = {
+    /**
+     * Tracker
+     */
+    tracker: string;
+    /**
+     * Channel
+     */
+    channel: string;
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Timestamp
+     */
+    timestamp: string;
+    /**
+     * Quote
+     */
+    quote: string;
+    /**
+     * Speaker
+     */
+    speaker: string;
+    /**
+     * Score
+     */
+    score: number;
+};
+
+/**
  * CouncilReport
  *
  * The full Tier 3–5 output for one run, persisted as the latest snapshot.
@@ -182,6 +222,10 @@ export type CouncilReport = {
      * Predictions
      */
     predictions?: Array<Prediction>;
+    /**
+     * Ledger
+     */
+    ledger?: Array<LedgerRow>;
     /**
      * Source Count
      */
@@ -388,6 +432,38 @@ export type HttpValidationError = {
 };
 
 /**
+ * LedgerRow
+ *
+ * One channel's prediction track record (PROJECT_GUIDANCE §7.3 — Brier-scored).
+ */
+export type LedgerRow = {
+    /**
+     * Rank
+     */
+    rank: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Acc
+     */
+    acc: number;
+    /**
+     * N
+     */
+    n: number;
+    /**
+     * Brier
+     */
+    brier: number;
+    /**
+     * Trend
+     */
+    trend?: string;
+};
+
+/**
  * MacroIndicator
  *
  * Tier 5 — a macro/financial indicator score for the dashboard.
@@ -433,6 +509,18 @@ export type Prediction = {
      * Status
      */
     status?: string;
+    /**
+     * Probability
+     */
+    probability?: number;
+    /**
+     * Outcome
+     */
+    outcome?: boolean | null;
+    /**
+     * Resolved At
+     */
+    resolved_at?: string | null;
 };
 
 /**
@@ -838,6 +926,36 @@ export type ListItemsResponses = {
 
 export type ListItemsResponse = ListItemsResponses[keyof ListItemsResponses];
 
+export type TrackerContextEndpointData = {
+    body?: never;
+    path: {
+        /**
+         * Tracker
+         */
+        tracker: string;
+    };
+    query?: never;
+    url: '/api/trackers/{tracker}/context';
+};
+
+export type TrackerContextEndpointErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TrackerContextEndpointError = TrackerContextEndpointErrors[keyof TrackerContextEndpointErrors];
+
+export type TrackerContextEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: ContextPreview;
+};
+
+export type TrackerContextEndpointResponse = TrackerContextEndpointResponses[keyof TrackerContextEndpointResponses];
+
 export type DiscoverGetStreamData = {
     body?: never;
     path?: never;
@@ -1046,6 +1164,26 @@ export type CouncilLatestResponses = {
 };
 
 export type CouncilLatestResponse = CouncilLatestResponses[keyof CouncilLatestResponses];
+
+export type CouncilResolveData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/council/resolve';
+};
+
+export type CouncilResolveResponses = {
+    /**
+     * Response Council Resolve
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: number;
+    };
+};
+
+export type CouncilResolveResponse = CouncilResolveResponses[keyof CouncilResolveResponses];
 
 export type ListItemsStreamData = {
     body?: never;

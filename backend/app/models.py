@@ -280,6 +280,20 @@ class Prediction(BaseModel):
     by: str                         # source/channel making the call
     resolve: str                    # e.g. "01 SEP"
     status: str = "pending"
+    probability: float = 0.5        # forecast confidence 0..1 (for Brier scoring)
+    outcome: bool | None = None     # True/False once resolved, else None
+    resolved_at: datetime | None = None
+
+
+class LedgerRow(BaseModel):
+    """One channel's prediction track record (PROJECT_GUIDANCE §7.3 — Brier-scored)."""
+
+    rank: int
+    name: str                       # channel / analyst name
+    acc: float                      # accuracy 0..1
+    n: int                          # number of resolved predictions
+    brier: float                    # mean Brier score (lower is better)
+    trend: str = "flat"             # "up" | "down" | "flat" vs the previous snapshot
 
 
 class CouncilReport(BaseModel):
@@ -292,6 +306,7 @@ class CouncilReport(BaseModel):
     ace: AceIndex | None = None
     briefing: list[BriefingItem] = Field(default_factory=list)
     predictions: list[Prediction] = Field(default_factory=list)
+    ledger: list[LedgerRow] = Field(default_factory=list)
     source_count: int = 0
     generated_at: datetime = Field(default_factory=_now)
 
