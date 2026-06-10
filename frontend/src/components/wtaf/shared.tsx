@@ -14,6 +14,15 @@ export function PageHead({ title, sub, right }: { title: string; sub: string; ri
   );
 }
 
+export function PageButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      style={{ padding: "8px 14px", borderRadius: 9, fontSize: 12.5, background: "var(--panel-2)", border: "1px solid var(--stroke)", color: "var(--t-mid)", opacity: disabled ? 0.4 : 1, cursor: disabled ? "default" : "pointer" }}>
+      {label}
+    </button>
+  );
+}
+
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>

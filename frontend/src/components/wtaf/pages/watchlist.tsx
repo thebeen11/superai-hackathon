@@ -1,17 +1,26 @@
 "use client";
 /* ============ WTAF — Watchlist (list + ticker detail routes) ============ */
+import { useState } from "react";
 import Link from "next/link";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, MiniBar, EmptyState } from "../primitives";
-import { PageHead } from "../shared";
+import { PageHead, PageButton } from "../shared";
 import { DebateCard } from "../command-center/debate-card";
 import { fmtChange, fmtPrice, hasQuote } from "@/lib/format";
+
+const PAGE_SIZE = 25;
 
 export function WatchlistPage() {
   const d = useWtafData();
   const { discovering } = useWtaf();
   const isEmpty = d.watchlist.length === 0;
+
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(d.watchlist.length / PAGE_SIZE));
+  // Clamp during render so a shrinking list (e.g. after re-discovery) never lands on an empty page.
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = d.watchlist.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div>
@@ -24,8 +33,8 @@ export function WatchlistPage() {
             <EmptyState label="No tickers tracked yet" sub="Run a discovery to resolve entities ($TICKER) from sources" minHeight={140} />
           ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {d.watchlist.map((w, i) => (
-              <Link key={w.t} href={`/watchlist/${encodeURIComponent(w.t)}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 8px", margin: "0 -8px", background: "transparent", borderBottom: i < d.watchlist.length - 1 ? "1px solid var(--stroke)" : "none", textAlign: "left", borderRadius: 8, transition: "background .15s", cursor: "pointer" }}
+            {pageItems.map((w, i) => (
+              <Link key={w.t} href={`/watchlist/${encodeURIComponent(w.t)}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 8px", margin: "0 -8px", background: "transparent", borderBottom: i < pageItems.length - 1 ? "1px solid var(--stroke)" : "none", textAlign: "left", borderRadius: 8, transition: "background .15s", cursor: "pointer" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--panel-2)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                 <span className="mono" style={{ fontSize: 13, fontWeight: 600, width: 56 }}>{w.t}</span>
@@ -37,6 +46,13 @@ export function WatchlistPage() {
                 <span style={{ color: "var(--t-faint)", flexShrink: 0 }}>›</span>
               </Link>
             ))}
+            {pageCount > 1 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--stroke)" }}>
+                <PageButton label="‹ Prev" disabled={safePage === 0} onClick={() => setPage(safePage - 1)} />
+                <span className="mono" style={{ fontSize: 12, color: "var(--t-mid)" }}>Page {safePage + 1} of {pageCount}</span>
+                <PageButton label="Next ›" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)} />
+              </div>
+            )}
           </div>
           )}
         </Card>
