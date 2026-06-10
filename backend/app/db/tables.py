@@ -1,7 +1,7 @@
 """SQLAlchemy table definitions (Req 14, 15). Plain Postgres — no embeddings."""
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, Index, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase
 
@@ -46,3 +46,32 @@ class CouncilSnapshotRow(Base):
 
 
 Index("idx_council_snapshots_generated_at", CouncilSnapshotRow.generated_at)
+
+
+class PredictionRow(Base):
+    """A single resolvable prediction, tracked over its window for the ledger (§7.3).
+
+    Predictions accumulate across council runs (deduped by claim+channel+resolve), are
+    resolved True/False once their window passes, and feed the per-channel Brier ledger.
+    """
+
+    __tablename__ = "predictions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    claim = Column(Text, nullable=False)
+    channel = Column(String, nullable=False)                  # the `by` field
+    resolve = Column(String, nullable=False)                  # raw resolve string, e.g. "01 SEP"
+    resolve_at = Column(DateTime(timezone=True), nullable=True)  # parsed due date (UTC)
+    probability = Column(Float, nullable=False, default=0.5)  # forecast confidence 0..1
+    status = Column(String, nullable=False, default="pending")   # 'pending' | 'resolved'
+    outcome = Column(Boolean, nullable=True)                  # True/False once resolved
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("claim", "channel", "resolve", name="uq_predictions_claim_channel_resolve"),
+    )
+
+
+Index("idx_predictions_status", PredictionRow.status)
+Index("idx_predictions_channel", PredictionRow.channel)

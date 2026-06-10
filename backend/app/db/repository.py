@@ -2,13 +2,25 @@
 from __future__ import annotations
 
 import logging
+import re
+from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ..models import CleanedItem, CouncilReport, ResolvedEntity, SourceType, Stream, TranscriptSegment
+from ..models import (
+    CleanedItem,
+    CouncilReport,
+    LedgerRow,
+    Prediction,
+    ResolvedEntity,
+    SourceType,
+    Stream,
+    TranscriptSegment,
+)
 from .session import get_session
-from .tables import CleanedItemRow, CouncilSnapshotRow
+from .tables import CleanedItemRow, CouncilSnapshotRow, PredictionRow
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +137,165 @@ def get_latest_council_snapshot() -> CouncilReport | None:
         return CouncilReport.model_validate(row.report) if row else None
     finally:
         session.close()
+
+
+# --- Predictions & the Brier ledger (Tier 3 rubric scoring, §7.3) ------------
+
+_MONTHS = {
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}
+
+
+def _parse_resolve_date(raw: str, now: datetime) -> datetime | None:
+    """Parse a resolve string into the upcoming UTC date it refers to.
+
+    Handles ISO ("2025-12-15") exactly, and free-form ("01 SEP", "Dec 15") by picking
+    the next occurrence on/after `now` (a prediction's window is in the future when made).
+    Returns None when no date can be read — such rows simply never become resolvable.
+    """
+    s = (raw or "").strip()
+    iso = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", s)
+    if iso:
+        y, m, d = int(iso[1]), int(iso[2]), int(iso[3])
+        try:
+            return datetime(y, m, d, tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    mon = re.search(r"(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)", s.upper())
+    day = re.search(r"\b(\d{1,2})\b", s)
+    if not mon or not day:
+        return None
+    m, d = _MONTHS[mon[1]], int(day[1])
+    try:
+        candidate = datetime(now.year, m, d, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    # The window is forward-looking from when the prediction was made.
+    if candidate < now:
+        try:
+            candidate = datetime(now.year + 1, m, d, tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    return candidate
+
+
+@dataclass(frozen=True)
+class DuePrediction:
+    """A pending prediction whose resolve window has passed — ready to be judged."""
+
+    id: int
+    claim: str
+    channel: str
+
+
+def save_predictions(preds: list[Prediction]) -> int:
+    """Append new predictions, deduped by (claim, channel, resolve). Returns rows inserted."""
+    if not preds:
+        return 0
+    now = datetime.now(timezone.utc)
+    rows = [
+        {
+            "claim": p.claim,
+            "channel": p.by,
+            "resolve": p.resolve,
+            "resolve_at": _parse_resolve_date(p.resolve, now),
+            "probability": max(0.0, min(1.0, p.probability)),
+            "status": "pending",
+            "outcome": None,
+            "created_at": now,
+            "resolved_at": None,
+        }
+        for p in preds
+    ]
+    stmt = pg_insert(PredictionRow).values(rows).on_conflict_do_nothing(
+        constraint="uq_predictions_claim_channel_resolve"
+    )
+    session = get_session()
+    try:
+        result = session.execute(stmt)
+        session.commit()
+        return result.rowcount or 0
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist predictions")
+        raise
+    finally:
+        session.close()
+
+
+def list_due_predictions(now: datetime | None = None) -> list[DuePrediction]:
+    """Pending predictions whose resolve date has passed (ready for rubric scoring)."""
+    now = now or datetime.now(timezone.utc)
+    stmt = (
+        select(PredictionRow.id, PredictionRow.claim, PredictionRow.channel)
+        .where(PredictionRow.status == "pending")
+        .where(PredictionRow.resolve_at.is_not(None))
+        .where(PredictionRow.resolve_at <= now)
+        .order_by(PredictionRow.resolve_at.asc())
+    )
+    session = get_session()
+    try:
+        return [DuePrediction(id=r.id, claim=r.claim, channel=r.channel) for r in session.execute(stmt)]
+    finally:
+        session.close()
+
+
+def resolve_prediction(prediction_id: int, outcome: bool) -> None:
+    """Mark a prediction resolved with its True/False outcome."""
+    session = get_session()
+    try:
+        row = session.get(PredictionRow, prediction_id)
+        if row is None:
+            return
+        row.outcome = outcome
+        row.status = "resolved"
+        row.resolved_at = datetime.now(timezone.utc)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to resolve prediction %s", prediction_id)
+        raise
+    finally:
+        session.close()
+
+
+def compute_ledger(prev: CouncilReport | None = None) -> list[LedgerRow]:
+    """Per-channel accuracy + Brier over all resolved predictions, ranked best-first.
+
+    `acc` = correct / n; `brier` = mean((probability − outcome)²). `trend` compares each
+    channel's accuracy to its row in the previous snapshot (±0.02 band → up/down/flat).
+    """
+    stmt = (
+        select(PredictionRow.channel, PredictionRow.probability, PredictionRow.outcome)
+        .where(PredictionRow.status == "resolved")
+        .where(PredictionRow.outcome.is_not(None))
+    )
+    session = get_session()
+    try:
+        rows = session.execute(stmt).all()
+    finally:
+        session.close()
+
+    by_channel: dict[str, list[tuple[float, bool]]] = {}
+    for channel, probability, outcome in rows:
+        by_channel.setdefault(channel, []).append((probability, bool(outcome)))
+
+    prev_acc = {r.name: r.acc for r in (prev.ledger if prev else [])}
+
+    stats = []
+    for channel, obs in by_channel.items():
+        n = len(obs)
+        correct = sum(1 for _, o in obs if o)
+        acc = correct / n
+        brier = sum((p - (1.0 if o else 0.0)) ** 2 for p, o in obs) / n
+        prior = prev_acc.get(channel)
+        trend = "flat" if prior is None else "up" if acc > prior + 0.02 else "down" if acc < prior - 0.02 else "flat"
+        stats.append((channel, acc, n, brier, trend))
+
+    # Best accuracy first; break ties by the lower (better) Brier score.
+    stats.sort(key=lambda s: (-s[1], s[3]))
+    return [
+        LedgerRow(rank=i + 1, name=c, acc=round(acc, 2), n=n, brier=round(brier, 2), trend=trend)
+        for i, (c, acc, n, brier, trend) in enumerate(stats)
+    ]

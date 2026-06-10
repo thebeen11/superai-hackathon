@@ -13,12 +13,19 @@ from __future__ import annotations
 
 import logging
 
-from ..db.repository import get_latest_council_snapshot, list_cleaned_items, save_council_snapshot
+from ..db.repository import (
+    compute_ledger,
+    get_latest_council_snapshot,
+    list_cleaned_items,
+    save_council_snapshot,
+    save_predictions,
+)
 from ..events import Emit, noop_emit
 from ..models import CouncilReport, DebateTurn, Stream
 from .analyst import run_analysts
 from .chairman import run_chairman
 from .debate import run_debate
+from .resolver import resolve_due_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +60,17 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
             DebateTurn(who="winston", round="Verdict", label="Winston · rules", text=verdict.verdict)
         )
 
+    # Tier 3 rubric scoring: persist new predictions, resolve any whose window passed,
+    # then recompute the per-channel Brier ledger. Fault-isolated — scoring must never
+    # break the council run (§7.3).
+    ledger = []
+    try:
+        save_predictions(verdict.predictions)
+        resolve_due_predictions(items, emit=emit)
+        ledger = compute_ledger(get_latest_council_snapshot())
+    except Exception:
+        logger.exception("Prediction ledger scoring failed; continuing without it")
+
     report = CouncilReport(
         sector_notes=notes,
         debate=debate,
@@ -61,6 +79,7 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
         ace=verdict.ace,
         briefing=verdict.briefing,
         predictions=verdict.predictions,
+        ledger=ledger,
         source_count=len(items),
     )
     save_council_snapshot(report)
@@ -72,3 +91,22 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
 def latest_council() -> CouncilReport | None:
     """Return the most recent persisted council snapshot, if any."""
     return get_latest_council_snapshot()
+
+
+def resolve_ledger(emit: Emit = noop_emit) -> int:
+    """Score due predictions against the current corpus and refresh the ledger snapshot.
+
+    Standalone counterpart to a full council run — useful to settle predictions whose
+    window has passed without re-running Tiers 3–5. Returns the number resolved.
+    """
+    corpus = list_cleaned_items(limit=_MAX_ITEMS)
+    resolved = resolve_due_predictions(corpus, emit=emit)
+    prev = get_latest_council_snapshot()
+    ledger = compute_ledger(prev)
+    # Don't manufacture an empty snapshot when nothing has run and nothing scored.
+    if prev is None and not ledger:
+        return resolved
+    report = prev or CouncilReport()
+    report.ledger = ledger
+    save_council_snapshot(report)
+    return resolved

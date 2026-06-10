@@ -11,7 +11,7 @@ from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .council import latest_council, run_council
+from .council import latest_council, resolve_ledger, run_council
 from .dataeng import process_discovery_result
 from .db.repository import list_cleaned_items
 from .discovery import discover, discover_with_refinement
@@ -269,6 +269,12 @@ def run_council_stream():
 def council_latest() -> CouncilReport | None:
     """The most recent council snapshot, or null if none has run yet."""
     return latest_council()
+
+
+@app.post("/council/resolve")
+def council_resolve() -> dict[str, int]:
+    """Score predictions whose window has passed and refresh the Brier ledger."""
+    return {"resolved": resolve_ledger()}
 
 
 @app.get("/items/stream")

@@ -46,8 +46,9 @@ _SYSTEM = (
     "and the resulting value (their weighted sum) with a label like 'CAPITAL ABUNDANT' or "
     "'CAPITAL STARVED'.\n"
     "5. briefing: 3-4 one-line bullets for the daily briefing, each toned up/down/neutral.\n"
-    "6. predictions: a few resolvable predictions, each with the claim, who made it, and a "
-    "resolve date. Ground everything in the provided material; do not invent companies."
+    "6. predictions: a few resolvable predictions, each with the claim, who made it, a "
+    "resolve date, and a calibrated probability 0.0-1.0 that the claim resolves TRUE. "
+    "Ground everything in the provided material; do not invent companies."
 )
 
 
@@ -90,6 +91,7 @@ class _LLMPrediction(BaseModel):
     claim: str
     by: str = ""
     resolve: str = ""
+    probability: float = 0.5
 
 
 class _ChairmanOutput(BaseModel):
@@ -187,7 +189,10 @@ def run_chairman(
         for b in out.briefing
     ]
     predictions = [
-        Prediction(claim=p.claim, by=p.by or "Council", resolve=p.resolve or "—", status="pending")
+        Prediction(
+            claim=p.claim, by=p.by or "Council", resolve=p.resolve or "—",
+            status="pending", probability=max(0.0, min(1.0, p.probability)),
+        )
         for p in out.predictions
     ]
     emit("council.chairman", "Winston issued the verdict", status="ok",

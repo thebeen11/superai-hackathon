@@ -675,6 +675,29 @@
         }
       }
     },
+    "/council/resolve": {
+      "post": {
+        "summary": "Council Resolve",
+        "description": "Score predictions whose window has passed and refresh the Brier ledger.",
+        "operationId": "council_resolve",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Council Resolve"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/items/stream": {
       "get": {
         "summary": "List Items Stream",
@@ -1093,6 +1116,13 @@
             "type": "array",
             "title": "Predictions"
           },
+          "ledger": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerRow"
+            },
+            "type": "array",
+            "title": "Ledger"
+          },
           "source_count": {
             "type": "integer",
             "title": "Source Count",
@@ -1402,6 +1432,45 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "LedgerRow": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "acc": {
+            "type": "number",
+            "title": "Acc"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "brier": {
+            "type": "number",
+            "title": "Brier"
+          },
+          "trend": {
+            "type": "string",
+            "title": "Trend",
+            "default": "flat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "name",
+          "acc",
+          "n",
+          "brier"
+        ],
+        "title": "LedgerRow",
+        "description": "One channel's prediction track record (PROJECT_GUIDANCE \u00a77.3 \u2014 Brier-scored)."
+      },
       "MacroIndicator": {
         "properties": {
           "name": {
@@ -1449,6 +1518,34 @@
             "type": "string",
             "title": "Status",
             "default": "pending"
+          },
+          "probability": {
+            "type": "number",
+            "title": "Probability",
+            "default": 0.5
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
           }
         },
         "type": "object",

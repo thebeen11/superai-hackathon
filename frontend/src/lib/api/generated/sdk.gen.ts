@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CouncilLatestData, CouncilLatestResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses } from './types.gen';
+import type { CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -78,6 +78,13 @@ export const dataengProcess = <ThrowOnError extends boolean = false>(options: Op
  * Read persisted, cleaned + labelled items (newest first), with optional filters.
  */
 export const listItems = <ThrowOnError extends boolean = false>(options?: Options<ListItemsData, ThrowOnError>): RequestResult<ListItemsResponses, ListItemsErrors, ThrowOnError> => (options?.client ?? client).get<ListItemsResponses, ListItemsErrors, ThrowOnError>({ url: '/items', ...options });
+
+/**
+ * Tracker Context Endpoint
+ *
+ * Best evidence quote for a tracker (theme) + a real 0..1 relevance score (§7.1).
+ */
+export const trackerContextEndpoint = <ThrowOnError extends boolean = false>(options: Options<TrackerContextEndpointData, ThrowOnError>): RequestResult<TrackerContextEndpointResponses, TrackerContextEndpointErrors, ThrowOnError> => (options.client ?? client).get<TrackerContextEndpointResponses, TrackerContextEndpointErrors, ThrowOnError>({ url: '/api/trackers/{tracker}/context', ...options });
 
 /**
  * Discover Get Stream
@@ -165,6 +172,13 @@ export const runCouncilStream = <ThrowOnError extends boolean = false>(options?:
  * The most recent council snapshot, or null if none has run yet.
  */
 export const councilLatest = <ThrowOnError extends boolean = false>(options?: Options<CouncilLatestData, ThrowOnError>): RequestResult<CouncilLatestResponses, unknown, ThrowOnError> => (options?.client ?? client).get<CouncilLatestResponses, unknown, ThrowOnError>({ url: '/council/latest', ...options });
+
+/**
+ * Council Resolve
+ *
+ * Score predictions whose window has passed and refresh the Brier ledger.
+ */
+export const councilResolve = <ThrowOnError extends boolean = false>(options?: Options<CouncilResolveData, ThrowOnError>): RequestResult<CouncilResolveResponses, unknown, ThrowOnError> => (options?.client ?? client).post<CouncilResolveResponses, unknown, ThrowOnError>({ url: '/council/resolve', ...options });
 
 /**
  * List Items Stream

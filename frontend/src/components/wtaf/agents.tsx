@@ -541,7 +541,7 @@ export function TierFlow({
   liveStatus?: Record<string, LiveAgentStatus>;
 }) {
   return (
-    <div style={{ position: "relative", paddingRight: 30 }}>
+    <div style={{ position: "relative" }}>
       {/* macro bypass rail (Timo → Winston) lives in the reserved right gutter */}
       {tiers.map((t, i) => {
         const ac = ACCENTS[t.accent] || ACCENTS.blue;
