@@ -8,8 +8,8 @@
 import type { ContextPreview, WtafData, Source } from "../types";
 import { wtafMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
-import { dataengProcess, discoverPost, listItems } from "./generated/sdk.gen";
-import type { DataEngReport } from "./generated/types.gen";
+import { councilLatest, dataengProcess, discoverPost, listItems } from "./generated/sdk.gen";
+import type { CouncilReport, DataEngReport } from "./generated/types.gen";
 import { itemsToWtafData } from "./adapter";
 import { streamSse, type ProgressEvent } from "./sse";
 
@@ -24,8 +24,26 @@ import { streamSse, type ProgressEvent } from "./sse";
  */
 export async function getSnapshot(): Promise<WtafData> {
   if (USE_MOCK) return mockResolve(wtafMock);
-  const { data } = await listItems({ query: { limit: 200 }, throwOnError: true });
-  return itemsToWtafData(data ?? []);
+  const [items, council] = await Promise.all([
+    listItems({ query: { limit: 200 }, throwOnError: true }),
+    getCouncil(),
+  ]);
+  return itemsToWtafData(items.data ?? [], council);
+}
+
+/**
+ * Latest Tier 3–5 council snapshot (debate, baskets, indicators, ACE, briefing).
+ * Returns null when no council has run yet (empty DB / fresh start) so the Tier 3–5
+ * cards fall back to their "awaiting" empty states. Backend: GET /council/latest
+ */
+export async function getCouncil(): Promise<CouncilReport | null> {
+  if (USE_MOCK) return null;
+  try {
+    const { data } = await councilLatest({ throwOnError: true });
+    return data ?? null;
+  } catch {
+    return null; // council is best-effort; never block the snapshot on it
+  }
 }
 
 /**

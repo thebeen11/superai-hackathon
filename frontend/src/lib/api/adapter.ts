@@ -17,18 +17,33 @@
  * only offline (USE_MOCK / network error), handled in `wtaf.ts`.
  */
 import type {
+  Ace,
+  BriefingItem,
+  BriefingTone,
+  Catalyst,
+  CatalystTone,
   ContextPreview,
+  Debate,
+  DebateTurn,
   Indicator,
+  IndicatorBand,
+  Prediction,
+  RiskBand,
   Sentiment,
   Source,
   SystemStatus,
   Theme,
+  Tier,
   Tracker,
   WatchItem,
   WtafData,
 } from "../types";
 import { tierTopology } from "../tiers";
-import type { CleanedItem } from "./generated/types.gen";
+import type {
+  CleanedItem,
+  CouncilReport,
+  DebateTurn as ApiDebateTurn,
+} from "./generated/types.gen";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"] as const;
@@ -293,12 +308,149 @@ function nowStamp(): string {
   return `${WEEKDAYS[d.getDay()].toUpperCase()} ${pad(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/* ============ Tier 3–5 (the Council) → dashboard ============ */
+
+const RISK_BANDS: RiskBand[] = ["Low", "Med", "High"];
+const INDICATOR_BANDS: IndicatorBand[] = ["Positive", "Neutral", "Negative"];
+const CATALYST_TONES: CatalystTone[] = ["orange", "blue", "green", "indigo"];
+
+function asRisk(s?: string): RiskBand {
+  return RISK_BANDS.includes(s as RiskBand) ? (s as RiskBand) : "Med";
+}
+function asBand(s?: string): IndicatorBand {
+  return INDICATOR_BANDS.includes(s as IndicatorBand) ? (s as IndicatorBand) : "Neutral";
+}
+function asBriefingTone(s?: string): BriefingTone {
+  return s === "up" || s === "down" ? s : "neutral";
+}
+function asWho(s: string): DebateTurn["who"] {
+  return s === "bull" || s === "bear" || s === "winston" ? s : "winston";
+}
+
+/** Winston's baskets are the real thematic portfolios — they replace the heuristic. */
+function councilThemes(report: CouncilReport): Theme[] {
+  return (report.baskets ?? []).map((b) => ({
+    name: b.name,
+    risk: asRisk(b.risk),
+    horizon: b.horizon || "—",
+    ret: 0, // no backtest tier yet — card shows it as pending
+    stocks: b.stocks ?? [],
+    strat: b.strat ?? "",
+    conviction: clamp01(b.conviction ?? 0),
+    verdict: b.verdict || undefined,
+    hold: b.hold || undefined,
+  }));
+}
+
+function councilDebate(report: CouncilReport): Debate | null {
+  const d = report.debate;
+  if (!d) return null;
+  return {
+    topic: d.topic ?? "",
+    round: d.round ?? 0,
+    rounds: d.rounds ?? 3,
+    bull: { name: d.bull.name, model: d.bull.model, accent: "green", stance: d.bull.stance ?? "" },
+    bear: { name: d.bear.name, model: d.bear.model, accent: "red", stance: d.bear.stance ?? "" },
+    verdict: d.verdict ?? "",
+    transcript: (d.transcript ?? []).map((t: ApiDebateTurn): DebateTurn => ({
+      who: asWho(t.who),
+      round: t.round,
+      label: t.label,
+      text: t.text,
+    })),
+  };
+}
+
+function councilIndicators(report: CouncilReport): Indicator[] {
+  return (report.indicators ?? []).map((i) => ({
+    name: i.name,
+    score: i.score,
+    band: asBand(i.band),
+    evid: i.evidence ?? "",
+  }));
+}
+
+function councilAce(report: CouncilReport): Ace | null {
+  const a = report.ace;
+  if (!a) return null;
+  return {
+    value: a.value,
+    label: a.label,
+    delta: a.delta ?? 0,
+    components: a.components ?? [],
+    overlay: { ace: [], smh: [] }, // no historical series; ACE card is not rendered
+  };
+}
+
+function councilBriefing(report: CouncilReport): BriefingItem[] {
+  return (report.briefing ?? []).map((b) => ({ tone: asBriefingTone(b.tone), text: b.text }));
+}
+
+function councilPredictions(report: CouncilReport): Prediction[] {
+  return (report.predictions ?? []).map((p) => ({
+    claim: p.claim,
+    by: p.by,
+    resolve: p.resolve,
+    status: p.status ?? "pending",
+  }));
+}
+
+/** Upcoming key events, derived from the Chairman's resolvable predictions. */
+function councilCatalysts(report: CouncilReport): Catalyst[] {
+  return (report.predictions ?? []).map((p, i) => {
+    const [d = "", m = ""] = (p.resolve ?? "").trim().split(/\s+/);
+    return {
+      d,
+      m: m.toUpperCase(),
+      t: p.claim.length > 48 ? `${p.claim.slice(0, 47)}…` : p.claim,
+      sub: `${p.by} · ${p.status ?? "pending"}`,
+      tone: CATALYST_TONES[i % CATALYST_TONES.length],
+    };
+  });
+}
+
+/** Once the council has run, light up Tiers 3–5 in the agent-council flow. */
+function activatedTiers(): Tier[] {
+  return tierTopology.map((t) =>
+    t.n < 3
+      ? t
+      : {
+          ...t,
+          status: "active",
+          statusText: "online",
+          squad: t.squad.map((a) => ({ ...a, status: "active", statusText: "online" })),
+        },
+  );
+}
+
+/** Map a persisted CouncilReport onto the Tier 3–5 slices of the dashboard. */
+export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
+  const debate = councilDebate(report);
+  const themes = councilThemes(report);
+  const indicators = councilIndicators(report);
+  const ace = councilAce(report);
+  const briefing = councilBriefing(report);
+  const predictions = councilPredictions(report);
+  const catalysts = councilCatalysts(report);
+  return {
+    tiers: activatedTiers(),
+    ...(debate ? { debate } : {}),
+    ...(themes.length ? { themes } : {}),
+    ...(indicators.length ? { indicators } : {}),
+    ...(ace ? { ace } : {}),
+    ...(briefing.length ? { briefing } : {}),
+    ...(predictions.length ? { predictions } : {}),
+    ...(catalysts.length ? { catalysts } : {}),
+  };
+}
+
 /**
  * Build the live snapshot from `emptyLiveData`, overriding each backend-derived
- * slice (only when non-empty, so cards fall back to their empty states). Tier 3–5
- * slices stay empty.
+ * slice (only when non-empty, so cards fall back to their empty states). The Tier
+ * 3–5 slices come from the council snapshot when one exists; otherwise they stay
+ * empty and the cards show their "awaiting Tier 3–5" state.
  */
-export function itemsToWtafData(items: CleanedItem[]): WtafData {
+export function itemsToWtafData(items: CleanedItem[], council?: CouncilReport | null): WtafData {
   const sources = deriveSources(items);
   const trackers = deriveTrackers(items);
   const watchlist = deriveWatchlist(items);
@@ -320,6 +472,9 @@ export function itemsToWtafData(items: CleanedItem[]): WtafData {
     ...(themes.length ? { themes } : {}),
     sentiment: items.length ? deriveSentiment(items) : emptyLiveData.sentiment,
     system: items.length ? deriveSystem(items, sources) : emptyLiveData.system,
-    // --- Tier 3–5 (debate, ledger, predictions, ace, briefing, catalysts, …) stay empty ---
+    // --- Tier 3–5 from the council snapshot (themes/indicators override the item
+    //     heuristics; debate/briefing/ace/predictions/catalysts fill formerly-empty
+    //     cards). Absent council → these stay empty and the cards show "awaiting". ---
+    ...(council ? councilToWtafData(council) : {}),
   };
 }

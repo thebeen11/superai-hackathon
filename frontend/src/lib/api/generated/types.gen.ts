@@ -5,6 +5,64 @@ export type ClientOptions = {
 };
 
 /**
+ * AceComponent
+ */
+export type AceComponent = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Weight
+     */
+    weight: number;
+    /**
+     * Score
+     */
+    score: number;
+};
+
+/**
+ * AceIndex
+ *
+ * Tier 5 — the composite AI Capital Environment index (PROJECT_GUIDANCE §8).
+ */
+export type AceIndex = {
+    /**
+     * Value
+     */
+    value: number;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Delta
+     */
+    delta?: number;
+    /**
+     * Components
+     */
+    components?: Array<AceComponent>;
+};
+
+/**
+ * BriefingItem
+ *
+ * Tier 5 — one line of the Chairman's daily briefing.
+ */
+export type BriefingItem = {
+    /**
+     * Tone
+     */
+    tone: string;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * ClarificationMode
  *
  * Controls how an ambiguous query is handled (Req 2.4).
@@ -97,6 +155,44 @@ export type CleanedItem = {
 };
 
 /**
+ * CouncilReport
+ *
+ * The full Tier 3–5 output for one run, persisted as the latest snapshot.
+ */
+export type CouncilReport = {
+    /**
+     * Sector Notes
+     */
+    sector_notes?: Array<SectorNote>;
+    debate?: DebateRecord | null;
+    /**
+     * Baskets
+     */
+    baskets?: Array<ThemeBasket>;
+    /**
+     * Indicators
+     */
+    indicators?: Array<MacroIndicator>;
+    ace?: AceIndex | null;
+    /**
+     * Briefing
+     */
+    briefing?: Array<BriefingItem>;
+    /**
+     * Predictions
+     */
+    predictions?: Array<Prediction>;
+    /**
+     * Source Count
+     */
+    source_count?: number;
+    /**
+     * Generated At
+     */
+    generated_at?: string;
+};
+
+/**
  * DataEngReport
  *
  * Batch outcome of a Data Engineering run (Req 7.4, 7.5).
@@ -114,6 +210,80 @@ export type DataEngReport = {
      * Failures
      */
     failures?: Array<ProcessingFailure>;
+};
+
+/**
+ * DebateRecord
+ *
+ * Tier 4 — the adversarial debate transcript + Chairman verdict.
+ */
+export type DebateRecord = {
+    /**
+     * Topic
+     */
+    topic?: string;
+    /**
+     * Round
+     */
+    round?: number;
+    /**
+     * Rounds
+     */
+    rounds?: number;
+    bull: DebateSideMeta;
+    bear: DebateSideMeta;
+    /**
+     * Verdict
+     */
+    verdict?: string;
+    /**
+     * Transcript
+     */
+    transcript?: Array<DebateTurn>;
+};
+
+/**
+ * DebateSideMeta
+ *
+ * A debater's identity (the model family is shown in the UI).
+ */
+export type DebateSideMeta = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Stance
+     */
+    stance?: string;
+};
+
+/**
+ * DebateTurn
+ *
+ * One logged turn of the Bull/Bear/Chairman debate (Req: full transcript).
+ */
+export type DebateTurn = {
+    /**
+     * Who
+     */
+    who: string;
+    /**
+     * Round
+     */
+    round: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Text
+     */
+    text: string;
 };
 
 /**
@@ -188,6 +358,26 @@ export type DiscoveryResultOutput = {
 };
 
 /**
+ * Evidence
+ *
+ * A source-anchored quote backing an analyst's call (no-orphan guardrail).
+ */
+export type Evidence = {
+    /**
+     * Quote
+     */
+    quote: string;
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Timestamp Start
+     */
+    timestamp_start?: number | null;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -195,6 +385,54 @@ export type HttpValidationError = {
      * Detail
      */
     detail?: Array<ValidationError>;
+};
+
+/**
+ * MacroIndicator
+ *
+ * Tier 5 — a macro/financial indicator score for the dashboard.
+ */
+export type MacroIndicator = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Score
+     */
+    score: number;
+    /**
+     * Band
+     */
+    band: string;
+    /**
+     * Evidence
+     */
+    evidence?: string;
+};
+
+/**
+ * Prediction
+ *
+ * Tier 5 — a resolvable prediction destined for the ledger (Req 7.3).
+ */
+export type Prediction = {
+    /**
+     * Claim
+     */
+    claim: string;
+    /**
+     * By
+     */
+    by: string;
+    /**
+     * Resolve
+     */
+    resolve: string;
+    /**
+     * Status
+     */
+    status?: string;
 };
 
 /**
@@ -227,6 +465,30 @@ export type ResolvedEntity = {
      * Mentions
      */
     mentions?: Array<string>;
+};
+
+/**
+ * SectorNote
+ *
+ * Tier 3 — an Andie desk's daily Investment Highlights & Catalyst Note.
+ */
+export type SectorNote = {
+    /**
+     * Desk
+     */
+    desk: string;
+    /**
+     * Summary
+     */
+    summary?: string;
+    /**
+     * Highlights
+     */
+    highlights?: Array<string>;
+    /**
+     * Stocks
+     */
+    stocks?: Array<StockTake>;
 };
 
 /**
@@ -285,9 +547,77 @@ export type SourceItem = {
 export type SourceType = 'web' | 'youtube';
 
 /**
+ * StockTake
+ *
+ * One analyst's view on a single ticker.
+ */
+export type StockTake = {
+    /**
+     * Ticker
+     */
+    ticker: string;
+    /**
+     * Conviction
+     */
+    conviction: number;
+    /**
+     * Horizon
+     */
+    horizon: string;
+    /**
+     * Rationale
+     */
+    rationale?: string;
+    /**
+     * Evidence
+     */
+    evidence?: Array<Evidence>;
+};
+
+/**
  * Stream
  */
 export type Stream = 'MACRO' | 'MICRO';
+
+/**
+ * ThemeBasket
+ *
+ * Tier 5 — a final thematic basket with the Chairman's conviction + hold period.
+ */
+export type ThemeBasket = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Risk
+     */
+    risk?: string;
+    /**
+     * Horizon
+     */
+    horizon?: string;
+    /**
+     * Stocks
+     */
+    stocks?: Array<string>;
+    /**
+     * Strat
+     */
+    strat?: string;
+    /**
+     * Conviction
+     */
+    conviction?: number;
+    /**
+     * Verdict
+     */
+    verdict?: string;
+    /**
+     * Hold
+     */
+    hold?: string;
+};
 
 /**
  * TranscriptSegment
@@ -610,6 +940,112 @@ export type DataengProcessStreamResponses = {
      */
     200: unknown;
 };
+
+export type DataengJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Status
+         *
+         * Filter by job status
+         */
+        status?: string | null;
+    };
+    url: '/dataeng/jobs';
+};
+
+export type DataengJobsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DataengJobsError = DataengJobsErrors[keyof DataengJobsErrors];
+
+export type DataengJobsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DataengJobStreamData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/dataeng/jobs/{job_id}/stream';
+};
+
+export type DataengJobStreamErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DataengJobStreamError = DataengJobStreamErrors[keyof DataengJobStreamErrors];
+
+export type DataengJobStreamResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type RunCouncilEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/council/run';
+};
+
+export type RunCouncilEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: CouncilReport;
+};
+
+export type RunCouncilEndpointResponse = RunCouncilEndpointResponses[keyof RunCouncilEndpointResponses];
+
+export type RunCouncilStreamData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/council/run/stream';
+};
+
+export type RunCouncilStreamResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type CouncilLatestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/council/latest';
+};
+
+export type CouncilLatestResponses = {
+    /**
+     * Response Council Latest
+     *
+     * Successful Response
+     */
+    200: CouncilReport | null;
+};
+
+export type CouncilLatestResponse = CouncilLatestResponses[keyof CouncilLatestResponses];
 
 export type ListItemsStreamData = {
     body?: never;

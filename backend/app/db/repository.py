@@ -6,9 +6,9 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ..models import CleanedItem, ResolvedEntity, SourceType, Stream, TranscriptSegment
+from ..models import CleanedItem, CouncilReport, ResolvedEntity, SourceType, Stream, TranscriptSegment
 from .session import get_session
-from .tables import CleanedItemRow
+from .tables import CleanedItemRow, CouncilSnapshotRow
 
 logger = logging.getLogger(__name__)
 
@@ -90,5 +90,38 @@ def upsert_cleaned_item(item: CleanedItem) -> None:
         session.rollback()
         logger.exception("Failed to persist cleaned item %s", item.source_url)
         raise
+    finally:
+        session.close()
+
+
+# --- Council snapshots (Tiers 3–5) ------------------------------------------
+
+
+def save_council_snapshot(report: CouncilReport) -> None:
+    """Append the latest council run. The newest row is the current snapshot."""
+    row = CouncilSnapshotRow(
+        report=report.model_dump(mode="json"),
+        source_count=report.source_count,
+        generated_at=report.generated_at,
+    )
+    session = get_session()
+    try:
+        session.add(row)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist council snapshot")
+        raise
+    finally:
+        session.close()
+
+
+def get_latest_council_snapshot() -> CouncilReport | None:
+    """Read back the most recent council snapshot, or None if none exists yet."""
+    stmt = select(CouncilSnapshotRow).order_by(CouncilSnapshotRow.generated_at.desc()).limit(1)
+    session = get_session()
+    try:
+        row = session.execute(stmt).scalars().first()
+        return CouncilReport.model_validate(row.report) if row else None
     finally:
         session.close()

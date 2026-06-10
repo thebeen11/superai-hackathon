@@ -63,6 +63,11 @@ function labelFromProgress(evt: ProgressEvent): DiscoveryStatus {
     const title = evt.message.replace(/^\[\d+\/\d+\]\s*/, "");
     text = `Cleaning ${evt.data.index}/${evt.data.total}${title ? ` · ${title}` : ""}`;
   } else if (evt.stage === "dataeng") text = "Processing…";
+  // Tier 3–5 council stages (auto-chained after data engineering).
+  else if (evt.stage === "council.analyst") text = "Analyst desks…";
+  else if (evt.stage === "council.debate") text = "Debating…";
+  else if (evt.stage === "council.chairman") text = "Chairman verdict…";
+  else if (evt.stage === "council") text = "Convening council…";
   else if (evt.stage.startsWith("discover")) text = "Searching…";
   else if (evt.stage === "refine") text = "Refining…";
   return { tone: "info", text };
@@ -128,7 +133,10 @@ export function WtafProvider({ children }: { children: ReactNode }) {
   // persisted (`dataeng.item` ok) refetch so its data lands in the cards mid-stream.
   const handleProgress = useCallback((evt: ProgressEvent) => {
     setDiscoveryStatus(labelFromProgress(evt));
+    // Refetch as items persist (Layer 2) and once the council snapshot is ready
+    // (Tier 5), so the Tier 3–5 cards fill in the same live pass.
     if (evt.stage === "dataeng.item" && evt.status === "ok") refetchSoon();
+    if (evt.stage === "council" && evt.status === "ok") refetchSoon();
   }, [refetchSoon]);
 
   // Manual retry from an event handler (e.g. ErrorScreen) — flip loading here.

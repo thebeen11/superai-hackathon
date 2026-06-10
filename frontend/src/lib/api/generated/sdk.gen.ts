@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses } from './types.gen';
+import type { CouncilLatestData, CouncilLatestResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -61,7 +61,7 @@ export const discoverClarify = <ThrowOnError extends boolean = false>(options: O
 /**
  * Dataeng Process
  *
- * Run Layer 2 (clean + label + theme + persist) over a DiscoveryResult.
+ * Run Layer 2 (clean + label + theme + persist), then convene the council.
  */
 export const dataengProcess = <ThrowOnError extends boolean = false>(options: Options<DataengProcessData, ThrowOnError>): RequestResult<DataengProcessResponses, DataengProcessErrors, ThrowOnError> => (options.client ?? client).post<DataengProcessResponses, DataengProcessErrors, ThrowOnError>({
     url: '/dataeng/process',
@@ -118,6 +118,9 @@ export const discoverClarifyStream = <ThrowOnError extends boolean = false>(opti
  * Dataeng Process Stream
  *
  * Streaming version of POST /dataeng/process (per-item progress).
+ *
+ * Registers a Job so a client that reloads mid-run can reconnect via
+ * /dataeng/jobs/{id}/stream. The job id is sent as a leading `job` SSE frame.
  */
 export const dataengProcessStream = <ThrowOnError extends boolean = false>(options: Options<DataengProcessStreamData, ThrowOnError>): RequestResult<DataengProcessStreamResponses, DataengProcessStreamErrors, ThrowOnError> => (options.client ?? client).post<DataengProcessStreamResponses, DataengProcessStreamErrors, ThrowOnError>({
     url: '/dataeng/process/stream',
@@ -127,6 +130,41 @@ export const dataengProcessStream = <ThrowOnError extends boolean = false>(optio
         ...options.headers
     }
 });
+
+/**
+ * Dataeng Jobs
+ *
+ * List tracked discovery jobs (running by default) so a reloaded client can find one.
+ */
+export const dataengJobs = <ThrowOnError extends boolean = false>(options?: Options<DataengJobsData, ThrowOnError>): RequestResult<DataengJobsResponses, DataengJobsErrors, ThrowOnError> => (options?.client ?? client).get<DataengJobsResponses, DataengJobsErrors, ThrowOnError>({ url: '/dataeng/jobs', ...options });
+
+/**
+ * Dataeng Job Stream
+ *
+ * Reconnect to a job: replay its progress so far, then stream live to completion.
+ */
+export const dataengJobStream = <ThrowOnError extends boolean = false>(options: Options<DataengJobStreamData, ThrowOnError>): RequestResult<DataengJobStreamResponses, DataengJobStreamErrors, ThrowOnError> => (options.client ?? client).get<DataengJobStreamResponses, DataengJobStreamErrors, ThrowOnError>({ url: '/dataeng/jobs/{job_id}/stream', ...options });
+
+/**
+ * Run Council Endpoint
+ *
+ * Run Tiers 3–5 on-demand over the persisted corpus and return the snapshot.
+ */
+export const runCouncilEndpoint = <ThrowOnError extends boolean = false>(options?: Options<RunCouncilEndpointData, ThrowOnError>): RequestResult<RunCouncilEndpointResponses, unknown, ThrowOnError> => (options?.client ?? client).post<RunCouncilEndpointResponses, unknown, ThrowOnError>({ url: '/council/run', ...options });
+
+/**
+ * Run Council Stream
+ *
+ * Streaming version of /council/run (per-tier progress + job reconnect).
+ */
+export const runCouncilStream = <ThrowOnError extends boolean = false>(options?: Options<RunCouncilStreamData, ThrowOnError>): RequestResult<RunCouncilStreamResponses, unknown, ThrowOnError> => (options?.client ?? client).post<RunCouncilStreamResponses, unknown, ThrowOnError>({ url: '/council/run/stream', ...options });
+
+/**
+ * Council Latest
+ *
+ * The most recent council snapshot, or null if none has run yet.
+ */
+export const councilLatest = <ThrowOnError extends boolean = false>(options?: Options<CouncilLatestData, ThrowOnError>): RequestResult<CouncilLatestResponses, unknown, ThrowOnError> => (options?.client ?? client).get<CouncilLatestResponses, unknown, ThrowOnError>({ url: '/council/latest', ...options });
 
 /**
  * List Items Stream

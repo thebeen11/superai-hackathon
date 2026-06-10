@@ -148,3 +148,133 @@ class DataEngReport(BaseModel):
     failed: int = 0
     failures: list[ProcessingFailure] = Field(default_factory=list)
 
+
+# --- The Council (Tiers 3–5: Andie analysts, Freddy debate, Winston chairman) ---
+#
+# Every score the council emits must trace back to a real source quote (no-orphan
+# guardrail, PROJECT_GUIDANCE §12.6). `Evidence.source_url` is always one of the
+# `cleaned_items` URLs the agents were given — never invented.
+
+
+class Evidence(BaseModel):
+    """A source-anchored quote backing an analyst's call (no-orphan guardrail)."""
+
+    quote: str
+    source_url: str                 # must be one of the provided CleanedItem URLs
+    timestamp_start: float | None = None  # seconds into a video, when known
+
+
+class StockTake(BaseModel):
+    """One analyst's view on a single ticker."""
+
+    ticker: str                     # e.g. "$NVDA"
+    conviction: float               # -1.0 (bearish) .. +1.0 (bullish)
+    horizon: str                    # e.g. "6-12M"
+    rationale: str = ""
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class SectorNote(BaseModel):
+    """Tier 3 — an Andie desk's daily Investment Highlights & Catalyst Note."""
+
+    desk: str                       # "TMT" | "Physical" | "Capital"
+    summary: str = ""
+    highlights: list[str] = Field(default_factory=list)
+    stocks: list[StockTake] = Field(default_factory=list)
+
+
+class DebateSideMeta(BaseModel):
+    """A debater's identity (the model family is shown in the UI)."""
+
+    name: str                       # "Freddy-Bull" | "Freddy-Bear"
+    model: str                      # human-readable model family, e.g. "Claude Sonnet"
+    stance: str = ""                # one-line position
+
+
+class DebateTurn(BaseModel):
+    """One logged turn of the Bull/Bear/Chairman debate (Req: full transcript)."""
+
+    who: str                        # "bull" | "bear" | "winston"
+    round: str                      # "R1" | "R2" | "R3" | "Verdict"
+    label: str                      # e.g. "Bull · proposes"
+    text: str
+
+
+class DebateRecord(BaseModel):
+    """Tier 4 — the adversarial debate transcript + Chairman verdict."""
+
+    topic: str = ""
+    round: int = 0
+    rounds: int = 3
+    bull: DebateSideMeta
+    bear: DebateSideMeta
+    verdict: str = ""               # filled by Winston (Tier 5)
+    transcript: list[DebateTurn] = Field(default_factory=list)
+
+
+class ThemeBasket(BaseModel):
+    """Tier 5 — a final thematic basket with the Chairman's conviction + hold period."""
+
+    name: str
+    risk: str = "Med"               # Low | Med | High
+    horizon: str = "—"
+    stocks: list[str] = Field(default_factory=list)
+    strat: str = ""
+    conviction: float = 0.0         # 0..1 confidence
+    verdict: str = ""               # the Chairman's call
+    hold: str = "—"                 # hold period, e.g. "6–12M"
+
+
+class MacroIndicator(BaseModel):
+    """Tier 5 — a macro/financial indicator score for the dashboard."""
+
+    name: str                       # e.g. "Inflation Trajectory"
+    score: float                    # -1.0 .. +1.0
+    band: str                       # Positive | Neutral | Negative
+    evidence: str = ""              # short evidence summary
+
+
+class AceComponent(BaseModel):
+    key: str                        # e.g. "AI Sentiment"
+    weight: float
+    score: float                    # -1.0 .. +1.0
+
+
+class AceIndex(BaseModel):
+    """Tier 5 — the composite AI Capital Environment index (PROJECT_GUIDANCE §8)."""
+
+    value: float                    # -1.0 (capital starved) .. +1.0 (abundant)
+    label: str                      # e.g. "CAPITAL ABUNDANT"
+    delta: float = 0.0
+    components: list[AceComponent] = Field(default_factory=list)
+
+
+class BriefingItem(BaseModel):
+    """Tier 5 — one line of the Chairman's daily briefing."""
+
+    tone: str                       # up | down | neutral
+    text: str
+
+
+class Prediction(BaseModel):
+    """Tier 5 — a resolvable prediction destined for the ledger (Req 7.3)."""
+
+    claim: str
+    by: str                         # source/channel making the call
+    resolve: str                    # e.g. "01 SEP"
+    status: str = "pending"
+
+
+class CouncilReport(BaseModel):
+    """The full Tier 3–5 output for one run, persisted as the latest snapshot."""
+
+    sector_notes: list[SectorNote] = Field(default_factory=list)
+    debate: DebateRecord | None = None
+    baskets: list[ThemeBasket] = Field(default_factory=list)
+    indicators: list[MacroIndicator] = Field(default_factory=list)
+    ace: AceIndex | None = None
+    briefing: list[BriefingItem] = Field(default_factory=list)
+    predictions: list[Prediction] = Field(default_factory=list)
+    source_count: int = 0
+    generated_at: datetime = Field(default_factory=_now)
+

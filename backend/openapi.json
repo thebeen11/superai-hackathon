@@ -182,7 +182,7 @@
     "/dataeng/process": {
       "post": {
         "summary": "Dataeng Process",
-        "description": "Run Layer 2 (clean + label + theme + persist) over a DiscoveryResult.",
+        "description": "Run Layer 2 (clean + label + theme + persist), then convene the council.",
         "operationId": "dataeng_process",
         "requestBody": {
           "content": {
@@ -452,7 +452,7 @@
     "/dataeng/process/stream": {
       "post": {
         "summary": "Dataeng Process Stream",
-        "description": "Streaming version of POST /dataeng/process (per-item progress).",
+        "description": "Streaming version of POST /dataeng/process (per-item progress).\n\nRegisters a Job so a client that reloads mid-run can reconnect via\n/dataeng/jobs/{id}/stream. The job id is sent as a leading `job` SSE frame.",
         "operationId": "dataeng_process_stream",
         "requestBody": {
           "content": {
@@ -479,6 +479,155 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dataeng/jobs": {
+      "get": {
+        "summary": "Dataeng Jobs",
+        "description": "List tracked discovery jobs (running by default) so a reloaded client can find one.",
+        "operationId": "dataeng_jobs",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by job status",
+              "default": "running",
+              "title": "Status"
+            },
+            "description": "Filter by job status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dataeng/jobs/{job_id}/stream": {
+      "get": {
+        "summary": "Dataeng Job Stream",
+        "description": "Reconnect to a job: replay its progress so far, then stream live to completion.",
+        "operationId": "dataeng_job_stream",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/council/run": {
+      "post": {
+        "summary": "Run Council Endpoint",
+        "description": "Run Tiers 3\u20135 on-demand over the persisted corpus and return the snapshot.",
+        "operationId": "run_council_endpoint",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouncilReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/council/run/stream": {
+      "post": {
+        "summary": "Run Council Stream",
+        "description": "Streaming version of /council/run (per-tier progress + job reconnect).",
+        "operationId": "run_council_stream",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/council/latest": {
+      "get": {
+        "summary": "Council Latest",
+        "description": "The most recent council snapshot, or null if none has run yet.",
+        "operationId": "council_latest",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CouncilReport"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Council Latest"
                 }
               }
             }
@@ -584,6 +733,79 @@
   },
   "components": {
     "schemas": {
+      "AceComponent": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "weight",
+          "score"
+        ],
+        "title": "AceComponent"
+      },
+      "AceIndex": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "delta": {
+            "type": "number",
+            "title": "Delta",
+            "default": 0.0
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/AceComponent"
+            },
+            "type": "array",
+            "title": "Components"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "AceIndex",
+        "description": "Tier 5 \u2014 the composite AI Capital Environment index (PROJECT_GUIDANCE \u00a78)."
+      },
+      "BriefingItem": {
+        "properties": {
+          "tone": {
+            "type": "string",
+            "title": "Tone"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tone",
+          "text"
+        ],
+        "title": "BriefingItem",
+        "description": "Tier 5 \u2014 one line of the Chairman's daily briefing."
+      },
       "ClarificationMode": {
         "type": "string",
         "enum": [
@@ -730,6 +952,78 @@
         "title": "CleanedItem",
         "description": "The unit persisted to Postgres after Data Engineering (Req 14, 15)."
       },
+      "CouncilReport": {
+        "properties": {
+          "sector_notes": {
+            "items": {
+              "$ref": "#/components/schemas/SectorNote"
+            },
+            "type": "array",
+            "title": "Sector Notes"
+          },
+          "debate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DebateRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baskets": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeBasket"
+            },
+            "type": "array",
+            "title": "Baskets"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/MacroIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          },
+          "ace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AceIndex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "briefing": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingItem"
+            },
+            "type": "array",
+            "title": "Briefing"
+          },
+          "predictions": {
+            "items": {
+              "$ref": "#/components/schemas/Prediction"
+            },
+            "type": "array",
+            "title": "Predictions"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count",
+            "default": 0
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "title": "CouncilReport",
+        "description": "The full Tier 3\u20135 output for one run, persisted as the latest snapshot."
+      },
       "DataEngReport": {
         "properties": {
           "persisted": {
@@ -753,6 +1047,103 @@
         "type": "object",
         "title": "DataEngReport",
         "description": "Batch outcome of a Data Engineering run (Req 7.4, 7.5)."
+      },
+      "DebateRecord": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "rounds": {
+            "type": "integer",
+            "title": "Rounds",
+            "default": 3
+          },
+          "bull": {
+            "$ref": "#/components/schemas/DebateSideMeta"
+          },
+          "bear": {
+            "$ref": "#/components/schemas/DebateSideMeta"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "default": ""
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/DebateTurn"
+            },
+            "type": "array",
+            "title": "Transcript"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bull",
+          "bear"
+        ],
+        "title": "DebateRecord",
+        "description": "Tier 4 \u2014 the adversarial debate transcript + Chairman verdict."
+      },
+      "DebateSideMeta": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "stance": {
+            "type": "string",
+            "title": "Stance",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "model"
+        ],
+        "title": "DebateSideMeta",
+        "description": "A debater's identity (the model family is shown in the UI)."
+      },
+      "DebateTurn": {
+        "properties": {
+          "who": {
+            "type": "string",
+            "title": "Who"
+          },
+          "round": {
+            "type": "string",
+            "title": "Round"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "who",
+          "round",
+          "label",
+          "text"
+        ],
+        "title": "DebateTurn",
+        "description": "One logged turn of the Bull/Bear/Chairman debate (Req: full transcript)."
       },
       "DiscoverRequest": {
         "properties": {
@@ -884,6 +1275,36 @@
         "title": "DiscoveryResult",
         "description": "What the Discovery agent returns for a single topic query."
       },
+      "Evidence": {
+        "properties": {
+          "quote": {
+            "type": "string",
+            "title": "Quote"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "timestamp_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp Start"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quote",
+          "source_url"
+        ],
+        "title": "Evidence",
+        "description": "A source-anchored quote backing an analyst's call (no-orphan guardrail)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -896,6 +1317,64 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "MacroIndicator": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "band": {
+            "type": "string",
+            "title": "Band"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "score",
+          "band"
+        ],
+        "title": "MacroIndicator",
+        "description": "Tier 5 \u2014 a macro/financial indicator score for the dashboard."
+      },
+      "Prediction": {
+        "properties": {
+          "claim": {
+            "type": "string",
+            "title": "Claim"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "resolve": {
+            "type": "string",
+            "title": "Resolve"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim",
+          "by",
+          "resolve"
+        ],
+        "title": "Prediction",
+        "description": "Tier 5 \u2014 a resolvable prediction destined for the ledger (Req 7.3)."
       },
       "ProcessingFailure": {
         "properties": {
@@ -942,6 +1421,39 @@
         ],
         "title": "ResolvedEntity",
         "description": "A canonical entity (ticker or macro entity) with the aliases that matched it."
+      },
+      "SectorNote": {
+        "properties": {
+          "desk": {
+            "type": "string",
+            "title": "Desk"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Highlights"
+          },
+          "stocks": {
+            "items": {
+              "$ref": "#/components/schemas/StockTake"
+            },
+            "type": "array",
+            "title": "Stocks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "desk"
+        ],
+        "title": "SectorNote",
+        "description": "Tier 3 \u2014 an Andie desk's daily Investment Highlights & Catalyst Note."
       },
       "SkippedSource": {
         "properties": {
@@ -1031,6 +1543,42 @@
         ],
         "title": "SourceType"
       },
+      "StockTake": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "conviction": {
+            "type": "number",
+            "title": "Conviction"
+          },
+          "horizon": {
+            "type": "string",
+            "title": "Horizon"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "conviction",
+          "horizon"
+        ],
+        "title": "StockTake",
+        "description": "One analyst's view on a single ticker."
+      },
       "Stream": {
         "type": "string",
         "enum": [
@@ -1038,6 +1586,57 @@
           "MICRO"
         ],
         "title": "Stream"
+      },
+      "ThemeBasket": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "risk": {
+            "type": "string",
+            "title": "Risk",
+            "default": "Med"
+          },
+          "horizon": {
+            "type": "string",
+            "title": "Horizon",
+            "default": "\u2014"
+          },
+          "stocks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stocks"
+          },
+          "strat": {
+            "type": "string",
+            "title": "Strat",
+            "default": ""
+          },
+          "conviction": {
+            "type": "number",
+            "title": "Conviction",
+            "default": 0.0
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "default": ""
+          },
+          "hold": {
+            "type": "string",
+            "title": "Hold",
+            "default": "\u2014"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ThemeBasket",
+        "description": "Tier 5 \u2014 a final thematic basket with the Chairman's conviction + hold period."
       },
       "TranscriptSegment": {
         "properties": {
