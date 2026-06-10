@@ -93,15 +93,6 @@ function hostOf(url: string): string {
   }
 }
 
-/** A 9-point gently-rising sparkline, nudged by a seed so rows differ. */
-function spark(seed: number): number[] {
-  return Array.from({ length: 9 }, (_, i) => {
-    const base = 0.2 + 0.8 * (i / 8);
-    const jitter = Math.sin(seed + i) * 0.06;
-    return clamp01(Number((base + jitter).toFixed(2)));
-  });
-}
-
 function dayKey(ts?: string | null): string | null {
   if (!ts) return null;
   const d = new Date(ts);
@@ -133,26 +124,35 @@ function deriveSources(items: CleanedItem[]): Source[] {
 }
 
 function deriveTrackers(items: CleanedItem[]): Tracker[] {
-  const byTheme = new Map<string, { mentions: number; hosts: Set<string> }>();
+  // Common day axis across all items, so every tracker's sparkline shares one grid.
+  const allDays = [...new Set(items.map((it) => dayKey(it.ingested_at ?? it.published_at)).filter((k): k is string => !!k))].sort();
+
+  const byTheme = new Map<string, { mentions: number; hosts: Set<string>; byDay: Map<string, number> }>();
   for (const it of items) {
     const host = hostOf(it.source_url);
+    const day = dayKey(it.ingested_at ?? it.published_at);
     for (const theme of it.themes ?? []) {
-      const cur = byTheme.get(theme) ?? { mentions: 0, hosts: new Set<string>() };
+      const cur = byTheme.get(theme) ?? { mentions: 0, hosts: new Set<string>(), byDay: new Map<string, number>() };
       cur.mentions += 1;
       cur.hosts.add(host);
+      if (day) cur.byDay.set(day, (cur.byDay.get(day) ?? 0) + 1);
       byTheme.set(theme, cur);
     }
   }
   const rows = [...byTheme.entries()].sort((a, b) => b[1].mentions - a[1].mentions);
-  const median = rows.length ? rows[Math.floor(rows.length / 2)][1].mentions : 0;
-  return rows.slice(0, 15).map(([name, { mentions, hosts }], i) => ({
-    name,
-    mentions,
-    chg: mentions, // no historical series yet — surface raw volume as the delta
-    channels: hosts.size,
-    spark: spark(i + 1),
-    tone: mentions >= median ? "up" : "flat",
-  }));
+  return rows.slice(0, 15).map(([name, { mentions, hosts, byDay }]) => {
+    // Real per-day mention counts on the shared axis (zero-filled). Spark auto-normalizes.
+    const series = allDays.map((day) => byDay.get(day) ?? 0);
+    if (series.length < 2) {
+      // Sparse history — pad to a flat 2-point line so the chart renders, not NaN.
+      return { name, mentions, chg: 0, channels: hosts.size, spark: [mentions, mentions], tone: "flat" as const };
+    }
+    const mid = Math.floor(series.length / 2);
+    const a = series.slice(0, mid).reduce((s, v) => s + v, 0);
+    const b = series.slice(mid).reduce((s, v) => s + v, 0);
+    const tone: Tracker["tone"] = b > a * 1.15 ? "up" : b < a * 0.85 ? "down" : "flat";
+    return { name, mentions, chg: b - a, channels: hosts.size, spark: series, tone };
+  });
 }
 
 /** Ticker → mention count, highest first (tickers only, macro entities skipped). */
