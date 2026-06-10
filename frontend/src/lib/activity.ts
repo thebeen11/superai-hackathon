@@ -34,9 +34,11 @@ export function routeEvent(evt: ProgressEvent): Routed {
   const { stage, data, message } = evt;
 
   if (stage === "refine" || stage.startsWith("discover")) {
+    // Per-source events use a dotted stage (`discover.youtube` / `discover.web`); the
+    // rare skip-on-error event instead carries `source_type`. Route on either.
     const src = typeof data.source_type === "string" ? data.source_type : "";
-    if (src === "youtube") return { agentId: "wilfred-video", agentName: "Wilfred-Video", tierKey: "discovery" };
-    if (src === "web") return { agentId: "wilfred-news", agentName: "Wilfred-News", tierKey: "discovery" };
+    if (stage === "discover.youtube" || src === "youtube") return { agentId: "wilfred-video", agentName: "Wilfred-Video", tierKey: "discovery" };
+    if (stage === "discover.web" || src === "web") return { agentId: "wilfred-news", agentName: "Wilfred-News", tierKey: "discovery" };
     return { agentId: null, agentName: "Wilfred", tierKey: "discovery" };
   }
 

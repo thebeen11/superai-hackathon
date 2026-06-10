@@ -9,7 +9,7 @@ import type { ContextPreview, WtafData, Source } from "../types";
 import { wtafMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import { councilLatest, dataengProcess, discoverPost, listItems } from "./generated/sdk.gen";
-import type { CouncilReport, DataEngReport } from "./generated/types.gen";
+import type { Clarify, CouncilReport, DataEngReport, DiscoveryResultOutput } from "./generated/types.gen";
 import { itemsToWtafData } from "./adapter";
 import { streamSse, type ProgressEvent } from "./sse";
 
@@ -68,20 +68,25 @@ export async function discoverAndProcess(query: string): Promise<DataEngReport> 
 }
 
 /**
- * Streaming variant of {@link discoverAndProcess}. `/discover` stays a fast blocking
- * call; the slow per-item Data Engineering runs against `/dataeng/process/stream` so
- * `onProgress` fires for each stage (clean → label → theme → persist). Resolves with
- * the terminal DataEngReport. Backend: POST /discover → POST /dataeng/process/stream
+ * Streaming variant of {@link discoverAndProcess}. BOTH phases stream into the same
+ * `onProgress`: `/discover/stream` surfaces the Tier-1 refine + per-source events
+ * (`discover.web`, `discover.youtube`) so the activity log shows Wilfred-News /
+ * Wilfred-Video lines, then the slow per-item Data Engineering runs against
+ * `/dataeng/process/stream` (clean → label → theme → persist → council). Resolves with
+ * the terminal DataEngReport. Backend: POST /discover/stream → POST /dataeng/process/stream
  */
 export async function discoverAndProcessStream(
   query: string,
   onProgress: (evt: ProgressEvent) => void,
   onJob?: (jobId: string) => void,
 ): Promise<DataEngReport> {
-  const { data: discovery } = await discoverPost({
-    body: { query, mode: "auto_proceed" },
-    throwOnError: true,
-  });
+  // Stream the discovery phase so refine + per-source progress reaches the activity feed.
+  // (No job here — discovery is fast; reload-reconnect is owned by the dataeng stream.)
+  const discovery = await streamSse<DiscoveryResultOutput | Clarify>(
+    "/discover/stream",
+    { method: "POST", body: { query, mode: "auto_proceed" } },
+    onProgress,
+  );
   if (!discovery || "questions" in discovery) {
     throw new Error("Discovery returned clarifying questions instead of results");
   }
