@@ -8,7 +8,6 @@ creds.txt
 **/.env.*
 !**/.env.example
 
-
 # Python
 __pycache__/
 *.pyc

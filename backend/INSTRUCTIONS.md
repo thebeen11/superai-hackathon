@@ -138,16 +138,17 @@ curl -s 'http://localhost:8000/items?ticker=$META&limit=10'
 
 ## 5. Endpoint reference
 
-| Method | Path | Purpose | Returns |
-| ------ | ---- | ------- | ------- |
-| GET | `/health` | liveness check | `{status}` |
-| POST | `/discover` | refine query → fan out (Exa + YouTube) | `DiscoveryResult` or `Clarify` |
-| POST | `/discover/clarify` | resume after clarifying questions | `DiscoveryResult` or `Clarify` |
-| POST | `/dataeng/process` | clean + label + theme + persist | `DataEngReport` |
-| GET | `/items` | read persisted rows (filters: `stream`, `theme`, `ticker`, `limit`) | `list[CleanedItem]` |
-| GET | `/discover?query=` | plain fan-out, no LLM (quick test, no AWS needed) | `DiscoveryResult` |
+| Method | Path                | Purpose                                                             | Returns                        |
+| ------ | ------------------- | ------------------------------------------------------------------- | ------------------------------ |
+| GET    | `/health`           | liveness check                                                      | `{status}`                     |
+| POST   | `/discover`         | refine query → fan out (Exa + YouTube)                              | `DiscoveryResult` or `Clarify` |
+| POST   | `/discover/clarify` | resume after clarifying questions                                   | `DiscoveryResult` or `Clarify` |
+| POST   | `/dataeng/process`  | clean + label + theme + persist                                     | `DataEngReport`                |
+| GET    | `/items`            | read persisted rows (filters: `stream`, `theme`, `ticker`, `limit`) | `list[CleanedItem]`            |
+| GET    | `/discover?query=`  | plain fan-out, no LLM (quick test, no AWS needed)                   | `DiscoveryResult`              |
 
 **Key request fields**
+
 - `mode`: `"auto_proceed"` (skip clarification, one-shot) or `"interactive"` (ask when ambiguous). Default is interactive.
 - `max_results`: 1–50 results per source.
 - `/items` filters: `stream=MICRO|MACRO`, `theme=Solar` (etc.), `ticker=$META`.
@@ -198,6 +199,7 @@ uv run pytest        # 32 unit tests; no network or DB needed (Bedrock + DB are 
 ## 9. What to look for when testing
 
 A successful end-to-end run should show:
+
 1. `POST /discover` returns real web sources with the query **refined** by Opus
    (`original_query` vs `query` differ).
 2. `POST /dataeng/process` reports `persisted > 0`.
