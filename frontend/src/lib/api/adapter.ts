@@ -310,12 +310,15 @@ function nowStamp(): string {
 
 /* ============ Tier 3–5 (the Council) → dashboard ============ */
 
-const RISK_BANDS: RiskBand[] = ["Low", "Med", "High"];
 const INDICATOR_BANDS: IndicatorBand[] = ["Positive", "Neutral", "Negative"];
 const CATALYST_TONES: CatalystTone[] = ["orange", "blue", "green", "indigo"];
 
 function asRisk(s?: string): RiskBand {
-  return RISK_BANDS.includes(s as RiskBand) ? (s as RiskBand) : "Med";
+  const v = (s ?? "").trim().toLowerCase();
+  if (v.startsWith("low")) return "Low";
+  if (v.startsWith("high")) return "High";
+  if (v.startsWith("med")) return "Med"; // med / medium
+  return "Med";
 }
 function asBand(s?: string): IndicatorBand {
   return INDICATOR_BANDS.includes(s as IndicatorBand) ? (s as IndicatorBand) : "Neutral";
@@ -395,13 +398,27 @@ function councilPredictions(report: CouncilReport): Prediction[] {
   }));
 }
 
+/** Split a resolve date into a short day + month for the compact catalyst column.
+ *  Handles ISO ("2025-12-15") and free-form ("15 DEC", "Dec 15") inputs. */
+function splitResolve(resolve?: string): { d: string; m: string } {
+  const raw = (resolve ?? "").trim();
+  const iso = raw.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    const mi = Number(iso[2]) - 1;
+    return { d: String(Number(iso[3])).padStart(2, "0"), m: MONTHS[mi] ?? "" };
+  }
+  const day = raw.match(/\b(\d{1,2})\b/);
+  const mon = raw.toUpperCase().match(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)/);
+  return { d: day ? day[1].padStart(2, "0") : raw.slice(0, 5), m: mon ? mon[1] : "" };
+}
+
 /** Upcoming key events, derived from the Chairman's resolvable predictions. */
 function councilCatalysts(report: CouncilReport): Catalyst[] {
   return (report.predictions ?? []).map((p, i) => {
-    const [d = "", m = ""] = (p.resolve ?? "").trim().split(/\s+/);
+    const { d, m } = splitResolve(p.resolve);
     return {
       d,
-      m: m.toUpperCase(),
+      m,
       t: p.claim.length > 48 ? `${p.claim.slice(0, 47)}…` : p.claim,
       sub: `${p.by} · ${p.status ?? "pending"}`,
       tone: CATALYST_TONES[i % CATALYST_TONES.length],

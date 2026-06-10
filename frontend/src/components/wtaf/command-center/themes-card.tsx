@@ -11,7 +11,7 @@ export function ThemesCard({
   onOpenDebate: () => void;
   discovering?: boolean;
 }) {
-  const riskC: Record<string, string> = { Low: "var(--up)", Med: "var(--amber)", High: "var(--down)" };
+  const riskC: Record<string, string> = { Low: "var(--down)", Med: "var(--amber)", High: "var(--up)" };
   const isEmpty = themes.length === 0;
   return (
     <Card title="Thematic Portfolios" sub="Winston · final baskets" className="span12"
