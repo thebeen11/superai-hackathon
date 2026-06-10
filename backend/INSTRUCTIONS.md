@@ -136,82 +136,26 @@ curl -s 'http://localhost:8000/items?ticker=$META&limit=10'
 
 ---
 
-## 5. Streaming (SSE) flow — watch it live
+## 5. Endpoint reference
 
-Every endpoint above has a **`/stream` variant** that emits Server-Sent Events so you can
-watch each stage happen in real time (refinement → per-source fan-out → per-item
-clean/label/theme/persist). Same flow, same results, just streamed.
-
-Use `curl -N` (the `-N` disables buffering so events appear as they happen). Each frame is
-`event: <name>` + `data: <json>`; the stream ends with `event: done`. The `progress`
-events are behind-the-scenes status; the final `result` event carries the payload.
-
-### Path B over SSE
-
-**Step 1 — interactive discover** (streams refinement, returns clarifying questions):
-
-```bash
-curl -N -X POST http://localhost:8000/discover/stream \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"meta","mode":"interactive","max_results":3}'
-```
-
-**Step 2 — answer the clarification** (streams refinement + the Exa/YouTube fan-out):
-
-```bash
-curl -N -X POST http://localhost:8000/discover/clarify/stream \
-  -H 'Content-Type: application/json' \
-  -d '{"clarified_query":"Meta Platforms (META) stock outlook","round":1,"mode":"interactive","max_results":3}'
-```
-
-**Step 3 — process into Postgres** (streams per-item progress: redact → entities → labels
-→ themes → persisted). Feed the clarified `DiscoveryResult` into the process stream:
-
-```bash
-curl -s -X POST http://localhost:8000/discover/clarify \
-  -H 'Content-Type: application/json' \
-  -d '{"clarified_query":"Meta Platforms (META) stock outlook","round":1,"mode":"interactive","max_results":3}' \
-| curl -N -X POST http://localhost:8000/dataeng/process/stream \
-  -H 'Content-Type: application/json' --data-binary @-
-```
-
-**Step 4 — read back, streamed:**
-
-```bash
-curl -N 'http://localhost:8000/items/stream?ticker=$META&limit=10'
-```
-
-> Tip: pipe through `grep -E '^event:|message'` to see just the status messages without
-> the full payloads. In a browser, consume `GET` streams with `EventSource` and `POST`
-> streams with `fetch` + `ReadableStream`.
-
----
-
-## 6. Endpoint reference
-
-| Method | Path | Purpose | Returns |
-| ------ | ---- | ------- | ------- |
-| GET | `/health` | liveness check | `{status}` |
-| POST | `/discover` | refine query → fan out (Exa + YouTube) | `DiscoveryResult` or `Clarify` |
-| POST | `/discover/clarify` | resume after clarifying questions | `DiscoveryResult` or `Clarify` |
-| POST | `/dataeng/process` | clean + label + theme + persist | `DataEngReport` |
-| GET | `/items` | read persisted rows (filters: `stream`, `theme`, `ticker`, `limit`) | `list[CleanedItem]` |
-| GET | `/discover?query=` | plain fan-out, no LLM (quick test, no AWS needed) | `DiscoveryResult` |
-
-**Streaming variants** (Server-Sent Events — see section 5): every endpoint above has a
-`/stream` version with the same inputs — `POST /discover/stream`,
-`POST /discover/clarify/stream`, `POST /dataeng/process/stream`, `GET /discover/stream`,
-`GET /items/stream`. They emit `progress` events as work happens, then a final `result`
-(or `error`) event, closed by `done`.
+| Method | Path                | Purpose                                                             | Returns                        |
+| ------ | ------------------- | ------------------------------------------------------------------- | ------------------------------ |
+| GET    | `/health`           | liveness check                                                      | `{status}`                     |
+| POST   | `/discover`         | refine query → fan out (Exa + YouTube)                              | `DiscoveryResult` or `Clarify` |
+| POST   | `/discover/clarify` | resume after clarifying questions                                   | `DiscoveryResult` or `Clarify` |
+| POST   | `/dataeng/process`  | clean + label + theme + persist                                     | `DataEngReport`                |
+| GET    | `/items`            | read persisted rows (filters: `stream`, `theme`, `ticker`, `limit`) | `list[CleanedItem]`            |
+| GET    | `/discover?query=`  | plain fan-out, no LLM (quick test, no AWS needed)                   | `DiscoveryResult`              |
 
 **Key request fields**
+
 - `mode`: `"auto_proceed"` (skip clarification, one-shot) or `"interactive"` (ask when ambiguous). Default is interactive.
 - `max_results`: 1–50 results per source.
 - `/items` filters: `stream=MICRO|MACRO`, `theme=Solar` (etc.), `ticker=$META`.
 
 ---
 
-## 7. Inspecting the database directly (DBeaver / psql)
+## 6. Inspecting the database directly (DBeaver / psql)
 
 The data lives in the shared **RDS Postgres** (see `DATABASE_URL` in `.env`):
 
@@ -224,7 +168,7 @@ Table: `cleaned_items` (schema `public`).
 
 ---
 
-## 8. Run the tests
+## 7. Run the tests
 
 ```bash
 uv run pytest        # 32 unit tests; no network or DB needed (Bedrock + DB are mocked)
@@ -232,7 +176,7 @@ uv run pytest        # 32 unit tests; no network or DB needed (Bedrock + DB are 
 
 ---
 
-## 9. Troubleshooting
+## 8. Troubleshooting
 
 - **DB connection times out** → the RDS security group only allows specific IPs and your
   IP may have rotated. Add your current IP (run from the **repo root**):
@@ -252,9 +196,10 @@ uv run pytest        # 32 unit tests; no network or DB needed (Bedrock + DB are 
 
 ---
 
-## 10. What to look for when testing
+## 9. What to look for when testing
 
 A successful end-to-end run should show:
+
 1. `POST /discover` returns real web sources with the query **refined** by Opus
    (`original_query` vs `query` differ).
 2. `POST /dataeng/process` reports `persisted > 0`.

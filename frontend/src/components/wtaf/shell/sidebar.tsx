@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
-import type { PageId } from "../shared";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const ICONS: Record<string, string> = {
   command: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
@@ -10,12 +11,12 @@ const ICONS: Record<string, string> = {
   indicators: "M12 21a9 9 0 1 0-9-9M12 21V12l5-3",
 };
 
-const NAV: { id: PageId; label: string; icon: string }[] = [
-  { id: "command", label: "Command Center", icon: "command" },
-  { id: "watchlist", label: "Watchlist", icon: "watchlist" },
-  { id: "signals", label: "Signal Terminal", icon: "signals" },
-  { id: "sources", label: "Sources & Ledger", icon: "sources" },
-  { id: "indicators", label: "Indicators", icon: "indicators" },
+const NAV: { href: string; label: string; icon: string }[] = [
+  { href: "/", label: "Command Center", icon: "command" },
+  { href: "/watchlist", label: "Watchlist", icon: "watchlist" },
+  { href: "/signals", label: "Signal Terminal", icon: "signals" },
+  { href: "/sources", label: "Sources & Ledger", icon: "sources" },
+  { href: "/indicators", label: "Indicators", icon: "indicators" },
 ];
 
 function NavIcon({ d, active }: { d: string; active: boolean }) {
@@ -26,7 +27,8 @@ function NavIcon({ d, active }: { d: string; active: boolean }) {
   );
 }
 
-export function Sidebar({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
+export function Sidebar() {
+  const pathname = usePathname();
   return (
     <aside style={{ width: 66, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "16px 0", borderRight: "1px solid var(--stroke)", background: "rgba(255,255,255,0.012)", zIndex: 5 }}>
       <Image src="/logo.jpg" alt="WTAF Fund" width={38} height={38} priority
@@ -34,15 +36,15 @@ export function Sidebar({ page, setPage }: { page: PageId; setPage: (p: PageId) 
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
         {NAV.map((n) => {
-          const active = page === n.id;
+          const active = n.href === "/" ? pathname === "/" : pathname.startsWith(n.href);
           return (
-            <button key={n.id} onClick={() => setPage(n.id)} title={n.label}
+            <Link key={n.href} href={n.href} title={n.label}
               style={{ width: 44, height: 44, borderRadius: 12, display: "grid", placeItems: "center", position: "relative", color: active ? "var(--blue-bright)" : "var(--t-lo)", background: active ? "color-mix(in oklch, var(--blue) 14%, transparent)" : "transparent", border: "1px solid " + (active ? "color-mix(in oklch, var(--blue) 40%, transparent)" : "transparent"), transition: "all .15s" }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "var(--t-hi)"; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "var(--t-lo)"; }}>
               <NavIcon d={ICONS[n.icon]} active={active} />
               {active && <span style={{ position: "absolute", left: -9, top: "50%", transform: "translateY(-50%)", width: 3, height: 18, borderRadius: 2, background: "var(--blue-bright)", boxShadow: "0 0 8px var(--blue)" }} />}
-            </button>
+            </Link>
           );
         })}
       </nav>

@@ -1,21 +1,26 @@
 "use client";
+import Link from "next/link";
 import type { Tracker } from "@/lib/types";
-import { Card, Spark } from "../primitives";
-import type { PageId } from "../shared";
+import { Card, Spark, EmptyState } from "../primitives";
 
 export function TrackersCard({
   trackers,
   onOpenContext,
-  onNav,
+  discovering = false,
 }: {
   trackers: Tracker[];
   onOpenContext: (trackerName: string) => void;
-  onNav: (p: PageId) => void;
+  discovering?: boolean;
 }) {
   const toneC: Record<string, string> = { up: "var(--up)", down: "var(--down)", flat: "var(--t-lo)" };
+  const isEmpty = trackers.length === 0;
   return (
-    <Card title="Concept Trackers" sub={`${trackers.length}/15 active`} className="span6"
-      action={<button onClick={() => onNav("signals")} style={{ fontSize: 11, color: "var(--blue-bright)", background: "none", border: "none" }}>Open terminal →</button>}>
+    <Card title="Concept Trackers" sub={`${trackers.length}/15 active`} className="span7"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}
+      action={<Link href="/signals" style={{ fontSize: 11, color: "var(--blue-bright)" }}>Open terminal →</Link>}>
+      {trackers.length === 0 ? (
+        <EmptyState label="No concept trackers yet" sub="Run a discovery to surface themes" />
+      ) : (
       <div style={{ display: "flex", flexDirection: "column" }}>
         {trackers.map((t, i) => (
           <button key={i} onClick={() => onOpenContext(t.name)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 8px", margin: "0 -8px", background: "transparent", border: "none", borderBottom: i < trackers.length - 1 ? "1px solid var(--stroke)" : "none", textAlign: "left", borderRadius: 8, transition: "background .15s" }}
@@ -29,6 +34,7 @@ export function TrackersCard({
           </button>
         ))}
       </div>
+      )}
     </Card>
   );
 }

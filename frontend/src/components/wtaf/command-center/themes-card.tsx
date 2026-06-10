@@ -1,18 +1,28 @@
 "use client";
 import type { Theme } from "@/lib/types";
-import { Card } from "../primitives";
+import { Card, EmptyState } from "../primitives";
 
 export function ThemesCard({
   themes,
   onOpenDebate,
+  discovering = false,
 }: {
   themes: Theme[];
   onOpenDebate: () => void;
+  discovering?: boolean;
 }) {
   const riskC: Record<string, string> = { Low: "var(--up)", Med: "var(--amber)", High: "var(--down)" };
+  // Conviction is a "higher is better" metric: high = green, mid = amber, low = red.
+  const convictionColor = (c: number) =>
+    c <= 0 ? "var(--t-faint)" : c >= 0.6 ? "var(--up)" : c >= 0.45 ? "var(--amber)" : "var(--down)";
+  const isEmpty = themes.length === 0;
   return (
     <Card title="Thematic Portfolios" sub="Winston · final baskets" className="span12"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}
       action={<button onClick={onOpenDebate} style={{ fontSize: 11, color: "var(--blue-bright)", background: "none", border: "none" }}>View debate →</button>}>
+      {themes.length === 0 ? (
+        <EmptyState label="No thematic baskets yet" sub="Run a discovery to group themes · conviction & returns await Winston (Tier 5)" />
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {themes.map((t, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 13px", borderRadius: 11, background: "var(--inset)", border: "1px solid var(--stroke)" }}>
@@ -31,16 +41,17 @@ export function ThemesCard({
               <span style={{ fontSize: 10.5, color: "var(--t-mid)", lineHeight: 1.3, textWrap: "pretty" }}>{t.verdict}</span>
             </div>
             <div style={{ textAlign: "right", width: 62 }}>
-              <div className="mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--up)" }}>+{t.ret}%</div>
+              <div className="mono" style={{ fontSize: 15, fontWeight: 600, color: t.ret > 0 ? "var(--up)" : "var(--t-faint)" }}>{t.ret > 0 ? `+${t.ret}%` : "—"}</div>
               <div className="label-xs" style={{ fontSize: 8 }}>12M sim</div>
             </div>
             <div style={{ width: 64, textAlign: "right" }}>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--t-hi)" }}>{Math.round(t.conviction * 100)}%</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: convictionColor(t.conviction) }}>{t.conviction > 0 ? `${Math.round(t.conviction * 100)}%` : "—"}</div>
               <div className="label-xs" style={{ fontSize: 8 }}>conviction</div>
             </div>
           </div>
         ))}
       </div>
+      )}
     </Card>
   );
 }

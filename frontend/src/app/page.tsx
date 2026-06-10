@@ -1,5 +1,5 @@
-import { WtafApp } from "@/components/wtaf/app-shell";
+import { CommandCenter } from "@/components/wtaf/command-center";
 
-export default function Home() {
-  return <WtafApp />;
+export default function CommandCenterPage() {
+  return <CommandCenter />;
 }

@@ -32,3 +32,17 @@ Index("idx_cleaned_items_stream", CleanedItemRow.stream)
 Index("idx_cleaned_items_industry", CleanedItemRow.industry)
 Index("idx_cleaned_items_entities", CleanedItemRow.entities, postgresql_using="gin")
 Index("idx_cleaned_items_themes", CleanedItemRow.themes, postgresql_using="gin")
+
+
+class CouncilSnapshotRow(Base):
+    """Tiers 3–5 output for one run. The newest row is the current snapshot."""
+
+    __tablename__ = "council_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report = Column(JSONB, nullable=False)                    # serialized CouncilReport
+    source_count = Column(Integer, nullable=False, default=0)
+    generated_at = Column(DateTime(timezone=True), nullable=False)  # UTC at run time
+
+
+Index("idx_council_snapshots_generated_at", CouncilSnapshotRow.generated_at)

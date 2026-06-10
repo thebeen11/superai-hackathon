@@ -3,17 +3,23 @@
 import { useEffect, useState } from "react";
 import type { ContextPreview } from "@/lib/types";
 import { getContextPreview } from "@/lib/api/wtaf";
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Dot } from "../primitives";
 import { Modal } from "./modal";
 
 export function ContextModal({ trackerName, onClose }: { trackerName: string; onClose: () => void }) {
   const [c, setC] = useState<ContextPreview | null>(null);
+  // The live backend (Layers 1–2) has no per-tracker context endpoint; fall back
+  // to the snapshot-derived preview so a 404 doesn't become an unhandled rejection.
+  const fallback = useWtafData().contextPreview;
 
   useEffect(() => {
     let active = true;
-    getContextPreview(trackerName).then((res) => { if (active) setC(res); });
+    getContextPreview(trackerName)
+      .then((res) => { if (active) setC(res); })
+      .catch(() => { if (active) setC({ ...fallback, tracker: trackerName }); });
     return () => { active = false; };
-  }, [trackerName]);
+  }, [trackerName, fallback]);
 
   return (
     <Modal onClose={onClose} w={520}>
@@ -35,7 +41,7 @@ export function ContextModal({ trackerName, onClose }: { trackerName: string; on
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
               <span className="chip"><Dot tone="blue" pulse={false} />{c.channel}</span>
               <span className="chip">{c.date}</span>
-              <span className="chip" style={{ color: "var(--up)", borderColor: "color-mix(in oklch, var(--up) 40%, transparent)" }}>score +{c.score.toFixed(2)}</span>
+              <span className="chip" style={{ color: "var(--up)", borderColor: "color-mix(in oklch, var(--up) 40%, transparent)" }}>relevance {(c.score ?? 0).toFixed(2)}</span>
             </div>
             <div style={{ padding: "16px 18px", borderRadius: 12, background: "var(--inset)", borderLeft: "2px solid var(--blue-bright)", marginBottom: 6 }}>
               <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--t-hi)", fontStyle: "italic", textWrap: "pretty" }}>{c.quote}</p>

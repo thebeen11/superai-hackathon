@@ -2,8 +2,9 @@
 /* ============ WTAF — Signal & Tracker Terminal ============ */
 import { useState } from "react";
 import type { WtafData } from "@/lib/types";
-import { useWtafData } from "@/providers/wtaf-provider";
-import { Card, Spark } from "../primitives";
+import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
+import { useShellActions } from "@/providers/shell-ui-provider";
+import { Card, Spark, EmptyState } from "../primitives";
 import { PageHead, Stat } from "../shared";
 
 function Heatmap({ d }: { d: WtafData }) {
@@ -20,6 +21,7 @@ function Heatmap({ d }: { d: WtafData }) {
         {Array.from({ length: weeks }).map((_, i) => (<span key={i} className="label-xs" style={{ fontSize: 8, textAlign: "center" }}>W{i + 1}</span>))}
         <span className="label-xs" style={{ fontSize: 8, textAlign: "right" }}>now</span>
       </div>
+      {d.indicators.length === 0 && <EmptyState label="No indicator scores yet" sub="Awaiting Tier 3 · Andie analysts" />}
       {d.indicators.map((ind, r) => {
         const series = Array.from({ length: weeks }).map((_, i) => ind.score * (0.4 + 0.6 * (i / (weeks - 1))) + Math.sin(r + i) * 0.12);
         return (
@@ -36,25 +38,24 @@ function Heatmap({ d }: { d: WtafData }) {
   );
 }
 
-export function SignalTerminal({
-  onOpenContext,
-  onNewTracker,
-}: {
-  onOpenContext: (trackerName: string) => void;
-  onNewTracker: () => void;
-}) {
+export function SignalTerminal() {
   const d = useWtafData();
+  const { discovering } = useWtaf();
+  const { onOpenContext, onNewTracker } = useShellActions();
   const [sel, setSel] = useState(0);
-  const t = d.trackers[sel];
   const toneC: Record<string, string> = { up: "var(--up)", down: "var(--down)", flat: "var(--blue)" };
-  const big = t.spark.flatMap((v, i) => (i ? [(t.spark[i - 1] + v) / 2, v] : [v]));
+  const hasTrackers = d.trackers.length > 0;
+  const t = hasTrackers ? d.trackers[Math.min(sel, d.trackers.length - 1)] : null;
+  const big = t ? t.spark.flatMap((v, i) => (i ? [(t.spark[i - 1] + v) / 2, v] : [v])) : [];
   return (
     <div>
       <PageHead title="Signal & Tracker Terminal" sub="semantic concept tracking · channel-level"
         right={<button onClick={onNewTracker} className="primary-btn">+ New Tracker</button>} />
       <div className="grid12">
-        <Card title="Trackers" sub={`${d.trackers.length}/15`} className="span3" pad={false}>
+        <Card title="Trackers" sub={`${d.trackers.length}/15`} className="span3" pad={false}
+          loading={discovering && !hasTrackers} updating={discovering && hasTrackers}>
           <div style={{ padding: "4px 8px 10px" }}>
+            {!hasTrackers && <EmptyState label="No trackers" sub="run a discovery" minHeight={120} />}
             {d.trackers.map((tr, i) => (
               <button key={i} onClick={() => setSel(i)} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: "9px 10px", borderRadius: 9, marginTop: 4, border: "1px solid " + (i === sel ? "var(--stroke-hi)" : "transparent"), background: i === sel ? "var(--panel-2)" : "transparent" }}>
                 <span style={{ width: 5, height: 5, borderRadius: 99, background: toneC[tr.tone], boxShadow: `0 0 6px ${toneC[tr.tone]}`, flexShrink: 0 }} />
@@ -65,6 +66,7 @@ export function SignalTerminal({
           </div>
         </Card>
 
+        {t ? (
         <Card title={t.name} sub={`${t.channels} channels · mentions over time`} className="span9"
           action={<button onClick={() => onOpenContext(t.name)} style={{ fontSize: 11, color: "var(--blue-bright)", background: "none", border: "none" }}>Context preview →</button>}>
           <div style={{ display: "flex", gap: 20, marginBottom: 8 }}>
@@ -81,8 +83,14 @@ export function SignalTerminal({
           </div>
           <div style={{ marginTop: 8, fontSize: 11, color: "var(--t-lo)" }}>Click any spike to open the exact transcript moment · jump-to-timestamp source link.</div>
         </Card>
+        ) : (
+        <Card title="Tracker detail" sub="no tracker selected" className="span9" loading={discovering}>
+          <EmptyState label="No concept trackers yet" sub="Run a discovery from the topbar to populate trackers" minHeight={210} />
+        </Card>
+        )}
 
-        <Card title="Indicator Heatmap" sub="rubric scores · last 8 weeks" className="span12">
+        <Card title="Indicator Heatmap" sub="rubric scores · last 8 weeks" className="span12"
+          loading={discovering && d.indicators.length === 0} updating={discovering && d.indicators.length > 0}>
           <Heatmap d={d} />
         </Card>
       </div>

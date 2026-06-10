@@ -25,3 +25,4 @@ __pycache__/
 # Handoff / design bundles
 hackathon-handoff.zip
 *.zip
+docs/SESSION_HANDOFF.md

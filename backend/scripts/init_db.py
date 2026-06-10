@@ -15,7 +15,7 @@ from app.db.tables import Base
 def main() -> None:
     engine = get_engine()
     Base.metadata.create_all(engine)
-    print("Schema created (cleaned_items + indexes).")
+    print("Schema created (cleaned_items + council_snapshots + indexes).")
 
 
 if __name__ == "__main__":

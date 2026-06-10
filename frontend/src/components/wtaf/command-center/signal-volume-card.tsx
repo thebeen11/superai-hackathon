@@ -1,16 +1,23 @@
 "use client";
 import type { SignalVolume } from "@/lib/types";
-import { Card, BarChart } from "../primitives";
+import { Card, BarChart, EmptyState } from "../primitives";
 
-export function SignalVolumeCard({ signalVolume }: { signalVolume: SignalVolume }) {
+export function SignalVolumeCard({ signalVolume, discovering = false }: { signalVolume: SignalVolume; discovering?: boolean }) {
+  const isEmpty = signalVolume.bars.length === 0;
   return (
-    <Card title="Signal Volume" sub="this week" className="span3">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
-        <span className="mono display" style={{ fontSize: 26, fontWeight: 700 }}>312</span>
-        <span className="mono" style={{ fontSize: 12, color: "var(--t-lo)" }}>transcripts</span>
-        <span className="mono" style={{ marginLeft: "auto", fontSize: 12, color: "var(--up)" }}>▲ +18 today</span>
-      </div>
-      <BarChart bars={signalVolume.bars} height={158} peakLabel={signalVolume.peakLabel} />
+    <Card title="Signal Volume" sub="this week" className="span3"
+      loading={discovering && isEmpty} updating={discovering && !isEmpty}>
+      {signalVolume.bars.length === 0 ? (
+        <EmptyState label="No signal volume yet" sub="run a discovery" minHeight={158} />
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+            <span className="mono" style={{ fontSize: 12, color: "var(--t-lo)" }}>{signalVolume.sub}</span>
+            {signalVolume.peakLabel && <span className="mono" style={{ marginLeft: "auto", fontSize: 12, color: "var(--up)" }}>▲ {signalVolume.peakLabel}</span>}
+          </div>
+          <BarChart bars={signalVolume.bars} height={158} peakLabel={signalVolume.peakLabel} />
+        </>
+      )}
     </Card>
   );
 }

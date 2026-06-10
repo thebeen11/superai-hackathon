@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Default: Claude Opus 4.6 via the us-west-2 cross-region inference profile.
     bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
     bedrock_max_retries: int = 3
+    # Tier 4 (Freddy) debates with two *different* model families to curb collusion
+    # (PROJECT_GUIDANCE §11). The workshop account only permits Claude Opus and Amazon
+    # Nova, so Bull = Claude Opus, Bear = Amazon Nova Pro — still two distinct families.
+    bedrock_bull_model_id: str = "us.anthropic.claude-opus-4-6-v1"
+    bedrock_bear_model_id: str = "us.amazon.nova-pro-v1:0"
 
     # --- Database (RDS Postgres) ---
     database_url: str | None = None

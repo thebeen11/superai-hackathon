@@ -32,12 +32,8 @@ export function Stat({ label, value, color }: { label: string; value: ReactNode;
   );
 }
 
-/** Shared navigation target ids — single source of truth for routing within the SPA. */
-export type PageId = "command" | "watchlist" | "signals" | "sources" | "indicators";
-
-/** Callbacks the shell hands down to pages/cards (modals + navigation). */
+/** Overlay/drawer actions the shell exposes to pages/cards via `useShellActions()`. */
 export interface ShellActions {
-  onNav: (p: PageId) => void;
   onOpenAgent: (agentId: string) => void;
   onOpenContext: (trackerName: string) => void;
   onNewTracker: () => void;
