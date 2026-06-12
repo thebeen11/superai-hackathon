@@ -24,6 +24,7 @@ import enum
 import json
 import logging
 import re
+import threading
 import time
 import types
 import typing
@@ -36,6 +37,9 @@ from ..config import settings
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+_client_singleton = None
+_client_lock = threading.Lock()
 
 
 class ReasoningError(Exception):
@@ -51,16 +55,28 @@ class ReasoningError(Exception):
 
 
 def _client():
-    # Imported lazily so the app boots without GCP configured.
-    from google import genai
+    # Cache one client for the process. A fresh client per call hits a GC race: the
+    # throwaway Client wrapper is finalized right after `.models` is read, which closes
+    # the httpx client the live Models object still uses -> subsequent sends fail with
+    # "Cannot send a request, as the client has been closed." A module-level reference
+    # keeps the client alive, and reusing it avoids rebuilding the httpx pool / re-
+    # resolving ADC on every reasoning step.
+    global _client_singleton
+    if _client_singleton is None:
+        with _client_lock:
+            if _client_singleton is None:
+                # Imported lazily so the app boots without GCP configured.
+                from google import genai
 
-    # Vertex backend uses Application Default Credentials; project/location come from
-    # settings (env). If `gcp_project` is unset, google-auth resolves it from ADC.
-    return genai.Client(
-        vertexai=True,
-        project=settings.gcp_project,
-        location=settings.vertex_location,
-    )
+                # Vertex backend uses Application Default Credentials; project/location
+                # come from settings (env). If `gcp_project` is unset, google-auth
+                # resolves it from ADC.
+                _client_singleton = genai.Client(
+                    vertexai=True,
+                    project=settings.gcp_project,
+                    location=settings.vertex_location,
+                )
+    return _client_singleton
 
 
 def _extract_json(text: str) -> dict:
@@ -132,7 +148,8 @@ def converse_structured(
 
     for attempt in range(retries + 1):
         try:
-            response = _client().models.generate_content(
+            client = _client()
+            response = client.models.generate_content(
                 model=model,
                 contents=user_content,
                 config={
