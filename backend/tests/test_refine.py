@@ -1,11 +1,11 @@
-"""Task 2.4 — Query Refinement unit tests (Bedrock mocked). Requirements 2.1-2.9, 1.x."""
+"""Task 2.4 — Query Refinement unit tests (LLM mocked). Requirements 2.1-2.9, 1.x."""
 from __future__ import annotations
 
 import pytest
 
 from app.discovery import refine as refine_mod
 from app.discovery.refine import QueryValidationError, refine_query, validate_query
-from app.llm import BedrockReasoningError
+from app.llm import ReasoningError
 from app.models import (
     Clarify,
     ClarificationMode,
@@ -27,7 +27,7 @@ def _stub_llm(monkeypatch, *, classification, refined="refined topic", questions
 
 def _raise_llm(monkeypatch, kind="transient"):
     def fake(*a, **k):
-        raise BedrockReasoningError("boom", kind=kind)
+        raise ReasoningError("boom", kind=kind)
     monkeypatch.setattr(refine_mod, "converse_structured", fake)
 
 

@@ -4,9 +4,13 @@ creds.txt
 .env
 .env.*
 !.env.example
+!.env.local.example
+!.env.prod.example
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.local.example
+!**/.env.prod.example
 
 # Python
 __pycache__/

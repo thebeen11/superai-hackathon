@@ -1,12 +1,12 @@
 """Tracker Context Preview tests — LLM judge grounding + deterministic fallback.
 
-Bedrock and the DB are mocked, so these run with no network or credentials.
+The LLM and the DB are mocked, so these run with no network or credentials.
 """
 from __future__ import annotations
 
 from app.insights import context as ctx
 from app.insights.context import _Pick, tracker_context
-from app.llm import BedrockReasoningError
+from app.llm import ReasoningError
 from app.models import CleanedItem, SourceType, Stream, TranscriptSegment
 
 
@@ -62,7 +62,7 @@ def test_llm_unavailable_uses_computed_fallback(monkeypatch):
     monkeypatch.setattr(ctx, "list_cleaned_items", lambda **k: items)
 
     def boom(*a, **k):
-        raise BedrockReasoningError("down", kind="transient")
+        raise ReasoningError("down", kind="transient")
 
     monkeypatch.setattr(ctx, "converse_structured", boom)
     preview = tracker_context("Solar")

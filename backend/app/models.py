@@ -80,7 +80,7 @@ class DiscoveryResult(BaseModel):
 # --- Query Refinement & Clarification (Req 2) ---
 
 class RefineLLMOutput(BaseModel):
-    """Schema enforced on the Bedrock reply for query refinement."""
+    """Schema enforced on the LLM reply for query refinement."""
 
     classification: QueryClassification
     refined_query: str

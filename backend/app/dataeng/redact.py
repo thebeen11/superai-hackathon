@@ -1,6 +1,6 @@
 """Noise redaction skill (Req 8). Removes ad reads/filler, preserves signal.
 
-Uses Bedrock to strip promotional/filler passages while keeping every passage that
+Uses the LLM to strip promotional/filler passages while keeping every passage that
 carries financial/investment signal. For video items, surviving transcript segments
 keep their timestamp_start so claims stay anchored (Req 8.3).
 """

@@ -15,7 +15,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from ..events import Emit, noop_emit
-from ..llm import BedrockReasoningError, converse_structured
+from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem, Evidence, SectorNote, StockTake
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ def analyze_desk(desk: str, items: list[CleanedItem]) -> SectorNote:
         return SectorNote(desk=desk)
     try:
         out = converse_structured(_AnalystOutput, _SYSTEM, _digest(items))
-    except BedrockReasoningError as exc:
+    except ReasoningError as exc:
         logger.warning("Andie-%s reasoning failed: %s", desk, exc)
         return SectorNote(desk=desk, summary=f"Analysis unavailable ({exc.kind}).")
     return SectorNote(

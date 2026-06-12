@@ -2,9 +2,11 @@
 
 Two adversarial personas argue over the Andie desk notes for three rounds so a single
 sycophantic model can't rubber-stamp its own thesis (PROJECT_GUIDANCE §0, §11). The
-two sides run on *different* Bedrock model families (Bull = Claude Opus, Bear =
-Amazon Nova Pro — the families the workshop account permits) to curb collusion. The
-full transcript is logged and handed up to the Chairman, who appends the verdict.
+two sides run on different Gemini models (Bull = Gemini 2.5 Pro, Bear = Gemini 2.5
+Flash). NOTE: on the Gemini-only stack these are the same model family, so this is a
+weaker anti-collusion guardrail than the original two-family (Claude vs Nova) setup —
+an intentional tradeoff. The full transcript is logged and handed up to the Chairman,
+who appends the verdict.
 """
 from __future__ import annotations
 
@@ -14,13 +16,13 @@ from pydantic import BaseModel
 
 from ..config import settings
 from ..events import Emit, noop_emit
-from ..llm import BedrockReasoningError, converse_structured
+from ..llm import ReasoningError, converse_structured
 from ..models import DebateRecord, DebateSideMeta, DebateTurn, SectorNote
 
 logger = logging.getLogger(__name__)
 
-_BULL_NAME, _BULL_MODEL = "Freddy-Bull", "Claude Opus"
-_BEAR_NAME, _BEAR_MODEL = "Freddy-Bear", "Amazon Nova Pro"
+_BULL_NAME, _BULL_MODEL = "Freddy-Bull", "Gemini 2.5 Pro"
+_BEAR_NAME, _BEAR_MODEL = "Freddy-Bear", "Gemini 2.5 Flash"
 
 _BULL_SYSTEM = (
     "You are Freddy-Bull, a growth/momentum portfolio manager. Argue why the analyst desk "
@@ -74,7 +76,7 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
     try:
         r1 = converse_structured(
             _BullTurn, _BULL_SYSTEM, f"Desk notes:\n{digest}\n\nRound 1: propose the trade.",
-            model_id=settings.bedrock_bull_model_id,
+            model_id=settings.gemini_bull_model,
         )
         bull.stance = r1.stance
         record.transcript.append(
@@ -87,7 +89,7 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
             _BearTurn, _BEAR_SYSTEM,
             f"Desk notes:\n{digest}\n\nBull proposed: {r1.stance}\n{r1.argument}\n\n"
             "Round 2: attack the thesis.",
-            model_id=settings.bedrock_bear_model_id,
+            model_id=settings.gemini_bear_model,
         )
         bear.stance = r2.stance
         record.transcript.append(
@@ -100,13 +102,13 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
             _BullTurn, _BULL_SYSTEM,
             f"Desk notes:\n{digest}\n\nYour thesis: {r1.argument}\n\n"
             f"Bear countered: {r2.rebuttal}\n\nRound 3: defend or adjust.",
-            model_id=settings.bedrock_bull_model_id,
+            model_id=settings.gemini_bull_model,
         )
         record.transcript.append(
             DebateTurn(who="bull", round="R3", label="Bull · defends", text=r3.argument)
         )
         record.round = 3
-    except BedrockReasoningError as exc:
+    except ReasoningError as exc:
         logger.warning("Debate aborted: %s", exc)
         emit("council.debate", f"Debate degraded: {exc.kind}", status="skip")
 

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from ..db.repository import list_due_predictions, resolve_prediction
 from ..events import Emit, noop_emit
-from ..llm import BedrockReasoningError, converse_structured
+from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ def resolve_due_predictions(corpus: list[CleanedItem], emit: Emit = noop_emit) -
         user = f"PREDICTION (by {p.channel}):\n{p.claim}\n\nEVIDENCE:\n{digest}"
         try:
             verdict = converse_structured(_RubricVerdict, _SYSTEM, user)
-        except BedrockReasoningError as exc:
+        except ReasoningError as exc:
             logger.warning("Rubric scoring failed for prediction %s: %s", p.id, exc)
             continue
         outcome = verdict.outcome.strip().lower()

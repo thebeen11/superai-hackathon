@@ -1,33 +1,47 @@
-"""Application configuration, loaded from environment / .env."""
+"""Application configuration, loaded from environment / .env.
+
+Env files are layered: an optional shared `.env` base, then a per-environment file chosen
+by `APP_ENV` (`local` by default → `.env.local`; set `APP_ENV=prod` → `.env.prod`). The
+later file wins, and OS environment variables outrank both — so on Cloud Run (where
+`APP_ENV=prod` is set and no `.env.prod` is shipped) the platform-injected env/secrets are
+used directly. Missing env files are skipped silently.
+"""
 from __future__ import annotations
+
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_APP_ENV = os.getenv("APP_ENV", "local")
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", f".env.{_APP_ENV}"),  # base, then per-env overlay; last wins
+        extra="ignore",
+    )
+
+    # Which environment this process loaded config for (exposed for /health, logs).
+    app_env: str = _APP_ENV
 
     # --- Discovery source APIs ---
     exa_api_key: str | None = None
     youtube_api_key: str | None = None
     discovery_max_results_per_source: int = 5
 
-    # --- Bedrock (reasoning) ---
-    aws_region: str = "us-west-2"
-    # AWS credentials. Loaded from .env / environment. If left unset, boto3 falls back
-    # to its default credential chain (~/.aws, instance role, sourced env vars).
-    aws_access_key_id: str | None = None
-    aws_secret_access_key: str | None = None
-    aws_session_token: str | None = None  # required for temporary STS credentials
-    # Reasoning model. The workshop account allows Amazon Nova and Claude Opus.
-    # Default: Claude Opus 4.6 via the us-west-2 cross-region inference profile.
-    bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
-    bedrock_max_retries: int = 3
-    # Tier 4 (Freddy) debates with two *different* model families to curb collusion
-    # (PROJECT_GUIDANCE §11). The workshop account only permits Claude Opus and Amazon
-    # Nova, so Bull = Claude Opus, Bear = Amazon Nova Pro — still two distinct families.
-    bedrock_bull_model_id: str = "us.anthropic.claude-opus-4-6-v1"
-    bedrock_bear_model_id: str = "us.amazon.nova-pro-v1:0"
+    # --- Gemini on Vertex AI (reasoning) ---
+    # Auth is via Application Default Credentials (ADC) — no API keys. On Cloud Run the
+    # service account is used automatically; locally run `gcloud auth application-default
+    # login`. If `gcp_project` is unset, google-auth resolves it from ADC.
+    gcp_project: str | None = None
+    vertex_location: str = "us-central1"
+    gemini_model: str = "gemini-2.5-pro"
+    gemini_max_retries: int = 3
+    # Tier 4 (Freddy) debates Bull vs Bear. Originally two *different* model families to
+    # curb collusion (PROJECT_GUIDANCE §11); on Gemini-only these are the same family
+    # (pro vs flash), so the anti-collusion guardrail is weaker — intentional tradeoff.
+    gemini_bull_model: str = "gemini-2.5-pro"
+    gemini_bear_model: str = "gemini-2.5-flash"
 
     # --- Database (RDS Postgres) ---
     database_url: str | None = None

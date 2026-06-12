@@ -2,7 +2,7 @@
 
 The frontend's `pnpm gen:api` reads this file to generate its typed client, so
 the build never needs the backend running. The schema is built purely from the
-route signatures — no network, DB, or AWS credentials required.
+route signatures — no network, DB, or cloud credentials required.
 
 Run from the repo root or `backend/`:
 

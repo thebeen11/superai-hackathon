@@ -2,16 +2,18 @@
 
 This is the Layer 1 (Discovery) + Layer 2 (Data Engineering) backend of the Hedge Fund
 AI Agent Council. It turns a research topic into clean, labelled, source-anchored rows in
-Postgres, using Amazon Bedrock (Claude Opus) for reasoning.
+Postgres, using Gemini on Vertex AI for reasoning.
 
 ---
 
 ## 1. Prerequisites
 
 - **uv** (Python package manager) — https://docs.astral.sh/uv/
-- **AWS credentials** in `creds.txt` at the repo root (temporary STS creds; they expire).
-- Access to the shared **RDS Postgres** (already provisioned) — connection string is in
-  `backend/.env`.
+- **GCP Application Default Credentials** for Gemini on Vertex AI — run
+  `gcloud auth application-default login` (no API keys). Set `GCP_PROJECT` in `.env`, and
+  enable the Vertex AI API (`gcloud services enable aiplatform.googleapis.com`).
+- A **Postgres** to connect to — local via `docker compose up -d` (see `docker-compose.yml`),
+  or Cloud SQL. Set the connection string as `DATABASE_URL` in `backend/.env`.
 
 > All commands below are run from the `backend/` directory unless stated otherwise.
 
@@ -23,24 +25,30 @@ Postgres, using Amazon Bedrock (Claude Opus) for reasoning.
 uv sync                 # install dependencies
 ```
 
-`backend/.env` should already exist with the Bedrock model, AWS region, and the RDS
-`DATABASE_URL`. If it doesn't, copy the example and ask the team for the DB password:
+Config is layered by `APP_ENV` (defaults to `local` → loads `.env.local`; set `APP_ENV=prod`
+→ `.env.prod`). For local dev, copy the local template and fill it in:
 
 ```bash
-cp .env.example .env
+cp .env.local.example .env.local
 ```
 
-You also need an `EXA_API_KEY` in `.env` for live web discovery (ask the team). Without
-it, the web branch is skipped gracefully but you'll get no results.
+Set `GCP_PROJECT`, keep `VERTEX_LOCATION` / `GEMINI_MODEL`, and point `DATABASE_URL` at the
+local Postgres (the default in the template). Add `EXA_API_KEY` for live web discovery —
+without it the web branch is skipped gracefully but returns no results.
+
+> **Prod** config lives in Cloud Run (`--set-env-vars` / `--set-secrets`, set by `deploy.sh`
+> with `APP_ENV=prod`); no `.env.prod` is shipped — OS env overrides any file. `.env.prod.example`
+> is a template for prod-like local runs only. Never commit real secrets.
 
 ---
 
 ## 3. Run the server
 
-The app needs AWS credentials in its environment for Bedrock, so source `creds.txt` first:
+Reasoning uses Application Default Credentials, so make sure you've run
+`gcloud auth application-default login` first, then:
 
 ```
-uv run uvicorn app.main:app --reload'
+uv run uvicorn app.main:app --reload
 ```
 
 - Server: **http://localhost:8000**
@@ -61,7 +69,7 @@ curl http://localhost:8000/health
 
 `POST /discover` → `POST /dataeng/process` → `GET /items`
 
-**Step 1 — Discover** (Opus refines the query, then fans out to Exa + YouTube):
+**Step 1 — Discover** (Gemini refines the query, then fans out to Exa + YouTube):
 
 ```bash
 curl -s -X POST http://localhost:8000/discover \
@@ -145,7 +153,7 @@ curl -s 'http://localhost:8000/items?ticker=$META&limit=10'
 | POST   | `/discover/clarify` | resume after clarifying questions                                   | `DiscoveryResult` or `Clarify` |
 | POST   | `/dataeng/process`  | clean + label + theme + persist                                     | `DataEngReport`                |
 | GET    | `/items`            | read persisted rows (filters: `stream`, `theme`, `ticker`, `limit`) | `list[CleanedItem]`            |
-| GET    | `/discover?query=`  | plain fan-out, no LLM (quick test, no AWS needed)                   | `DiscoveryResult`              |
+| GET    | `/discover?query=`  | plain fan-out, no LLM (quick test, no GCP needed)                   | `DiscoveryResult`              |
 
 **Key request fields**
 
@@ -157,12 +165,11 @@ curl -s 'http://localhost:8000/items?ticker=$META&limit=10'
 
 ## 6. Inspecting the database directly (DBeaver / psql)
 
-The data lives in the shared **RDS Postgres** (see `DATABASE_URL` in `.env`):
+The data lives in Postgres (see `DATABASE_URL` in `.env`):
 
-- Host: `council-db.cdkao7bmhbkr.us-west-2.rds.amazonaws.com`
-- Port: `5432`
-- Database / User: `council`
-- Password: ask the team (it's in `backend/.env`)
+- **Local:** `localhost:5433`, database/user `council`, password `council` (from `docker-compose.yml`).
+- **Cloud SQL:** connect via the Cloud SQL Auth Proxy, or from Cloud Run over the
+  `/cloudsql/PROJECT:REGION:INSTANCE` socket.
 
 Table: `cleaned_items` (schema `public`).
 
@@ -171,22 +178,20 @@ Table: `cleaned_items` (schema `public`).
 ## 7. Run the tests
 
 ```bash
-uv run pytest        # 32 unit tests; no network or DB needed (Bedrock + DB are mocked)
+uv run pytest        # unit tests; no network or DB needed (the LLM + DB are mocked)
 ```
 
 ---
 
 ## 8. Troubleshooting
 
-- **DB connection times out** → the RDS security group only allows specific IPs and your
-  IP may have rotated. Add your current IP (run from the **repo root**):
-  ```bash
-  bash -c 'set -a; source creds.txt; set +a; aws ec2 authorize-security-group-ingress \
-    --region us-west-2 --group-id sg-019ccf119510b074f \
-    --protocol tcp --port 5432 --cidr $(curl -s https://checkip.amazonaws.com)/32'
-  ```
-- **`ExpiredTokenException` from Bedrock** → `creds.txt` STS tokens expired. Get fresh
-  credentials and replace `creds.txt`, then restart the server.
+- **DB connection refused** → for local dev make sure Postgres is up (`docker compose up -d`);
+  for Cloud SQL make sure the Auth Proxy is running (or that Cloud Run has the
+  `--add-cloudsql-instances` flag and the service account has `roles/cloudsql.client`).
+- **`PermissionDenied` / `403` from Vertex** → run `gcloud auth application-default login`,
+  confirm `GCP_PROJECT` is set, the Vertex AI API is enabled, and (on Cloud Run) the service
+  account has `roles/aiplatform.user`. A `404` usually means the `GEMINI_MODEL` id isn't
+  available in `VERTEX_LOCATION`.
 - **`EXA_API_KEY not set` in `skipped`** → add the Exa key to `backend/.env` and restart.
 - **No results, both sources skipped** → expected if neither `EXA_API_KEY` nor
   `YOUTUBE_API_KEY` is set; the run still succeeds, just with empty `items`.
@@ -200,7 +205,7 @@ uv run pytest        # 32 unit tests; no network or DB needed (Bedrock + DB are 
 
 A successful end-to-end run should show:
 
-1. `POST /discover` returns real web sources with the query **refined** by Opus
+1. `POST /discover` returns real web sources with the query **refined** by Gemini
    (`original_query` vs `query` differ).
 2. `POST /dataeng/process` reports `persisted > 0`.
 3. `GET /items` returns rows with sensible `stream` (MACRO/MICRO), `industry`, `themes`

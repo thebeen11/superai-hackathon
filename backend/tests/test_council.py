@@ -1,6 +1,6 @@
 """Council (Tiers 3–5) tests — Andie routing/grounding, Freddy debate, Winston, DAG.
 
-Bedrock and the DB are mocked, so these run with no network or credentials, exactly
+The LLM and the DB are mocked, so these run with no network or credentials, exactly
 like the Layer-2 tests.
 """
 from __future__ import annotations

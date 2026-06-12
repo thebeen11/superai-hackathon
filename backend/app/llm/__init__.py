@@ -1,3 +1,3 @@
-from .bedrock import BedrockReasoningError, converse_structured
+from .vertex import ReasoningError, converse_structured
 
-__all__ = ["converse_structured", "BedrockReasoningError"]
+__all__ = ["converse_structured", "ReasoningError"]

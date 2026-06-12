@@ -6,7 +6,7 @@ ask the LLM to act as a semantic judge: pick the single most relevant excerpt an
 how strongly it is *about* the concept (meaning, not literal word overlap — §7.1).
 
 The chosen quote is grounded back to a real item (no-orphan guardrail §12.6, same pattern
-as `council/analyst.py`). If Bedrock is unavailable we fall back to a deterministic,
+as `council/analyst.py`). If the LLM is unavailable we fall back to a deterministic,
 theme-coverage score — still computed, never a hardcoded placeholder.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel
 
 from ..db.repository import list_cleaned_items
-from ..llm import BedrockReasoningError, converse_structured
+from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem, ContextPreview
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ def tracker_context(tracker: str) -> ContextPreview | None:
 
     try:
         pick = converse_structured(_Pick, _system(tracker), _digest(candidates))
-    except BedrockReasoningError as exc:
+    except ReasoningError as exc:
         logger.warning("Context judge unavailable for %r (%s); using rule fallback", tracker, exc.kind)
         return _fallback(items, tracker)
 

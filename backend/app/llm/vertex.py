@@ -1,18 +1,22 @@
-"""Shared Amazon Bedrock `converse` wrapper with schema enforcement + retries.
+"""Shared Gemini (Vertex AI) structured-reasoning wrapper with schema enforcement + retries.
 
 Used by every reasoning step in the backend (the Discovery query-refinement skill
-and all Data Engineering skills). It is the single place that talks to an LLM.
+and all Data Engineering / Council skills). It is the single place that talks to an LLM.
 
 Design (Requirements 12):
-- One call per reasoning step via the Bedrock `converse` API (boto3).
-- The reply is constrained to JSON and validated against a caller-supplied Pydantic
-  schema.
+- One call per reasoning step via the Vertex AI `generate_content` API (google-genai).
+- The reply is constrained to JSON (Gemini JSON mode) and validated against a
+  caller-supplied Pydantic schema.
 - Retries up to `max_retries` additional attempts on BOTH:
     * Pydantic `ValidationError` (model returned malformed / invalid JSON), and
-    * transient Bedrock errors (throttling / timeouts),
+    * transient Vertex errors (5xx / rate limits),
   with exponential backoff.
-- On exhaustion raises `BedrockReasoningError(kind=...)` so callers can surface a
-  reason distinguishing a schema-validation failure from a transient service error.
+- On exhaustion raises `ReasoningError(kind=...)` so callers can surface a reason
+  distinguishing a schema-validation failure from a transient service error.
+
+Auth: the Vertex client uses Application Default Credentials (ADC). On Cloud Run the
+service account is picked up automatically; locally run `gcloud auth application-default
+login`. No API keys are stored.
 """
 from __future__ import annotations
 
@@ -33,18 +37,9 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
-# botocore error codes treated as transient / retryable.
-_TRANSIENT_CODES = {
-    "ThrottlingException",
-    "TooManyRequestsException",
-    "ModelTimeoutException",
-    "ServiceUnavailableException",
-    "InternalServerException",
-}
 
-
-class BedrockReasoningError(Exception):
-    """Raised when a Bedrock reasoning call cannot produce valid output.
+class ReasoningError(Exception):
+    """Raised when a reasoning call cannot produce valid output.
 
     `kind` is "schema_validation" or "transient" so callers can record a precise,
     human-readable failure reason (Req 12.5).
@@ -56,19 +51,16 @@ class BedrockReasoningError(Exception):
 
 
 def _client():
-    # Imported lazily so the app boots without AWS configured.
-    import boto3
+    # Imported lazily so the app boots without GCP configured.
+    from google import genai
 
-    # Pass credentials from settings (.env) when present; otherwise let boto3 fall back
-    # to its default credential chain (~/.aws, instance role, sourced env vars).
-    creds = {}
-    if settings.aws_access_key_id and settings.aws_secret_access_key:
-        creds["aws_access_key_id"] = settings.aws_access_key_id
-        creds["aws_secret_access_key"] = settings.aws_secret_access_key
-        if settings.aws_session_token:
-            creds["aws_session_token"] = settings.aws_session_token
-
-    return boto3.client("bedrock-runtime", region_name=settings.aws_region, **creds)
+    # Vertex backend uses Application Default Credentials; project/location come from
+    # settings (env). If `gcp_project` is unset, google-auth resolves it from ADC.
+    return genai.Client(
+        vertexai=True,
+        project=settings.gcp_project,
+        location=settings.vertex_location,
+    )
 
 
 def _extract_json(text: str) -> dict:
@@ -117,15 +109,15 @@ def converse_structured(
     model_id: str | None = None,
     max_retries: int | None = None,
 ) -> T:
-    """Call Bedrock `converse`, parse the JSON reply, validate it against `schema`.
+    """Call Gemini, parse the JSON reply, validate it against `schema`.
 
-    Returns a validated instance of `schema`. Raises BedrockReasoningError after the
-    retry budget is exhausted.
+    Returns a validated instance of `schema`. Raises ReasoningError after the retry
+    budget is exhausted.
     """
-    from botocore.exceptions import ClientError
+    from google.genai import errors as genai_errors
 
-    model = model_id or settings.bedrock_model_id
-    retries = settings.bedrock_max_retries if max_retries is None else max_retries
+    model = model_id or settings.gemini_model
+    retries = settings.gemini_max_retries if max_retries is None else max_retries
 
     # Show the model a concrete example instance (NOT the JSON Schema — some models
     # echo the schema back). It must fill in real values with the same keys.
@@ -140,30 +132,34 @@ def converse_structured(
 
     for attempt in range(retries + 1):
         try:
-            response = _client().converse(
-                modelId=model,
-                system=[{"text": system_with_schema}],
-                messages=[{"role": "user", "content": [{"text": user_content}]}],
-                inferenceConfig={"temperature": 0.0},
+            response = _client().models.generate_content(
+                model=model,
+                contents=user_content,
+                config={
+                    "system_instruction": system_with_schema,
+                    "temperature": 0.0,
+                    "response_mime_type": "application/json",
+                },
             )
-            reply = response["output"]["message"]["content"][0]["text"]
-            return schema.model_validate(_extract_json(reply))
+            return schema.model_validate(_extract_json(response.text))
 
-        except ClientError as exc:  # transient vs fatal AWS errors
-            code = exc.response.get("Error", {}).get("Code", "")
-            if code in _TRANSIENT_CODES:
+        except genai_errors.ServerError as exc:  # 5xx — transient
+            last_error, last_kind = exc, "transient"
+            logger.warning("Vertex transient error %s (attempt %d)", exc.code, attempt + 1)
+        except genai_errors.ClientError as exc:  # 4xx — only rate limits are retryable
+            if exc.code == 429:
                 last_error, last_kind = exc, "transient"
-                logger.warning("Bedrock transient error %s (attempt %d)", code, attempt + 1)
+                logger.warning("Vertex rate-limited (attempt %d)", attempt + 1)
             else:
-                raise  # non-retryable (auth, access, bad model id) — surface immediately
+                raise  # non-retryable (auth, permission, bad model id) — surface immediately
         except (ValidationError, ValueError, json.JSONDecodeError) as exc:
             last_error, last_kind = exc, "schema_validation"
-            logger.warning("Bedrock output failed validation (attempt %d): %s", attempt + 1, exc)
+            logger.warning("Vertex output failed validation (attempt %d): %s", attempt + 1, exc)
 
         if attempt < retries:
             time.sleep(2 ** attempt)  # exponential backoff: 1s, 2s, 4s...
 
-    raise BedrockReasoningError(
-        f"Bedrock reasoning failed after {retries + 1} attempts ({last_kind}): {last_error}",
+    raise ReasoningError(
+        f"Gemini reasoning failed after {retries + 1} attempts ({last_kind}): {last_error}",
         kind=last_kind,
     )

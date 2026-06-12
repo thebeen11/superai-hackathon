@@ -40,12 +40,12 @@ backend/
 ├── pyproject.toml          # deps (uv)
 ├── .env.example
 ├── app/
-│   ├── config.py           # env-backed settings (Exa/YouTube/Bedrock/DB)
+│   ├── config.py           # env-backed settings (Exa/YouTube/Gemini-Vertex/DB)
 │   ├── models.py           # shared Pydantic shapes
 │   ├── taxonomy.py         # market themes, sectors, alias maps
 │   ├── main.py             # FastAPI app
 │   ├── llm/
-│   │   └── bedrock.py      # shared converse() wrapper + schema + retries
+│   │   └── vertex.py       # shared Gemini wrapper: structured output + schema + retries
 │   ├── discovery/          # LAYER 1 — Discovery agent
 │   │   ├── agent.py        #   fan-out + merge + skip-with-reason
 │   │   ├── refine.py       #   LLM query refinement / clarification

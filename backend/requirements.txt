@@ -6,16 +6,11 @@ annotated-types==0.7.0
     # via pydantic
 anyio==4.13.0
     # via
+    #   google-genai
     #   httpx
     #   openai
     #   starlette
     #   watchfiles
-boto3==1.43.25
-    # via hedge-fund-council-backend
-botocore==1.43.25
-    # via
-    #   boto3
-    #   s3transfer
 certifi==2026.5.20
     # via
     #   httpcore
@@ -30,6 +25,7 @@ click==8.4.1
 colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
+    #   pytest
     #   tqdm
     #   uvicorn
 cryptography==48.0.0
@@ -37,7 +33,9 @@ cryptography==48.0.0
 defusedxml==0.7.1
     # via youtube-transcript-api
 distro==1.9.0
-    # via openai
+    # via
+    #   google-genai
+    #   openai
 exa-py==1.8.7
     # via hedge-fund-council-backend
 fastapi==0.115.6
@@ -51,8 +49,11 @@ google-auth==2.53.0
     #   google-api-core
     #   google-api-python-client
     #   google-auth-httplib2
+    #   google-genai
 google-auth-httplib2==0.4.0
     # via google-api-python-client
+google-genai==2.8.0
+    # via hedge-fund-council-backend
 googleapis-common-protos==1.75.0
     # via google-api-core
 greenlet==3.5.1 ; platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'
@@ -70,24 +71,28 @@ httplib2==0.31.2
 httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
-    # via openai
+    # via
+    #   google-genai
+    #   openai
 idna==3.18
     # via
     #   anyio
     #   httpx
     #   requests
+iniconfig==2.3.0
+    # via pytest
 jiter==0.15.0
     # via openai
-jmespath==1.1.0
-    # via
-    #   boto3
-    #   botocore
 mako==1.3.12
     # via alembic
 markupsafe==3.0.3
     # via mako
 openai==1.109.1
     # via exa-py
+packaging==26.2
+    # via pytest
+pluggy==1.6.0
+    # via pytest
 proto-plus==1.28.0
     # via google-api-core
 protobuf==7.35.0
@@ -108,6 +113,7 @@ pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementatio
 pydantic==2.10.4
     # via
     #   fastapi
+    #   google-genai
     #   hedge-fund-council-backend
     #   openai
     #   pydantic-settings
@@ -115,10 +121,11 @@ pydantic-core==2.27.2
     # via pydantic
 pydantic-settings==2.7.1
     # via hedge-fund-council-backend
+pygments==2.20.0
+    # via pytest
 pyparsing==3.3.2
     # via httplib2
-python-dateutil==2.9.0.post0
-    # via botocore
+pytest==9.0.3
 python-dotenv==1.0.1
     # via
     #   hedge-fund-council-backend
@@ -130,19 +137,21 @@ requests==2.34.2
     # via
     #   exa-py
     #   google-api-core
+    #   google-auth
+    #   google-genai
     #   youtube-transcript-api
-s3transfer==0.18.0
-    # via boto3
-six==1.17.0
-    # via python-dateutil
 sniffio==1.3.1
-    # via openai
+    # via
+    #   google-genai
+    #   openai
 sqlalchemy==2.0.50
     # via
     #   alembic
     #   hedge-fund-council-backend
 starlette==0.41.3
     # via fastapi
+tenacity==9.1.4
+    # via google-genai
 tqdm==4.68.1
     # via openai
 typing-extensions==4.15.0
@@ -151,6 +160,7 @@ typing-extensions==4.15.0
     #   anyio
     #   exa-py
     #   fastapi
+    #   google-genai
     #   openai
     #   psycopg
     #   pydantic
@@ -161,9 +171,7 @@ tzdata==2026.2 ; sys_platform == 'win32'
 uritemplate==4.2.0
     # via google-api-python-client
 urllib3==2.7.0
-    # via
-    #   botocore
-    #   requests
+    # via requests
 uvicorn==0.34.0
     # via hedge-fund-council-backend
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
@@ -171,6 +179,8 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
 watchfiles==1.2.0
     # via uvicorn
 websockets==16.0
-    # via uvicorn
+    # via
+    #   google-genai
+    #   uvicorn
 youtube-transcript-api==0.6.3
     # via hedge-fund-council-backend

@@ -13,7 +13,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from ..events import Emit, noop_emit
-from ..llm import BedrockReasoningError, converse_structured
+from ..llm import ReasoningError, converse_structured
 from ..models import (
     AceComponent,
     AceIndex,
@@ -157,7 +157,7 @@ def run_chairman(
     )
     try:
         out = converse_structured(_ChairmanOutput, _SYSTEM, user)
-    except BedrockReasoningError as exc:
+    except ReasoningError as exc:
         logger.warning("Chairman reasoning failed: %s", exc)
         emit("council.chairman", f"Chairman unavailable: {exc.kind}", status="skip")
         return ChairmanVerdict(verdict=f"Verdict unavailable ({exc.kind}).")

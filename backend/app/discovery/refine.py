@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from ..config import settings
-from ..llm import BedrockReasoningError, converse_structured
+from ..llm import ReasoningError, converse_structured
 from ..models import (
     Clarify,
     ClarificationMode,
@@ -73,7 +73,7 @@ def refine_query(
 
     try:
         out = converse_structured(RefineLLMOutput, _SYSTEM, trimmed)
-    except BedrockReasoningError as exc:
+    except ReasoningError as exc:
         # Graceful fallback: proceed with the original query (Req 2.9).
         logger.warning("Query refinement failed (%s); using original query", exc.kind)
         return Proceed(original_query=trimmed, refined_query=trimmed, refinement_failed=True)
