@@ -197,14 +197,26 @@ export function Spark({
   pad?: number;
 }) {
   const id = "sp" + useId().replace(/:/g, "");
+  const pathRef = useRef<SVGPathElement>(null);
+  const [len, setLen] = useState(0);
+  useEffect(() => { if (pathRef.current) setLen(pathRef.current.getTotalLength()); }, [w, h, data]);
+
+  // Need at least two points to draw a curve; otherwise show a flat baseline so layout
+  // stays stable (data can be empty while the backend has nothing to chart yet).
+  if (!data || data.length < 2) {
+    return (
+      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+        <line x1={pad} y1={h / 2} x2={w - pad} y2={h / 2}
+          stroke={color} strokeWidth={strokeW} strokeLinecap="round" opacity={0.3} />
+      </svg>
+    );
+  }
+
   const min = Math.min(...data), max = Math.max(...data);
   const rng = max - min || 1;
   const pts = data.map((v, i): [number, number] => [pad + (i / (data.length - 1)) * (w - pad * 2), h - pad - ((v - min) / rng) * (h - pad * 2)]);
   const line = smoothPath(pts);
   const area = `${line} L ${pts[pts.length - 1][0]} ${h} L ${pts[0][0]} ${h} Z`;
-  const pathRef = useRef<SVGPathElement>(null);
-  const [len, setLen] = useState(0);
-  useEffect(() => { if (pathRef.current) setLen(pathRef.current.getTotalLength()); }, [w, h]);
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
       <defs>
