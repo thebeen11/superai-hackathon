@@ -14,19 +14,12 @@ from ..db.repository import list_due_predictions, resolve_prediction
 from ..events import Emit, noop_emit
 from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem
+from ..prompts import get_prompt
 
 logger = logging.getLogger(__name__)
 
 _SNIPPET = 400
 _MAX_DIGEST = 25  # corpus items shown to the judge
-
-_SYSTEM = (
-    "You are Andie, the rubric scorer of an AI hedge-fund council. You are given a past "
-    "prediction and recent market evidence. Judge whether the prediction RESOLVED TRUE, "
-    "RESOLVED FALSE, or is UNKNOWN (the evidence does not settle it). Be strict: only answer "
-    "true or false when the evidence clearly supports it; otherwise answer unknown. Reply with "
-    "the outcome ('true' | 'false' | 'unknown') and a one-line rationale grounded in the evidence."
-)
 
 
 class _RubricVerdict(BaseModel):
@@ -52,7 +45,7 @@ def resolve_due_predictions(corpus: list[CleanedItem], emit: Emit = noop_emit) -
     for p in due:
         user = f"PREDICTION (by {p.channel}):\n{p.claim}\n\nEVIDENCE:\n{digest}"
         try:
-            verdict = converse_structured(_RubricVerdict, _SYSTEM, user)
+            verdict = converse_structured(_RubricVerdict, get_prompt("council.resolver"), user)
         except ReasoningError as exc:
             logger.warning("Rubric scoring failed for prediction %s: %s", p.id, exc)
             continue

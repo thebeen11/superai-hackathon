@@ -9,6 +9,7 @@ const ICONS: Record<string, string> = {
   signals: "M3 12h3l3-8 4 16 3-10 2 4h3",
   sources: "M12 3c5 0 8 1.3 8 3s-3 3-8 3-8-1.3-8-3 3-3 8-3zM4 6v6c0 1.7 3 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3 3 8 3v-6",
   indicators: "M12 21a9 9 0 1 0-9-9M12 21V12l5-3",
+  console: "M4 5h16v14H4zM8 10l2.5 2.5L8 15M13 15h4",
 };
 
 const NAV: { href: string; label: string; icon: string }[] = [
@@ -17,6 +18,7 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/signals", label: "Signal Terminal", icon: "signals" },
   { href: "/sources", label: "Sources & Ledger", icon: "sources" },
   { href: "/indicators", label: "Indicators", icon: "indicators" },
+  { href: "/console", label: "Agent Console", icon: "console" },
 ];
 
 function NavIcon({ d, active }: { d: string; active: boolean }) {

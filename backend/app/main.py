@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -11,12 +13,19 @@ from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .config import settings
 from .council import latest_council, resolve_ledger, run_council
+from .crawl import (
+    run_council_safe as _run_council_safe,
+    run_daily_crawl,
+    start_daily_crawl_timer,
+    stop_daily_crawl_timer,
+)
 from .dataeng import process_discovery_result
 from .db.repository import list_cleaned_items
 from .discovery import discover, discover_with_refinement
 from .discovery.refine import QueryValidationError
-from .events import Emit, noop_emit
+from .events import Emit
 from .insights.context import tracker_context
 from .models import (
     CleanedItem,
@@ -28,6 +37,8 @@ from .models import (
     DiscoveryResult,
 )
 from .jobs import create_job, get_job, list_jobs
+from .prompts import store as prompt_store
+from .prompts.registry import PromptSpec, get_spec, list_prompt_specs
 from .sse import sse_from_subscribe, sse_stream
 
 logging.basicConfig(level=logging.INFO)
@@ -42,12 +53,21 @@ def _operation_id(route: APIRoute) -> str:
     return route.name
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    if settings.daily_crawl_enabled:
+        start_daily_crawl_timer()
+    yield
+    stop_daily_crawl_timer()
+
+
 app = FastAPI(
     title="Hedge Fund AI Agent Council — API",
     version="0.1.0",
     docs_url="/docs",       # Swagger UI
     redoc_url=None,         # disabled here; served below from a self-hosted bundle
     generate_unique_id_function=_operation_id,
+    lifespan=_lifespan,
 )
 
 # Serve static assets (self-hosted ReDoc bundle) so the API reference renders
@@ -90,6 +110,23 @@ class ClarifyRequest(BaseModel):
     round: int = Field(default=1, ge=1)
     mode: ClarificationMode = ClarificationMode.INTERACTIVE
     max_results: int | None = Field(default=None, ge=1, le=50)
+
+
+class PromptView(BaseModel):
+    """One editable system prompt + its current/default text for the Agent Console."""
+
+    key: str
+    label: str
+    group: str
+    description: str
+    placeholders: list[str]
+    default_text: str
+    current_text: str
+    is_overridden: bool
+
+
+class PromptUpdate(BaseModel):
+    text: str = Field(..., min_length=1, description="The new system-prompt text")
 
 
 @app.get("/health")
@@ -143,13 +180,20 @@ def discover_clarify(body: ClarifyRequest) -> DiscoveryResult | Clarify:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def _run_council_safe(emit: Emit = noop_emit) -> None:
-    """Run Tiers 3–5 after discovery, fault-isolated so it never breaks ingestion."""
+@app.post("/crawl/daily", response_model=DataEngReport)
+def crawl_daily(
+    day: str | None = Query(
+        None, description="UTC day to crawl (YYYY-MM-DD). Default: yesterday (UTC)."
+    ),
+) -> DataEngReport:
+    """Crawl one day's news through the full pipeline (Cloud Scheduler / cron hook)."""
     try:
-        run_council(emit=emit)
-    except Exception as exc:  # noqa: BLE001 - council failure must not fail discovery
-        logging.getLogger(__name__).warning("Council run failed: %s", exc)
-        emit("council", f"Council failed: {exc}", status="error", reason=str(exc))
+        parsed = date.fromisoformat(day) if day else None
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail=f"Invalid day {day!r}: expected YYYY-MM-DD"
+        ) from exc
+    return run_daily_crawl(parsed)
 
 
 @app.post("/dataeng/process", response_model=DataEngReport)
@@ -178,6 +222,50 @@ def tracker_context_endpoint(tracker: str) -> ContextPreview:
     if preview is None:
         raise HTTPException(status_code=404, detail=f"No stored items for tracker {tracker!r}")
     return preview
+
+
+# --- Agent Console: editable system prompts ---------------------------------
+
+
+def _prompt_view(spec: PromptSpec) -> PromptView:
+    """Build the console view for one prompt (override text if set, else the default)."""
+    override = prompt_store.get_override(spec.key)
+    return PromptView(
+        key=spec.key,
+        label=spec.label,
+        group=spec.group,
+        description=spec.description,
+        placeholders=list(spec.placeholders),
+        default_text=spec.default_template,
+        current_text=override if override is not None else spec.default_template,
+        is_overridden=override is not None,
+    )
+
+
+@app.get("/api/prompts", response_model=list[PromptView])
+def list_prompts() -> list[PromptView]:
+    """Every agent system prompt with its default and current (possibly overridden) text."""
+    return [_prompt_view(spec) for spec in list_prompt_specs()]
+
+
+@app.put("/api/prompts/{key}", response_model=PromptView)
+def update_prompt(key: str, body: PromptUpdate) -> PromptView:
+    """Override one prompt with user-supplied text (takes effect on the next agent run)."""
+    spec = get_spec(key)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"Unknown prompt key: {key!r}")
+    prompt_store.set_override(key, body.text)
+    return _prompt_view(spec)
+
+
+@app.delete("/api/prompts/{key}", response_model=PromptView)
+def reset_prompt(key: str) -> PromptView:
+    """Reset one prompt back to its built-in default."""
+    spec = get_spec(key)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"Unknown prompt key: {key!r}")
+    prompt_store.delete_override(key)
+    return _prompt_view(spec)
 
 
 # --- SSE streaming variants -------------------------------------------------

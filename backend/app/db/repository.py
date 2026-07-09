@@ -20,7 +20,7 @@ from ..models import (
     TranscriptSegment,
 )
 from .session import get_session
-from .tables import CleanedItemRow, CouncilSnapshotRow, PredictionRow
+from .tables import CleanedItemRow, CouncilSnapshotRow, PredictionRow, PromptOverrideRow
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,54 @@ def get_latest_council_snapshot() -> CouncilReport | None:
     try:
         row = session.execute(stmt).scalars().first()
         return CouncilReport.model_validate(row.report) if row else None
+    finally:
+        session.close()
+
+
+# --- Prompt overrides (Agent Console) ---------------------------------------
+
+
+def get_prompt_overrides() -> dict[str, str]:
+    """Every overridden prompt as key → text (absent keys use their registry default)."""
+    stmt = select(PromptOverrideRow.key, PromptOverrideRow.text)
+    session = get_session()
+    try:
+        return {key: text for key, text in session.execute(stmt)}
+    finally:
+        session.close()
+
+
+def set_prompt_override(key: str, text: str) -> None:
+    """Upsert a single prompt override by key."""
+    now = datetime.now(timezone.utc)
+    stmt = pg_insert(PromptOverrideRow).values(key=key, text=text, updated_at=now)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["key"], set_={"text": text, "updated_at": now}
+    )
+    session = get_session()
+    try:
+        session.execute(stmt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist prompt override %s", key)
+        raise
+    finally:
+        session.close()
+
+
+def delete_prompt_override(key: str) -> None:
+    """Remove a prompt override so its key reverts to the registry default."""
+    session = get_session()
+    try:
+        row = session.get(PromptOverrideRow, key)
+        if row is not None:
+            session.delete(row)
+            session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to delete prompt override %s", key)
+        raise
     finally:
         session.close()
 

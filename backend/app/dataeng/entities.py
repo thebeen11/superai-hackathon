@@ -10,15 +10,8 @@ from pydantic import BaseModel, Field
 
 from ..llm import converse_structured
 from ..models import ResolvedEntity
+from ..prompts import get_prompt
 from ..taxonomy import COMPANY_ALIASES, MACRO_ALIASES
-
-_SYSTEM = (
-    "You identify the companies and macro-economic entities explicitly mentioned in the "
-    "text. For each, return its canonical form: a stock ticker prefixed with '$' for a "
-    "company (e.g. $META), or a canonical macro entity name (e.g. Federal_Reserve). "
-    "Only include entities that are actually present in the text — never guess or invent. "
-    "List each alias mention you matched."
-)
 
 
 class _LLMEntity(BaseModel):
@@ -44,7 +37,7 @@ def resolve_entities(text: str) -> list[ResolvedEntity]:
     """Resolve entities via the built-in map + LLM, de-duplicated by canonical."""
     merged: dict[str, set[str]] = _builtin_matches(text)
 
-    out = converse_structured(_EntityOutput, _SYSTEM, text)
+    out = converse_structured(_EntityOutput, get_prompt("dataeng.entities"), text)
     for e in out.entities:
         canonical = (e.canonical or "").strip()
         if not canonical:

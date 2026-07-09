@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from ..events import Emit, noop_emit
 from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem, Evidence, SectorNote, StockTake
+from ..prompts import get_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +30,6 @@ DESK_SECTORS: dict[str, set[str]] = {
 DESK_ORDER = ["TMT", "Physical", "Capital"]
 MAX_STOCKS_PER_DESK = 20  # §12.2 — avoid "lost in the middle" context degradation
 _SNIPPET = 600            # chars of clean_text shown per item to bound the prompt
-
-_SYSTEM = (
-    "You are Andie, a buy-side sector analyst. You are given a numbered list of cleaned "
-    "research excerpts for your desk's sectors. Produce a concise desk note: a one-paragraph "
-    "summary, a few catalyst highlights, and a per-stock take ONLY for tickers actually "
-    "discussed in the excerpts. For each stock give a conviction from -1.0 (bearish) to +1.0 "
-    "(bullish), a holding horizon (e.g. '6-12M'), a short rationale, and evidence: a direct "
-    "quote plus the integer index of the source excerpt it came from. Never invent tickers, "
-    "quotes, or sources — cite only what is present. If nothing actionable is present, return "
-    "empty highlights and stocks."
-)
 
 
 class _LLMEvidence(BaseModel):
@@ -117,7 +107,7 @@ def analyze_desk(desk: str, items: list[CleanedItem]) -> SectorNote:
     if not items:
         return SectorNote(desk=desk)
     try:
-        out = converse_structured(_AnalystOutput, _SYSTEM, _digest(items))
+        out = converse_structured(_AnalystOutput, get_prompt("council.analyst"), _digest(items))
     except ReasoningError as exc:
         logger.warning("Andie-%s reasoning failed: %s", desk, exc)
         return SectorNote(desk=desk, summary=f"Analysis unavailable ({exc.kind}).")

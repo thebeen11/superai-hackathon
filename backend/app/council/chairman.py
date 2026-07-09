@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from ..events import Emit, noop_emit
 from ..llm import ReasoningError, converse_structured
+from ..prompts import get_prompt
 from ..models import (
     AceComponent,
     AceIndex,
@@ -29,27 +30,6 @@ from ..models import (
 logger = logging.getLogger(__name__)
 
 _SNIPPET = 500
-
-_SYSTEM = (
-    "You are Winston, the Chairman of an AI hedge-fund council. You are given the analyst "
-    "desk notes, the Bull/Bear debate transcript, and macro excerpts. Be cold, objective and "
-    "capital-preserving. Produce:\n"
-    "1. verdict: a short ruling that weighs the bull thesis against the bear's risks.\n"
-    "2. baskets: final thematic stock baskets, each with risk (Low/Med/High), horizon, the "
-    "tickers, a one-line strategy, a conviction 0.0-1.0, a verdict line, and a hold period. "
-    "Recommend conviction + timing only, NEVER price targets.\n"
-    "3. indicators: macro/financial indicators (e.g. Macro Outlook, Inflation Trajectory, "
-    "Interest Rate Policy, Market Sentiment) each scored -1.0..+1.0 with a band "
-    "(Positive/Neutral/Negative) and a short evidence note.\n"
-    "4. ace: the AI Capital Environment composite. Provide three components — 'AI Sentiment' "
-    "(weight 0.4), 'Rate Expectations' (0.3), 'Inflation Drag' (0.3) — each scored -1.0..+1.0, "
-    "and the resulting value (their weighted sum) with a label like 'CAPITAL ABUNDANT' or "
-    "'CAPITAL STARVED'.\n"
-    "5. briefing: 3-4 one-line bullets for the daily briefing, each toned up/down/neutral.\n"
-    "6. predictions: a few resolvable predictions, each with the claim, who made it, a "
-    "resolve date, and a calibrated probability 0.0-1.0 that the claim resolves TRUE. "
-    "Ground everything in the provided material; do not invent companies."
-)
 
 
 class _LLMBasket(BaseModel):
@@ -156,7 +136,7 @@ def run_chairman(
         f"MACRO EXCERPTS:\n{_macro_digest(macro_items)}"
     )
     try:
-        out = converse_structured(_ChairmanOutput, _SYSTEM, user)
+        out = converse_structured(_ChairmanOutput, get_prompt("council.chairman"), user)
     except ReasoningError as exc:
         logger.warning("Chairman reasoning failed: %s", exc)
         emit("council.chairman", f"Chairman unavailable: {exc.kind}", status="skip")

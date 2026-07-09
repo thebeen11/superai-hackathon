@@ -35,7 +35,8 @@ gcloud config set project "${PROJECT_ID}"
 echo "==> Enabling APIs"
 gcloud services enable \
   run.googleapis.com sqladmin.googleapis.com aiplatform.googleapis.com \
-  artifactregistry.googleapis.com secretmanager.googleapis.com cloudbuild.googleapis.com
+  artifactregistry.googleapis.com secretmanager.googleapis.com cloudbuild.googleapis.com \
+  cloudscheduler.googleapis.com
 
 echo "==> Cloud SQL (Postgres 16)"
 gcloud sql instances create "${SQL_INSTANCE}" \
@@ -85,10 +86,26 @@ gcloud run deploy "${SERVICE}" \
   --set-env-vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL}" \
   --set-secrets="EXA_API_KEY=EXA_API_KEY:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
 
+echo "==> Cloud Scheduler: daily crawl (00:30 UTC, crawls yesterday's news)"
+SERVICE_URL="$(gcloud run services describe "${SERVICE}" --region "${REGION}" --format='value(status.url)')"
+# The service is deployed --allow-unauthenticated, so a plain HTTP target works. If you
+# later require auth, add:  --oidc-service-account-email="${SA}" --oidc-token-audience="${SERVICE_URL}"
+if gcloud scheduler jobs describe daily-crawl --location "${REGION}" >/dev/null 2>&1; then
+  gcloud scheduler jobs update http daily-crawl --location "${REGION}" \
+    --schedule="30 0 * * *" --time-zone="Etc/UTC" \
+    --uri="${SERVICE_URL}/crawl/daily" --http-method=POST \
+    --attempt-deadline=1800s
+else
+  gcloud scheduler jobs create http daily-crawl --location "${REGION}" \
+    --schedule="30 0 * * *" --time-zone="Etc/UTC" \
+    --uri="${SERVICE_URL}/crawl/daily" --http-method=POST \
+    --attempt-deadline=1800s
+fi
+
 cat <<EOF
 
 ==> Done. Service URL:
-    $(gcloud run services describe "${SERVICE}" --region "${REGION}" --format='value(status.url)')
+    ${SERVICE_URL}
 
 One-time schema bootstrap (run once against Cloud SQL) via the Cloud SQL Auth Proxy.
 NOTE: bind the proxy to a NON-5432 port (e.g. 5434) — a local Postgres on 5432 will
