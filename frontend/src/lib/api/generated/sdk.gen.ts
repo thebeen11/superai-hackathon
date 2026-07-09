@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses } from './types.gen';
+import type { CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -26,7 +26,7 @@ export const health = <ThrowOnError extends boolean = false>(options?: Options<H
 /**
  * Discover Get
  *
- * Plain fan-out without refinement — kept for the CLI / back-compat.
+ * Plain fan-out without refinement — kept for the CLI / back-compat / backfills.
  */
 export const discoverGet = <ThrowOnError extends boolean = false>(options: Options<DiscoverGetData, ThrowOnError>): RequestResult<DiscoverGetResponses, DiscoverGetErrors, ThrowOnError> => (options.client ?? client).get<DiscoverGetResponses, DiscoverGetErrors, ThrowOnError>({ url: '/discover', ...options });
 
@@ -59,6 +59,13 @@ export const discoverClarify = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * Crawl Daily
+ *
+ * Crawl one day's news through the full pipeline (Cloud Scheduler / cron hook).
+ */
+export const crawlDaily = <ThrowOnError extends boolean = false>(options?: Options<CrawlDailyData, ThrowOnError>): RequestResult<CrawlDailyResponses, CrawlDailyErrors, ThrowOnError> => (options?.client ?? client).post<CrawlDailyResponses, CrawlDailyErrors, ThrowOnError>({ url: '/crawl/daily', ...options });
+
+/**
  * Dataeng Process
  *
  * Run Layer 2 (clean + label + theme + persist), then convene the council.
@@ -85,6 +92,34 @@ export const listItems = <ThrowOnError extends boolean = false>(options?: Option
  * Best evidence quote for a tracker (theme) + a real 0..1 relevance score (§7.1).
  */
 export const trackerContextEndpoint = <ThrowOnError extends boolean = false>(options: Options<TrackerContextEndpointData, ThrowOnError>): RequestResult<TrackerContextEndpointResponses, TrackerContextEndpointErrors, ThrowOnError> => (options.client ?? client).get<TrackerContextEndpointResponses, TrackerContextEndpointErrors, ThrowOnError>({ url: '/api/trackers/{tracker}/context', ...options });
+
+/**
+ * List Prompts
+ *
+ * Every agent system prompt with its default and current (possibly overridden) text.
+ */
+export const listPrompts = <ThrowOnError extends boolean = false>(options?: Options<ListPromptsData, ThrowOnError>): RequestResult<ListPromptsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListPromptsResponses, unknown, ThrowOnError>({ url: '/api/prompts', ...options });
+
+/**
+ * Reset Prompt
+ *
+ * Reset one prompt back to its built-in default.
+ */
+export const resetPrompt = <ThrowOnError extends boolean = false>(options: Options<ResetPromptData, ThrowOnError>): RequestResult<ResetPromptResponses, ResetPromptErrors, ThrowOnError> => (options.client ?? client).delete<ResetPromptResponses, ResetPromptErrors, ThrowOnError>({ url: '/api/prompts/{key}', ...options });
+
+/**
+ * Update Prompt
+ *
+ * Override one prompt with user-supplied text (takes effect on the next agent run).
+ */
+export const updatePrompt = <ThrowOnError extends boolean = false>(options: Options<UpdatePromptData, ThrowOnError>): RequestResult<UpdatePromptResponses, UpdatePromptErrors, ThrowOnError> => (options.client ?? client).put<UpdatePromptResponses, UpdatePromptErrors, ThrowOnError>({
+    url: '/api/prompts/{key}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Discover Get Stream

@@ -11,6 +11,7 @@ import logging
 
 from ..config import settings
 from ..llm import ReasoningError, converse_structured
+from ..prompts import get_prompt
 from ..models import (
     Clarify,
     ClarificationMode,
@@ -23,21 +24,6 @@ logger = logging.getLogger(__name__)
 
 MAX_QUERY_LEN = 500
 MAX_CLARIFICATION_ROUNDS = 2
-
-_SYSTEM = (
-    "You are a research query analyst for a US-equity investment research system. "
-    "Classify a topic query as CLEAR or AMBIGUOUS.\n"
-    "Mark it AMBIGUOUS ONLY if it has genuinely different possible interpretations or is "
-    "too vague to search (e.g. 'meta' could mean Meta Platforms or the concept 'meta'; "
-    "'apple' could be the company or the fruit).\n"
-    "Mark it CLEAR if it already names a specific company, ticker, sector, or topic — even "
-    "if it could be narrower. Do NOT ask the user to narrow scope (short-term vs long-term, "
-    "valuation vs earnings, etc.); breadth is fine and is handled downstream.\n"
-    "Always produce a 'refined_query': a concise, search-optimized rewrite. "
-    "If AMBIGUOUS, also provide 1-3 short 'clarifying_questions' that resolve the genuine "
-    "ambiguity."
-)
-
 
 class QueryValidationError(ValueError):
     """Raised when the submitted topic query is empty or too long (Req 1.2, 1.4)."""
@@ -72,7 +58,7 @@ def refine_query(
                        proceeded_without_clarification=True)
 
     try:
-        out = converse_structured(RefineLLMOutput, _SYSTEM, trimmed)
+        out = converse_structured(RefineLLMOutput, get_prompt("discovery.refine"), trimmed)
     except ReasoningError as exc:
         # Graceful fallback: proceed with the original query (Req 2.9).
         logger.warning("Query refinement failed (%s); using original query", exc.kind)

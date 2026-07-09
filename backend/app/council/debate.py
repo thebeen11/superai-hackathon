@@ -18,22 +18,12 @@ from ..config import settings
 from ..events import Emit, noop_emit
 from ..llm import ReasoningError, converse_structured
 from ..models import DebateRecord, DebateSideMeta, DebateTurn, SectorNote
+from ..prompts import get_prompt
 
 logger = logging.getLogger(__name__)
 
 _BULL_NAME, _BULL_MODEL = "Freddy-Bull", "Gemini 2.5 Pro"
 _BEAR_NAME, _BEAR_MODEL = "Freddy-Bear", "Gemini 2.5 Flash"
-
-_BULL_SYSTEM = (
-    "You are Freddy-Bull, a growth/momentum portfolio manager. Argue why the analyst desk "
-    "notes justify going long specific themes and tickers. Be concrete and cite the desks' "
-    "evidence. Give a one-line stance and a tight argument (<120 words)."
-)
-_BEAR_SYSTEM = (
-    "You are Freddy-Bear, a value/risk portfolio manager. Attack the bull thesis: valuation, "
-    "macro headwinds, crowded positioning, ways it fails. Cite the desk notes where you can. "
-    "Give a one-line stance and a tight rebuttal (<120 words)."
-)
 
 
 class _BullTurn(BaseModel):
@@ -75,7 +65,7 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
 
     try:
         r1 = converse_structured(
-            _BullTurn, _BULL_SYSTEM, f"Desk notes:\n{digest}\n\nRound 1: propose the trade.",
+            _BullTurn, get_prompt("council.debate.bull"), f"Desk notes:\n{digest}\n\nRound 1: propose the trade.",
             model_id=settings.gemini_bull_model,
         )
         bull.stance = r1.stance
@@ -86,7 +76,7 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
 
         emit("council.debate", "Freddy: Bear rebuts, round 2", status="progress")
         r2 = converse_structured(
-            _BearTurn, _BEAR_SYSTEM,
+            _BearTurn, get_prompt("council.debate.bear"),
             f"Desk notes:\n{digest}\n\nBull proposed: {r1.stance}\n{r1.argument}\n\n"
             "Round 2: attack the thesis.",
             model_id=settings.gemini_bear_model,
@@ -99,7 +89,7 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
 
         emit("council.debate", "Freddy: Bull defends, round 3", status="progress")
         r3 = converse_structured(
-            _BullTurn, _BULL_SYSTEM,
+            _BullTurn, get_prompt("council.debate.bull"),
             f"Desk notes:\n{digest}\n\nYour thesis: {r1.argument}\n\n"
             f"Bear countered: {r2.rebuttal}\n\nRound 3: defend or adjust.",
             model_id=settings.gemini_bull_model,

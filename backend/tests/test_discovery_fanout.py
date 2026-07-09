@@ -29,7 +29,7 @@ def test_dedupe_is_case_sensitive_exact_match():
 # --- _safe_call (Req 5.1, 5.2) ---
 
 def test_safe_call_converts_source_unavailable_to_reason():
-    def boom(q, m):
+    def boom(q, m, emit=None, **kw):
         raise SourceUnavailable("KEY not set")
     items, error = _safe_call(boom, "q", None)
     assert items == []
@@ -37,7 +37,7 @@ def test_safe_call_converts_source_unavailable_to_reason():
 
 
 def test_safe_call_converts_arbitrary_exception_to_reason():
-    def boom(q, m):
+    def boom(q, m, emit=None, **kw):
         raise RuntimeError("network down")
     items, error = _safe_call(boom, "q", None)
     assert items == []
@@ -47,7 +47,7 @@ def test_safe_call_converts_arbitrary_exception_to_reason():
 # --- discover end-to-end with both branches skipped (Req 5.6) ---
 
 def test_both_branches_skipped_returns_empty_items_and_two_skips(monkeypatch):
-    def unavailable(q, m):
+    def unavailable(q, m, emit=None, **kw):
         raise SourceUnavailable("no key")
     monkeypatch.setattr(agent.exa_source, "search", unavailable)
     monkeypatch.setattr(agent.youtube_source, "search", unavailable)
@@ -59,11 +59,11 @@ def test_both_branches_skipped_returns_empty_items_and_two_skips(monkeypatch):
 
 
 def test_discover_merges_items_from_both_branches(monkeypatch):
-    monkeypatch.setattr(agent.exa_source, "search", lambda q, m: [_item("web1")])
+    monkeypatch.setattr(agent.exa_source, "search", lambda q, m, emit=None, **kw: [_item("web1")])
     monkeypatch.setattr(
         agent.youtube_source,
         "search",
-        lambda q, m: [SourceItem(source_type=SourceType.YOUTUBE, title="v",
+        lambda q, m, emit=None, **kw: [SourceItem(source_type=SourceType.YOUTUBE, title="v",
                                  url="yt1", text="signal")],
     )
     result = discover("topic")

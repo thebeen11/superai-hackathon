@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from ..db.repository import list_cleaned_items
 from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem, ContextPreview
+from ..prompts import get_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -33,17 +34,6 @@ class _Pick(BaseModel):
     quote: str
     relevance: float
     reason: str = ""
-
-
-def _system(tracker: str) -> str:
-    return (
-        f"You are a research analyst scoring how strongly each excerpt is ABOUT the concept "
-        f"{tracker!r}. Judge meaning and synonyms, not literal word overlap. You are given a "
-        f"numbered list of excerpts. Pick the SINGLE most relevant one and return: its integer "
-        f"index, a verbatim quote (<=300 chars) copied exactly from that excerpt, and a relevance "
-        f"score from 0.0 (unrelated) to 1.0 (squarely about the concept). Never invent text — "
-        f"copy the quote exactly from the chosen excerpt."
-    )
 
 
 def _snippet(item: CleanedItem) -> str:
@@ -106,7 +96,9 @@ def tracker_context(tracker: str) -> ContextPreview | None:
     candidates = items[:_MAX_CANDIDATES]
 
     try:
-        pick = converse_structured(_Pick, _system(tracker), _digest(candidates))
+        pick = converse_structured(
+            _Pick, get_prompt("insights.context", tracker=tracker), _digest(candidates)
+        )
     except ReasoningError as exc:
         logger.warning("Context judge unavailable for %r (%s); using rule fallback", tracker, exc.kind)
         return _fallback(items, tracker)

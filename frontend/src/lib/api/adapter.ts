@@ -137,7 +137,7 @@ function dayKey(ts?: string | null): string | null {
 function countsByDay(items: CleanedItem[]): [string, number][] {
   const m = new Map<string, number>();
   for (const it of items) {
-    const k = dayKey(it.ingested_at ?? it.published_at);
+    const k = dayKey(it.published_at ?? it.ingested_at);
     if (k) m.set(k, (m.get(k) ?? 0) + 1);
   }
   return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -169,7 +169,7 @@ function deriveTrackers(items: CleanedItem[]): Tracker[] {
   const allDays = [
     ...new Set(
       items
-        .map((it) => dayKey(it.ingested_at ?? it.published_at))
+        .map((it) => dayKey(it.published_at ?? it.ingested_at))
         .filter((k): k is string => !!k),
     ),
   ].sort();
@@ -180,7 +180,7 @@ function deriveTrackers(items: CleanedItem[]): Tracker[] {
   >();
   for (const it of items) {
     const host = hostOf(it.source_url);
-    const day = dayKey(it.ingested_at ?? it.published_at);
+    const day = dayKey(it.published_at ?? it.ingested_at);
     for (const theme of it.themes ?? []) {
       const cur = byTheme.get(theme) ?? {
         mentions: 0,
@@ -323,7 +323,7 @@ function deriveSentiment(items: CleanedItem[]): Sentiment {
 
 function deriveSystem(items: CleanedItem[], sources: Source[]): SystemStatus {
   const latest = items
-    .map((it) => new Date(it.ingested_at ?? it.published_at ?? 0).getTime())
+    .map((it) => new Date(it.published_at ?? it.ingested_at ?? 0).getTime())
     .filter((t) => t > 0);
   const minsAgo = latest.length
     ? Math.round((Date.now() - Math.max(...latest)) / 60000)
@@ -403,7 +403,7 @@ function deriveContextPreview(items: CleanedItem[]): ContextPreview | null {
   if (!withSegment) return null;
   const seg = withSegment.segments![0];
   const s = Math.floor(seg.start);
-  const ts = withSegment.ingested_at ?? withSegment.published_at;
+  const ts = withSegment.published_at ?? withSegment.ingested_at;
   const tracker = withSegment.themes?.[0] ?? withSegment.industry;
   // Snapshot fallback used only when the /api/trackers/:t/context endpoint is unavailable.
   // Derive an honest coverage score (share of items carrying this theme) instead of a

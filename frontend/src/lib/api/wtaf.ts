@@ -8,8 +8,22 @@
 import type { ContextPreview, WtafData, Source } from "../types";
 import { wtafMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
-import { councilLatest, dataengProcess, discoverPost, listItems } from "./generated/sdk.gen";
-import type { Clarify, CouncilReport, DataEngReport, DiscoveryResultOutput } from "./generated/types.gen";
+import {
+  councilLatest,
+  dataengProcess,
+  discoverPost,
+  listItems,
+  listPrompts,
+  resetPrompt,
+  updatePrompt,
+} from "./generated/sdk.gen";
+import type {
+  Clarify,
+  CouncilReport,
+  DataEngReport,
+  DiscoveryResultOutput,
+  PromptView,
+} from "./generated/types.gen";
 import { itemsToWtafData } from "./adapter";
 import { streamSse, type ProgressEvent } from "./sse";
 
@@ -122,6 +136,33 @@ export function reconnectJobStream(
 /** List tracked jobs (running by default). Backend: GET /dataeng/jobs */
 export function listRunningJobs(): Promise<JobSummary[]> {
   return apiFetch<JobSummary[]>("/dataeng/jobs");
+}
+
+/* ============ Agent Console — editable system prompts ============ */
+
+export type { PromptView };
+
+/** All agent system prompts with their default + current text. Backend: GET /api/prompts */
+export async function getPrompts(): Promise<PromptView[]> {
+  if (USE_MOCK) return [];
+  const { data } = await listPrompts({ throwOnError: true });
+  return data ?? [];
+}
+
+/** Override one prompt (takes effect on the next agent run). Backend: PUT /api/prompts/:key */
+export async function savePrompt(key: string, text: string): Promise<PromptView> {
+  const { data } = await updatePrompt({
+    path: { key },
+    body: { text },
+    throwOnError: true,
+  });
+  return data!;
+}
+
+/** Reset one prompt to its built-in default. Backend: DELETE /api/prompts/:key */
+export async function resetPromptToDefault(key: string): Promise<PromptView> {
+  const { data } = await resetPrompt({ path: { key }, throwOnError: true });
+  return data!;
 }
 
 /** Context preview for a tracker. Backend: GET /api/trackers/:name/context */

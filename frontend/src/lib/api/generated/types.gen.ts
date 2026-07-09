@@ -540,6 +540,58 @@ export type ProcessingFailure = {
 };
 
 /**
+ * PromptUpdate
+ */
+export type PromptUpdate = {
+    /**
+     * Text
+     *
+     * The new system-prompt text
+     */
+    text: string;
+};
+
+/**
+ * PromptView
+ *
+ * One editable system prompt + its current/default text for the Agent Console.
+ */
+export type PromptView = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Group
+     */
+    group: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Placeholders
+     */
+    placeholders: Array<string>;
+    /**
+     * Default Text
+     */
+    default_text: string;
+    /**
+     * Current Text
+     */
+    current_text: string;
+    /**
+     * Is Overridden
+     */
+    is_overridden: boolean;
+};
+
+/**
  * ResolvedEntity
  *
  * A canonical entity (ticker or macro entity) with the aliases that matched it.
@@ -775,6 +827,18 @@ export type DiscoverGetData = {
          * Max Results
          */
         max_results?: number | null;
+        /**
+         * Start Published Date
+         *
+         * ISO date lower bound on published date, e.g. '2025-06-01'
+         */
+        start_published_date?: string | null;
+        /**
+         * End Published Date
+         *
+         * ISO date upper bound on published date, e.g. '2025-06-30'
+         */
+        end_published_date?: string | null;
     };
     url: '/discover';
 };
@@ -850,6 +914,38 @@ export type DiscoverClarifyResponses = {
 };
 
 export type DiscoverClarifyResponse = DiscoverClarifyResponses[keyof DiscoverClarifyResponses];
+
+export type CrawlDailyData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Day
+         *
+         * UTC day to crawl (YYYY-MM-DD). Default: yesterday (UTC).
+         */
+        day?: string | null;
+    };
+    url: '/crawl/daily';
+};
+
+export type CrawlDailyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CrawlDailyError = CrawlDailyErrors[keyof CrawlDailyErrors];
+
+export type CrawlDailyResponses = {
+    /**
+     * Successful Response
+     */
+    200: DataEngReport;
+};
+
+export type CrawlDailyResponse = CrawlDailyResponses[keyof CrawlDailyResponses];
 
 export type DataengProcessData = {
     body: DiscoveryResultInput;
@@ -955,6 +1051,84 @@ export type TrackerContextEndpointResponses = {
 };
 
 export type TrackerContextEndpointResponse = TrackerContextEndpointResponses[keyof TrackerContextEndpointResponses];
+
+export type ListPromptsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/prompts';
+};
+
+export type ListPromptsResponses = {
+    /**
+     * Response List Prompts
+     *
+     * Successful Response
+     */
+    200: Array<PromptView>;
+};
+
+export type ListPromptsResponse = ListPromptsResponses[keyof ListPromptsResponses];
+
+export type ResetPromptData = {
+    body?: never;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/api/prompts/{key}';
+};
+
+export type ResetPromptErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResetPromptError = ResetPromptErrors[keyof ResetPromptErrors];
+
+export type ResetPromptResponses = {
+    /**
+     * Successful Response
+     */
+    200: PromptView;
+};
+
+export type ResetPromptResponse = ResetPromptResponses[keyof ResetPromptResponses];
+
+export type UpdatePromptData = {
+    body: PromptUpdate;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/api/prompts/{key}';
+};
+
+export type UpdatePromptErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdatePromptError = UpdatePromptErrors[keyof UpdatePromptErrors];
+
+export type UpdatePromptResponses = {
+    /**
+     * Successful Response
+     */
+    200: PromptView;
+};
+
+export type UpdatePromptResponse = UpdatePromptResponses[keyof UpdatePromptResponses];
 
 export type DiscoverGetStreamData = {
     body?: never;

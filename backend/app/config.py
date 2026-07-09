@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     gemini_bull_model: str = "gemini-2.5-pro"
     gemini_bear_model: str = "gemini-2.5-flash"
 
+    # --- Daily crawl (day-to-day ingestion) ---
+    # `POST /crawl/daily` always works; the in-process timer only runs when enabled.
+    # On Cloud Run (scale-to-zero) leave it off and trigger the endpoint from Cloud
+    # Scheduler instead (see deploy.sh).
+    daily_crawl_query: str = (
+        "stock market investing news: AI, semiconductors, energy, and the economy"
+    )
+    daily_crawl_max_results: int = 20
+    daily_crawl_enabled: bool = False
+    daily_crawl_hour_utc: int = 1  # timer fires at HH:00 UTC, crawling yesterday
+
     # --- Database (RDS Postgres) ---
     database_url: str | None = None
 

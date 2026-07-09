@@ -30,7 +30,7 @@
     "/discover": {
       "get": {
         "summary": "Discover Get",
-        "description": "Plain fan-out without refinement \u2014 kept for the CLI / back-compat.",
+        "description": "Plain fan-out without refinement \u2014 kept for the CLI / back-compat / backfills.",
         "operationId": "discover_get",
         "parameters": [
           {
@@ -61,6 +61,42 @@
               ],
               "title": "Max Results"
             }
+          },
+          {
+            "name": "start_published_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date lower bound on published date, e.g. '2025-06-01'",
+              "title": "Start Published Date"
+            },
+            "description": "ISO date lower bound on published date, e.g. '2025-06-01'"
+          },
+          {
+            "name": "end_published_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date upper bound on published date, e.g. '2025-06-30'",
+              "title": "End Published Date"
+            },
+            "description": "ISO date upper bound on published date, e.g. '2025-06-30'"
           }
         ],
         "responses": {
@@ -162,6 +198,55 @@
                     }
                   ],
                   "title": "Response Discover Clarify"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crawl/daily": {
+      "post": {
+        "summary": "Crawl Daily",
+        "description": "Crawl one day's news through the full pipeline (Cloud Scheduler / cron hook).",
+        "operationId": "crawl_daily",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "UTC day to crawl (YYYY-MM-DD). Default: yesterday (UTC).",
+              "title": "Day"
+            },
+            "description": "UTC day to crawl (YYYY-MM-DD). Default: yesterday (UTC)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataEngReport"
                 }
               }
             }
@@ -342,6 +427,117 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContextPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prompts": {
+      "get": {
+        "summary": "List Prompts",
+        "description": "Every agent system prompt with its default and current (possibly overridden) text.",
+        "operationId": "list_prompts",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromptView"
+                  },
+                  "type": "array",
+                  "title": "Response List Prompts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prompts/{key}": {
+      "put": {
+        "summary": "Update Prompt",
+        "description": "Override one prompt with user-supplied text (takes effect on the next agent run).",
+        "operationId": "update_prompt",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Reset Prompt",
+        "description": "Reset one prompt back to its built-in default.",
+        "operationId": "reset_prompt",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptView"
                 }
               }
             }
@@ -1581,6 +1777,73 @@
         ],
         "title": "ProcessingFailure",
         "description": "A SourceItem that could not be processed/persisted \u2014 surfaced, not hidden."
+      },
+      "PromptUpdate": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text",
+            "description": "The new system-prompt text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "PromptUpdate"
+      },
+      "PromptView": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "placeholders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Placeholders"
+          },
+          "default_text": {
+            "type": "string",
+            "title": "Default Text"
+          },
+          "current_text": {
+            "type": "string",
+            "title": "Current Text"
+          },
+          "is_overridden": {
+            "type": "boolean",
+            "title": "Is Overridden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "group",
+          "description",
+          "placeholders",
+          "default_text",
+          "current_text",
+          "is_overridden"
+        ],
+        "title": "PromptView",
+        "description": "One editable system prompt + its current/default text for the Agent Console."
       },
       "ResolvedEntity": {
         "properties": {

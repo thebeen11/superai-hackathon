@@ -75,3 +75,17 @@ class PredictionRow(Base):
 
 Index("idx_predictions_status", PredictionRow.status)
 Index("idx_predictions_channel", PredictionRow.channel)
+
+
+class PromptOverrideRow(Base):
+    """A user's edited system prompt, keyed by the registry prompt key (Agent Console).
+
+    Absence of a row means the prompt uses its registry default; one row per overridden
+    key (upserted on save, deleted on reset).
+    """
+
+    __tablename__ = "prompt_overrides"
+
+    key = Column(String, primary_key=True)                          # registry PromptSpec.key
+    text = Column(Text, nullable=False)                             # the override text
+    updated_at = Column(DateTime(timezone=True), nullable=False)    # UTC of last edit
