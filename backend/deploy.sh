@@ -35,6 +35,17 @@ SERVICE="${SERVICE:-council-api}"
 SQL_INSTANCE="${SQL_INSTANCE:-council-db}"
 DB_NAME="${DB_NAME:-council}"
 DB_USER="${DB_USER:-council}"
+# Cloud SQL sizing. Overridable because the right answer depends on what you're paying with:
+#   db-g1-small        cheapest usable, fine for local-ish/demo loads
+#   db-custom-2-7680   2 vCPU / 7.5GB — the default here; comfortable for the crawl + council
+#   db-custom-8-32768  8 vCPU / 32GB — when throughput matters and budget doesn't
+# NOTE: do NOT create this instance from the Console's *free trial* flow. That trial lasts
+# 30 days, provisions an oversized Enterprise Plus machine, and Google SUSPENDS the instance
+# the moment it expires — with no way to convert it and no second trial per project. This
+# project lost its database exactly that way. Create it here, on normal paid billing.
+SQL_TIER="${SQL_TIER:-db-custom-2-7680}"
+SQL_EDITION="${SQL_EDITION:-ENTERPRISE}"
+SQL_DB_VERSION="${SQL_DB_VERSION:-POSTGRES_16}"
 DB_PASSWORD="${DB_PASSWORD:?set DB_PASSWORD to a strong password}"
 EXA_API_KEY="${EXA_API_KEY:?set EXA_API_KEY}"
 YOUTUBE_API_KEY="${YOUTUBE_API_KEY:?set YOUTUBE_API_KEY}"
@@ -80,12 +91,41 @@ provision() {
   echo "==> Cloud SQL (Postgres 16)"
   # Check-then-create, never create-and-swallow: `2>/dev/null || echo "exists"` reports a
   # 429 as success and then deploys against an instance that may not be there.
-  if resource_exists sql instances describe "${SQL_INSTANCE}" --format='value(name)'; then
-    echo "    instance '${SQL_INSTANCE}' already exists"
+  if resource_exists sql instances describe "${SQL_INSTANCE}" \
+      --format='value(state,settings.backupConfiguration.enabled)'; then
+    # $GCLOUD_STDOUT is tab-separated: "<state>\t<backups-enabled>"
+    local sql_state sql_backups
+    sql_state="$(printf '%s' "${GCLOUD_STDOUT}" | cut -f1)"
+    sql_backups="$(printf '%s' "${GCLOUD_STDOUT}" | cut -f2)"
+    echo "    instance '${SQL_INSTANCE}' already exists (state=${sql_state})"
+    # "Exists" is not the same as "works". A SUSPENDED instance refuses every connection,
+    # and the Cloud Run SQL socket then retries against the Admin API until it trips a 429 —
+    # which is how this project's outage presented. Say so plainly instead of deploying
+    # onto a dead database.
+    # Report EVERY problem before aborting on any of them. Checking backups after the
+    # state check would hide "backups are off" behind the die() on a suspended instance —
+    # exactly the pair of facts this project needed to see together.
+    if [[ "${sql_backups}" != "True" ]]; then
+      echo "    !! WARNING: backups are DISABLED on '${SQL_INSTANCE}'. Enable them with:" >&2
+      echo "       gcloud sql instances patch ${SQL_INSTANCE} --backup --backup-start-time=03:00" >&2
+    fi
+    if [[ "${sql_state}" != RUNNABLE ]]; then
+      echo "    !! WARNING: instance is ${sql_state}, not RUNNABLE — the app cannot connect." >&2
+      echo "       A suspended instance also causes Cloud SQL Admin API 429s (see INSTRUCTIONS.md §8)." >&2
+      [[ "${ALLOW_UNHEALTHY_SQL:-}" == "1" ]] \
+        || die "refusing to deploy against a non-RUNNABLE instance; set ALLOW_UNHEALTHY_SQL=1 to override"
+    fi
   else
-    echo "    creating instance '${SQL_INSTANCE}'"
+    echo "    creating instance '${SQL_INSTANCE}' (${SQL_EDITION}, ${SQL_TIER})"
+    # Backups + PITR are on by default and deliberately not optional-by-omission: this
+    # project already lost a database that had backups disabled, and nothing could be
+    # recovered. Storage auto-increase stops a full disk becoming the next outage.
     retry_gcloud 5 -- sql instances create "${SQL_INSTANCE}" \
-      --database-version=POSTGRES_16 --tier=db-f1-micro --region="${REGION}" \
+      --database-version="${SQL_DB_VERSION}" --edition="${SQL_EDITION}" \
+      --tier="${SQL_TIER}" --region="${REGION}" \
+      --backup --backup-start-time=03:00 --retained-backups-count=7 \
+      --enable-point-in-time-recovery --retained-transaction-log-days=7 \
+      --storage-auto-increase \
       || [[ "$(gcloud_status)" == ALREADY_EXISTS ]] \
       || die "could not create Cloud SQL instance '${SQL_INSTANCE}'"
   fi

@@ -192,6 +192,17 @@ uv run pytest        # unit tests; no network or DB needed (the LLM + DB are moc
 - **DB connection refused** → for local dev make sure Postgres is up (`docker compose up -d`);
   for Cloud SQL make sure the Auth Proxy is running (or that Cloud Run has the
   `--add-cloudsql-instances` flag and the service account has `roles/cloudsql.client`).
+- **Cloud SQL instance is `SUSPENDED` / `Connection refused` on the `/cloudsql/...` socket**
+  → check `gcloud sql instances list`. If the state is `SUSPENDED`, the instance is switched
+  off and **no** app change will help. The usual cause on this project: the instance was
+  created through the Console's **Cloud SQL free trial**, which lasts exactly 30 days,
+  provisions an oversized Enterprise Plus machine, and is auto-suspended the hour it expires.
+  There is no convert/upgrade path afterwards and the free-trial quota is 1 per project and
+  not adjustable — check it under *IAM & Admin → Quotas → Cloud SQL Admin API*. A suspended
+  instance is also what produces the 429 below, because the Cloud Run SQL socket keeps
+  retrying `cloudsql.instances.connect` against a dead instance.
+  **Always create the instance with `./deploy.sh provision`, never the free-trial flow.**
+  Suspended instances are eventually deleted, so if backups were off, the data is gone.
 - **`429` / `rateLimitExceeded` from the Cloud SQL Admin API** → `sqladmin.googleapis.com`
   has a per-project, **per-minute** request quota shared by everything that administers the
   instance. Ordinary SQL queries don't count against it — the app talks to the
