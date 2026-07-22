@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses } from './types.gen';
+import type { AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -120,6 +120,44 @@ export const updatePrompt = <ThrowOnError extends boolean = false>(options: Opti
         ...options.headers
     }
 });
+
+/**
+ * List Agents
+ *
+ * The agent roster in council order (Tier 1 → Tier 5).
+ */
+export const listAgents = <ThrowOnError extends boolean = false>(options?: Options<ListAgentsData, ThrowOnError>): RequestResult<ListAgentsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListAgentsResponses, unknown, ThrowOnError>({ url: '/api/agents', ...options });
+
+/**
+ * Reset Agent Mental Models
+ *
+ * Restore this agent's built-in set of frameworks.
+ */
+export const resetAgentMentalModels = <ThrowOnError extends boolean = false>(options: Options<ResetAgentMentalModelsData, ThrowOnError>): RequestResult<ResetAgentMentalModelsResponses, ResetAgentMentalModelsErrors, ThrowOnError> => (options.client ?? client).delete<ResetAgentMentalModelsResponses, ResetAgentMentalModelsErrors, ThrowOnError>({ url: '/api/agents/{agent_id}/mental-models', ...options });
+
+/**
+ * Set Agent Mental Models
+ *
+ * Choose which reasoning frameworks this agent runs (takes effect on the next run).
+ */
+export const setAgentMentalModels = <ThrowOnError extends boolean = false>(options: Options<SetAgentMentalModelsData, ThrowOnError>): RequestResult<SetAgentMentalModelsResponses, SetAgentMentalModelsErrors, ThrowOnError> => (options.client ?? client).put<SetAgentMentalModelsResponses, SetAgentMentalModelsErrors, ThrowOnError>({
+    url: '/api/agents/{agent_id}/mental-models',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Agent Effective Prompt
+ *
+ * The fully composed system prompt this agent will send for `key`.
+ *
+ * Placeholders are left as literal tokens (their values are only known mid-run), and the
+ * JSON output contract that `llm/vertex.py` appends is not included.
+ */
+export const agentEffectivePrompt = <ThrowOnError extends boolean = false>(options: Options<AgentEffectivePromptData, ThrowOnError>): RequestResult<AgentEffectivePromptResponses, AgentEffectivePromptErrors, ThrowOnError> => (options.client ?? client).get<AgentEffectivePromptResponses, AgentEffectivePromptErrors, ThrowOnError>({ url: '/api/agents/{agent_id}/effective-prompt', ...options });
 
 /**
  * Discover Get Stream

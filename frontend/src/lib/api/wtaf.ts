@@ -9,19 +9,25 @@ import type { ContextPreview, WtafData, Source } from "../types";
 import { wtafMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import {
+  agentEffectivePrompt,
   councilLatest,
   dataengProcess,
   discoverPost,
+  listAgents,
   listItems,
   listPrompts,
+  resetAgentMentalModels,
   resetPrompt,
+  setAgentMentalModels,
   updatePrompt,
 } from "./generated/sdk.gen";
 import type {
+  AgentView,
   Clarify,
   CouncilReport,
   DataEngReport,
   DiscoveryResultOutput,
+  EffectivePrompt,
   PromptView,
 } from "./generated/types.gen";
 import { itemsToWtafData } from "./adapter";
@@ -138,9 +144,54 @@ export function listRunningJobs(): Promise<JobSummary[]> {
   return apiFetch<JobSummary[]>("/dataeng/jobs");
 }
 
-/* ============ Agent Console — editable system prompts ============ */
+/* ============ Agent Console — agents + their editable prompt layers ============ */
 
-export type { PromptView };
+export type { AgentView, EffectivePrompt, PromptView };
+
+/** The agent roster in council order, with tools + enabled frameworks. Backend: GET /api/agents */
+export async function getAgents(): Promise<AgentView[]> {
+  if (USE_MOCK) return [];
+  const { data } = await listAgents({ throwOnError: true });
+  return data ?? [];
+}
+
+/** Choose which reasoning frameworks an agent runs. Backend: PUT /api/agents/:id/mental-models */
+export async function saveMentalModels(
+  agentId: string,
+  keys: string[],
+): Promise<AgentView> {
+  const { data } = await setAgentMentalModels({
+    path: { agent_id: agentId },
+    body: { keys },
+    throwOnError: true,
+  });
+  return data!;
+}
+
+/** Restore an agent's built-in frameworks. Backend: DELETE /api/agents/:id/mental-models */
+export async function resetMentalModels(agentId: string): Promise<AgentView> {
+  const { data } = await resetAgentMentalModels({
+    path: { agent_id: agentId },
+    throwOnError: true,
+  });
+  return data!;
+}
+
+/**
+ * The fully composed system prompt an agent sends for one skill — soul, rules, mental
+ * models, personality, task. Backend: GET /api/agents/:id/effective-prompt?key=…
+ */
+export async function getEffectivePrompt(
+  agentId: string,
+  key: string,
+): Promise<EffectivePrompt> {
+  const { data } = await agentEffectivePrompt({
+    path: { agent_id: agentId },
+    query: { key },
+    throwOnError: true,
+  });
+  return data!;
+}
 
 /** All agent system prompts with their default + current text. Backend: GET /api/prompts */
 export async function getPrompts(): Promise<PromptView[]> {

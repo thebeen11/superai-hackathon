@@ -57,5 +57,11 @@ class Settings(BaseSettings):
     # --- Database (RDS Postgres) ---
     database_url: str | None = None
 
+    # --- Agent identity layers (Agent Console) ---
+    # When on, every system prompt is composed as SOUL + RULES + MENTAL MODELS +
+    # PERSONALITY + the task's own instructions (see app/prompts/identity.py).
+    # Set AGENT_IDENTITY_LAYERS=false to fall back to the bare task prompts.
+    agent_identity_layers: bool = True
+
 
 settings = Settings()
