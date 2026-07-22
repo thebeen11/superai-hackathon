@@ -39,6 +39,10 @@ without it the web branch is skipped gracefully but returns no results.
 > **Prod** config lives in Cloud Run (`--set-env-vars` / `--set-secrets`, set by `deploy.sh`
 > with `APP_ENV=prod`); no `.env.prod` is shipped — OS env overrides any file. `.env.prod.example`
 > is a template for prod-like local runs only. Never commit real secrets.
+>
+> `deploy.sh` takes a phase: `provision` (one-time — APIs, Cloud SQL, secrets, IAM),
+> `deploy` (repeatable — build & ship the code), or `all` (fresh project; the default).
+> Use `./deploy.sh deploy` for day-to-day redeploys.
 
 ---
 
@@ -188,6 +192,25 @@ uv run pytest        # unit tests; no network or DB needed (the LLM + DB are moc
 - **DB connection refused** → for local dev make sure Postgres is up (`docker compose up -d`);
   for Cloud SQL make sure the Auth Proxy is running (or that Cloud Run has the
   `--add-cloudsql-instances` flag and the service account has `roles/cloudsql.client`).
+- **`429` / `rateLimitExceeded` from the Cloud SQL Admin API** → `sqladmin.googleapis.com`
+  has a per-project, **per-minute** request quota shared by everything that administers the
+  instance. Ordinary SQL queries don't count against it — the app talks to the
+  `/cloudsql/...` socket via psycopg, so a healthy service spends none of it. The callers
+  that do are: `deploy.sh provision`, `init_db_job.sh`, a local `cloud-sql-proxy`, and the
+  Cloud Run SQL socket (which re-fetches an ephemeral cert on **every container start**).
+  - For routine code changes run `./deploy.sh deploy`, not the full script — it makes zero
+    Cloud SQL Admin calls. Provisioning is one-time-per-environment.
+  - Run **one** long-lived Auth Proxy. Restarting it in a loop re-fetches certs each time.
+  - If it happens with nothing but the app running, suspect a container restart loop —
+    each restart costs two admin calls. Check with:
+    ```bash
+    gcloud run revisions list --service council-api --region "$REGION"
+    gcloud logging read 'protoPayload.serviceName="sqladmin.googleapis.com"' --limit 50 \
+      --format='table(timestamp,protoPayload.methodName,protoPayload.authenticationInfo.principalEmail)'
+    ```
+  - The quota window is a minute — waiting it out is usually enough. The scripts now back
+    off and retry (2/4/8/16s) on their own, and **abort loudly** rather than mistaking a
+    throttle for "already exists".
 - **`PermissionDenied` / `403` from Vertex** → run `gcloud auth application-default login`,
   confirm `GCP_PROJECT` is set, the Vertex AI API is enabled, and (on Cloud Run) the service
   account has `roles/aiplatform.user`. A `404` usually means the `GEMINI_MODEL` id isn't
