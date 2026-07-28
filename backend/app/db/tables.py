@@ -89,3 +89,20 @@ class PromptOverrideRow(Base):
     key = Column(String, primary_key=True)                          # registry PromptSpec.key
     text = Column(Text, nullable=False)                             # the override text
     updated_at = Column(DateTime(timezone=True), nullable=False)    # UTC of last edit
+
+
+class WatchlistOverrideRow(Base):
+    """A user's per-ticker watchlist override (on/off toggle + delete).
+
+    The watchlist itself is derived from ticker mentions in cleaned_items, so absence of a
+    row means the ticker's default: tracked and enabled. A row records a user action —
+    `enabled=false` pauses scanning for that ticker; `deleted=true` is a tombstone that hides
+    it from the watchlist and stops it being re-discovered (its cleaned_items are retained).
+    """
+
+    __tablename__ = "watchlist_overrides"
+
+    ticker = Column(String, primary_key=True)                       # e.g. "NVDA" (no $)
+    enabled = Column(Boolean, nullable=False, default=True)         # False = scanning paused
+    deleted = Column(Boolean, nullable=False, default=False)        # True = removed (tombstone)
+    updated_at = Column(DateTime(timezone=True), nullable=False)    # UTC of last change

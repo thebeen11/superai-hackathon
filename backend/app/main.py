@@ -22,7 +22,12 @@ from .crawl import (
     stop_daily_crawl_timer,
 )
 from .dataeng import process_discovery_result
-from .db.repository import list_cleaned_items
+from .db.repository import (
+    delete_watchlist_entry,
+    list_cleaned_items,
+    list_watchlist_overrides,
+    set_watchlist_enabled,
+)
 from .discovery import discover, discover_with_refinement
 from .discovery.refine import QueryValidationError
 from .events import Emit
@@ -325,6 +330,45 @@ def reset_prompt(key: str) -> PromptView:
         raise HTTPException(status_code=404, detail=f"Unknown prompt key: {key!r}")
     prompt_store.delete_override(key)
     return _prompt_view(spec)
+
+
+# --- Watchlist: per-ticker on/off toggle + delete ----------------------------
+
+
+class WatchlistEntry(BaseModel):
+    """One watchlist override. Absence of an entry means tracked + enabled by default."""
+
+    ticker: str
+    enabled: bool
+    deleted: bool
+
+
+class WatchlistUpdate(BaseModel):
+    enabled: bool = Field(..., description="False pauses scanning for this ticker")
+
+
+@app.get("/api/watchlists", response_model=list[WatchlistEntry])
+def list_watchlists() -> list[WatchlistEntry]:
+    """Every watchlist override — the frontend applies `enabled` and hides `deleted`;
+    the per-ticker scan skips any ticker that is disabled or deleted."""
+    return [
+        WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+        for o in list_watchlist_overrides()
+    ]
+
+
+@app.put("/api/watchlists/{ticker}", response_model=WatchlistEntry)
+def update_watchlist(ticker: str, body: WatchlistUpdate) -> WatchlistEntry:
+    """Toggle scanning on/off for one ticker."""
+    o = set_watchlist_enabled(ticker.upper(), body.enabled)
+    return WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+
+
+@app.delete("/api/watchlists/{ticker}", response_model=WatchlistEntry)
+def remove_watchlist(ticker: str) -> WatchlistEntry:
+    """Remove a ticker from the watchlist completely (tombstone — stops scanning + hides it)."""
+    o = delete_watchlist_entry(ticker.upper())
+    return WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
 
 
 # --- Agent Console: the roster (soul, mental models, personality, tools) -----

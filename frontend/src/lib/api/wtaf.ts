@@ -5,7 +5,7 @@
  * Today they fall back to mock data (USE_MOCK); when the backend is ready,
  * only the `apiFetch(...)` lines below matter and the mock branches drop away.
  */
-import type { ContextPreview, WtafData, Source } from "../types";
+import type { ContextPreview, WtafData, Source, WatchlistEntry } from "../types";
 import { wtafMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import {
@@ -44,11 +44,12 @@ import { streamSse, type ProgressEvent } from "./sse";
  */
 export async function getSnapshot(): Promise<WtafData> {
   if (USE_MOCK) return mockResolve(wtafMock);
-  const [items, council] = await Promise.all([
+  const [items, council, watchlist] = await Promise.all([
     listItems({ query: { limit: 200 }, throwOnError: true }),
     getCouncil(),
+    getWatchlistOverrides(),
   ]);
-  return itemsToWtafData(items.data ?? [], council);
+  return itemsToWtafData(items.data ?? [], council, watchlist);
 }
 
 /**
@@ -233,5 +234,30 @@ export function setSourceLive(name: string, live: boolean): Promise<Source> {
   return apiFetch<Source>(`/api/sources/${encodeURIComponent(name)}`, {
     method: "PATCH",
     body: JSON.stringify({ live }),
+  });
+}
+
+/* ============ Watchlist — per-ticker on/off toggle + delete ============ */
+
+/** Persisted per-ticker overrides. Absence of an entry = tracked + enabled. Backend: GET /api/watchlists */
+export function getWatchlistOverrides(): Promise<WatchlistEntry[]> {
+  if (USE_MOCK) return mockResolve([]);
+  return apiFetch<WatchlistEntry[]>("/api/watchlists");
+}
+
+/** Toggle scanning on/off for one ticker. Backend: PUT /api/watchlists/:ticker */
+export function setWatchlistActive(ticker: string, active: boolean): Promise<WatchlistEntry> {
+  if (USE_MOCK) return mockResolve({ ticker, enabled: active, deleted: false });
+  return apiFetch<WatchlistEntry>(`/api/watchlists/${encodeURIComponent(ticker)}`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: active }),
+  });
+}
+
+/** Remove a ticker from the watchlist completely (tombstone). Backend: DELETE /api/watchlists/:ticker */
+export function deleteWatchlistItem(ticker: string): Promise<WatchlistEntry> {
+  if (USE_MOCK) return mockResolve({ ticker, enabled: false, deleted: true });
+  return apiFetch<WatchlistEntry>(`/api/watchlists/${encodeURIComponent(ticker)}`, {
+    method: "DELETE",
   });
 }

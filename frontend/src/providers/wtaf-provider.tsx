@@ -100,6 +100,8 @@ interface WtafState {
   liveStatus: Record<string, LiveAgentStatus>;
   error: Error | null;
   refresh: () => void;
+  /** Silently refetch the snapshot (no loading flip) — reconcile after a mutation. */
+  revalidate: () => Promise<void>;
   /** Run a live discovery, then refetch the snapshot. */
   discover: (query: string) => Promise<DataEngReport>;
 }
@@ -159,6 +161,10 @@ export function WtafProvider({ children }: { children: ReactNode }) {
     if (evt.stage === "dataeng.item" && evt.status === "ok") refetchSoon();
     if (evt.stage === "council" && evt.status === "ok") refetchSoon();
   }, [refetchSoon]);
+
+  // Silent refetch for post-mutation reconciliation (watchlist toggle/delete): update
+  // the snapshot in place without flipping `loading`, so the page never blanks.
+  const revalidate = useCallback(() => loadSnapshot({ silent: true }), [loadSnapshot]);
 
   // Manual retry from an event handler (e.g. ErrorScreen) — flip loading here.
   const refresh = useCallback(() => {
@@ -231,7 +237,7 @@ export function WtafProvider({ children }: { children: ReactNode }) {
   }, [loadSnapshot, handleProgress]);
 
   return (
-    <WtafContext.Provider value={{ data, loading, discovering, discoveryStatus, activity, liveStatus, error, refresh, discover }}>
+    <WtafContext.Provider value={{ data, loading, discovering, discoveryStatus, activity, liveStatus, error, refresh, revalidate, discover }}>
       {children}
     </WtafContext.Provider>
   );
