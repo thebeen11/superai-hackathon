@@ -100,11 +100,13 @@ def test_debate_uses_two_model_families(monkeypatch):
     notes = [SectorNote(desk="TMT", summary="s", stocks=[
         StockTake(ticker="$NVDA", conviction=0.8, horizon="6M")])]
     record = debate_mod.run_debate(notes)
-    assert record.round == 3
-    assert [t.who for t in record.transcript] == ["bull", "bear", "bull"]
-    # Bull and Bear ran on different model ids (R1 bull, R2 bear, R3 bull).
+    assert record.round == 6 and record.rounds == 6
+    assert [t.who for t in record.transcript] == ["bull", "bear"] * 3
+    assert [t.round for t in record.transcript] == [f"R{i}" for i in range(1, 7)]
+    # Bull and Bear alternate on two different model ids across all six rounds.
+    assert used_models[0::2] == [used_models[0]] * 3
+    assert used_models[1::2] == [used_models[1]] * 3
     assert used_models[0] != used_models[1]
-    assert used_models[0] == used_models[2]
 
 
 # --- Tier 5: Winston ---------------------------------------------------------

@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # (pro vs flash), so the anti-collusion guardrail is weaker — intentional tradeoff.
     gemini_bull_model: str = "gemini-2.5-pro"
     gemini_bear_model: str = "gemini-2.5-flash"
+    # Alternating Bull/Bear turns in the chamber; each round costs one Gemini call.
+    debate_rounds: int = 6
 
     # --- Daily crawl (day-to-day ingestion) ---
     # `POST /crawl/daily` always works; the in-process timer only runs when enabled.

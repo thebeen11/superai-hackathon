@@ -212,7 +212,7 @@ class DebateTurn(BaseModel):
     """One logged turn of the Bull/Bear/Chairman debate (Req: full transcript)."""
 
     who: str                        # "bull" | "bear" | "winston"
-    round: str                      # "R1" | "R2" | "R3" | "Verdict"
+    round: str                      # "R1" .. "R6" | "Verdict"
     label: str                      # e.g. "Bull · proposes"
     text: str
 
@@ -222,7 +222,7 @@ class DebateRecord(BaseModel):
 
     topic: str = ""
     round: int = 0
-    rounds: int = 3
+    rounds: int = 6
     bull: DebateSideMeta
     bear: DebateSideMeta
     verdict: str = ""               # filled by Winston (Tier 5)

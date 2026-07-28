@@ -1,0 +1,220 @@
+Ticker,Name
+000001.SS,SSE Composite Index
+000660.KS,SK hynix Inc.
+0700.HK,Tencent Holdings Ltd.
+1306.T,NEXT FUNDS TOPIX ETF
+1356.T,NEXT FUNDS Nikkei 225 Bear ETF
+301308.SZ,Shenzhen Longsys Electronics Co., Ltd.
+3191.HK,Global X Hang Seng ETF Series
+7709.HK,CSOP Hang Seng Tech Index ETF
+7974.T,Nintendo Co., Ltd.
+
+AAL,American Airlines Group Inc.
+ABBV,AbbVie Inc.
+AEHR,Aehr Test Systems
+ALAB,Astera Labs Inc.
+ALB,Albemarle Corporation
+AMD,Advanced Micro Devices Inc.
+AMAT,Applied Materials Inc.
+ANF,Abercrombie & Fitch Co.
+AAPL,Apple Inc.
+APG,API Group Corporation
+APP,AppLovin Corporation
+ARM,Arm Holdings plc
+ASTS,AST SpaceMobile Inc.
+AVGO,Broadcom Inc.
+AVUV,Avantis U.S. Small Cap Value ETF
+AXON,Axon Enterprise Inc.
+
+B,Barrick Gold Corporation (likely)
+BABA,Alibaba Group Holding Ltd.
+BHE,Benchmark Electronics Inc.
+BHP.AX,BHP Group Ltd.
+BIDU,Baidu Inc.
+BKNG,Booking Holdings Inc.
+BWXT,BWX Technologies Inc.
+
+CARR,Carrier Global Corporation
+CBA.AX,Commonwealth Bank of Australia
+CCJ,Cameco Corporation
+CCL,Carnival Corporation
+CEG,Constellation Energy Corporation
+CGNX,Cognex Corporation
+CIBR,First Trust Cybersecurity ETF
+CIEN,Ciena Corporation
+CMG,Chipotle Mexican Grill Inc.
+COIN,Coinbase Global Inc.
+COPX,Global X Copper Miners ETF
+CRDO,Credo Technology Group
+CRML,Critical Metals Corp
+CRWD,CrowdStrike Holdings Inc.
+CRWV,CoreWeave Inc.
+
+D05.SI,DBS Group Holdings Ltd.
+DASH,DoorDash Inc.
+DDOG,Datadog Inc.
+DIS,The Walt Disney Company
+DMAT,Global X Disruptive Materials ETF
+DOC,Physicians Realty Trust
+DOCN,DigitalOcean Holdings Inc.
+DPZ,Domino's Pizza Inc.
+DRS,Leonardo DRS Inc.
+DUOL,Duolingo Inc.
+DYL.AX,Deep Yellow Ltd.
+
+EA,Electronic Arts Inc.
+ECG,Everus Construction Group
+EQIX,Equinix Inc.
+ETH-USD,Ethereum (Crypto)
+EVTL,Vertical Aerospace Ltd.
+EWJ,iShares MSCI Japan ETF
+EWY,iShares MSCI South Korea ETF
+EXPE,Expedia Group Inc.
+
+FANG,Diamondback Energy Inc.
+FCX,Freeport-McMoRan Inc.
+FLR,Fluor Corporation
+FTI,TechnipFMC plc
+
+GDS,GDS Holdings Ltd.
+GEV,GE Vernova Inc.
+GLD,SPDR Gold Shares ETF
+GLDD,Great Lakes Dredge & Dock Corp
+GOOG,Alphabet Inc.
+GS,Goldman Sachs Group Inc.
+
+HOOD,Robinhood Markets Inc.
+
+IBB,iShares Biotechnology ETF
+INTC,Intel Corporation
+IREN,IREN Ltd.
+ISRG,Intuitive Surgical Inc.
+ITB,iShares U.S. Home Construction ETF
+
+JBL,Jabil Inc.
+JD,JD.com Inc.
+JETS,U.S. Global Jets ETF
+JOBY,Joby Aviation Inc.
+JPM,JPMorgan Chase & Co.
+
+KB,KB Financial Group Inc.
+KEP,Korea Electric Power Corporation
+KI5.F,Kioxia Holdings Corporation
+KKR,KKR & Co. Inc.
+KOSPI100.KS,KOSPI 100 Index
+KTOS,Kratos Defense & Security Solutions
+KWEB,KraneShares CSI China Internet ETF
+
+LAC,Lithium Americas Corp.
+LLY,Eli Lilly and Company
+LPL,LG Display Co. Ltd.
+LRCX,Lam Research Corporation
+LULU,Lululemon Athletica Inc.
+LYB,LyondellBasell Industries
+
+MARA,Marathon Digital Holdings
+MAR,Marriott International Inc. (likely)
+MDB,MongoDB Inc.
+META,Meta Platforms Inc.
+METC,Ramaco Resources Inc.
+MNST,Monster Beverage Corporation
+MP,MP Materials Corp.
+MPWR,Monolithic Power Systems
+MRVL,Marvell Technology Inc.
+MSFT,Microsoft Corporation
+MSTR,MicroStrategy Inc.
+MU,Micron Technology Inc.
+
+NB,NioCorp Developments Ltd.
+NBIS,Nebius Group NV
+NEM,Newmont Corporation
+NET,Cloudflare Inc.
+NKE,Nike Inc.
+NLR,VanEck Uranium+Nuclear ETF
+NVDA,NVIDIA Corporation
+NVTS,Navitas Semiconductor Corp
+NVO,Novo Nordisk A/S
+
+OKLO,Oklo Inc.
+ONDS,Ondas Holdings Inc.
+ORCL,Oracle Corporation
+OXY,Occidental Petroleum Corporation
+
+PKE,Park Aerospace Corp.
+PL,Planet Labs PBC
+PLAB,Photronics Inc.
+PLG,Platinum Group Metals Ltd.
+PLTR,Palantir Technologies Inc.
+POET,POET Technologies Inc.
+PG,Procter & Gamble Company
+PPLT,abrdn Physical Platinum Shares ETF
+PPTA,Perpetua Resources Corp.
+PSTG,Pure Storage Inc.
+PKX,POSCO Holdings Inc.
+
+QBTS,D-Wave Quantum Inc.
+
+RCL,Royal Caribbean Group
+RCAT,Red Cat Holdings Inc.
+RDDT,Reddit Inc.
+REMX,VanEck Rare Earth ETF
+RIG,Transocean Ltd.
+RKLB,Rocket Lab USA Inc.
+RMBS,Rambus Inc.
+ROKU,Roku Inc.
+RTX,RTX Corporation
+
+SAP,SAP SE
+SHG,Shinhan Financial Group
+SHAK,Shake Shack Inc.
+SKM,SK Telecom Co. Ltd.
+SLV,iShares Silver Trust
+SLVP,iShares Silver Miners ETF
+SMCI,Super Micro Computer Inc.
+SMR,NuScale Power Corporation
+SNDK,SanDisk Corporation
+SRE,Sempra Energy
+STAA,STAAR Surgical Company
+STX,Seagate Technology
+STRL,Sterling Infrastructure Inc.
+STZ,Constellation Brands Inc.
+SYM,Symbotic Inc.
+
+TCOM,Trip.com Group Ltd.
+TEM,Tempus AI Inc.
+TLN,Talen Energy Corporation
+TM,Toyota Motor Corporation
+TMQ,Trilogy Metals Inc.
+TQQQ,ProShares UltraPro QQQ ETF
+TSLA,Tesla Inc.
+TTD,Trade Desk Inc.
+TXRH,Texas Roadhouse Inc.
+
+UEC,Uranium Energy Corp
+UMAC,Unusual Machines Inc.
+URNM,Sprott Uranium Miners ETF
+URA,Global X Uranium ETF
+USAR,USA Rare Earth Inc.
+USO,United States Oil Fund ETF
+UVIX,2x Long VIX Futures ETF
+UUUU,Energy Fuels Inc.
+
+VALE,Vale S.A.
+VCX,Fundrise Growth Tech Fund
+VRT,Vertiv Holdings Co.
+VST,Vistra Corp.
+VSAT,Viasat Inc.
+
+WDC,Western Digital Corp.
+WING,Wingstop Inc.
+WMT,Walmart Inc.
+
+XBI,SPDR S&P Biotech ETF
+XLE,Energy Select Sector SPDR ETF
+XME,SPDR S&P Metals & Mining ETF
+
+^AXJO,S&P/ASX 200 Index
+^EMCLOUD,BVP Nasdaq Emerging Cloud Index
+^FTSE,FTSE 100 Index
+^HSI,Hang Seng Index
+^N225,Nikkei 225 Index

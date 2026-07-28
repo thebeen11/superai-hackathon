@@ -1616,7 +1616,7 @@
           "rounds": {
             "type": "integer",
             "title": "Rounds",
-            "default": 3
+            "default": 6
           },
           "bull": {
             "$ref": "#/components/schemas/DebateSideMeta"
