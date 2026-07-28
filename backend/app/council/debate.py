@@ -1,6 +1,6 @@
 """Tier 4 — the Freddy squad (Bull vs Bear debate chamber).
 
-Two adversarial personas argue over the Andie desk notes for three rounds so a single
+Two adversarial personas argue over the Andie desk notes for six rounds so a single
 sycophantic model can't rubber-stamp its own thesis (PROJECT_GUIDANCE §0, §11). The
 two sides run on different Gemini models (Bull = Gemini 2.5 Pro, Bear = Gemini 2.5
 Flash). NOTE: on the Gemini-only stack these are the same model family, so this is a
@@ -24,6 +24,17 @@ logger = logging.getLogger(__name__)
 
 _BULL_NAME, _BULL_MODEL = "Freddy-Bull", "Gemini 2.5 Pro"
 _BEAR_NAME, _BEAR_MODEL = "Freddy-Bear", "Gemini 2.5 Flash"
+
+# The chamber: strict alternation, Bull opens, Bear speaks last before Winston rules.
+# `settings.debate_rounds` slices this, so lowering it truncates from the end.
+_ROUND_PLAN: tuple[tuple[str, str, str], ...] = (
+    ("bull", "Bull · proposes", "propose the trade."),
+    ("bear", "Bear · attacks", "attack the thesis: valuation, crowding, failure modes."),
+    ("bull", "Bull · defends", "defend or adjust — concede what is fair, keep what holds."),
+    ("bear", "Bear · presses", "press the weakest remaining leg; name the trigger that breaks it."),
+    ("bull", "Bull · refines", "state your final position and sizing."),
+    ("bear", "Bear · closes", "closing risk statement — the one thing Winston must weigh."),
+)
 
 
 class _BullTurn(BaseModel):
@@ -55,49 +66,39 @@ def _topic(notes: list[SectorNote]) -> str:
 
 
 def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
-    """Three-round Bull/Bear debate over the desk notes. Verdict is added by Winston."""
+    """Multi-round Bull/Bear debate over the desk notes. Verdict is added by Winston."""
     bull = DebateSideMeta(name=_BULL_NAME, model=_BULL_MODEL)
     bear = DebateSideMeta(name=_BEAR_NAME, model=_BEAR_MODEL)
-    record = DebateRecord(topic=_topic(notes), round=0, rounds=3, bull=bull, bear=bear)
+    plan = _ROUND_PLAN[: max(1, settings.debate_rounds)]
+    record = DebateRecord(topic=_topic(notes), round=0, rounds=len(plan), bull=bull, bear=bear)
 
     digest = _notes_digest(notes)
-    emit("council.debate", "Freddy: Bull vs Bear, round 1", status="start")
 
     try:
-        r1 = converse_structured(
-            _BullTurn, get_prompt("council.debate.bull"), f"Desk notes:\n{digest}\n\nRound 1: propose the trade.",
-            model_id=settings.gemini_bull_model,
-        )
-        bull.stance = r1.stance
-        record.transcript.append(
-            DebateTurn(who="bull", round="R1", label="Bull · proposes", text=r1.argument)
-        )
-        record.round = 1
+        for i, (who, label, instruction) in enumerate(plan, start=1):
+            emit("council.debate", f"Freddy: {label}, round {i}",
+                 status="start" if i == 1 else "progress")
 
-        emit("council.debate", "Freddy: Bear rebuts, round 2", status="progress")
-        r2 = converse_structured(
-            _BearTurn, get_prompt("council.debate.bear"),
-            f"Desk notes:\n{digest}\n\nBull proposed: {r1.stance}\n{r1.argument}\n\n"
-            "Round 2: attack the thesis.",
-            model_id=settings.gemini_bear_model,
-        )
-        bear.stance = r2.stance
-        record.transcript.append(
-            DebateTurn(who="bear", round="R2", label="Bear · attacks", text=r2.rebuttal)
-        )
-        record.round = 2
+            is_bull = who == "bull"
+            schema = _BullTurn if is_bull else _BearTurn
+            prompt_key = "council.debate.bull" if is_bull else "council.debate.bear"
+            model_id = settings.gemini_bull_model if is_bull else settings.gemini_bear_model
 
-        emit("council.debate", "Freddy: Bull defends, round 3", status="progress")
-        r3 = converse_structured(
-            _BullTurn, get_prompt("council.debate.bull"),
-            f"Desk notes:\n{digest}\n\nYour thesis: {r1.argument}\n\n"
-            f"Bear countered: {r2.rebuttal}\n\nRound 3: defend or adjust.",
-            model_id=settings.gemini_bull_model,
-        )
-        record.transcript.append(
-            DebateTurn(who="bull", round="R3", label="Bull · defends", text=r3.argument)
-        )
-        record.round = 3
+            # Every turn sees the whole exchange so far, so later rounds engage with what
+            # was actually said instead of re-arguing the opener.
+            so_far = "\n".join(f"[{t.label}] {t.text}" for t in record.transcript)
+            user = (
+                f"Desk notes:\n{digest}\n\n"
+                f"Debate so far:\n{so_far or 'Nothing yet — you open.'}\n\n"
+                f"Round {i} of {len(plan)}: {instruction}"
+            )
+            turn = converse_structured(schema, get_prompt(prompt_key), user, model_id=model_id)
+
+            side = bull if is_bull else bear
+            side.stance = turn.stance
+            text = turn.argument if is_bull else turn.rebuttal
+            record.transcript.append(DebateTurn(who=who, round=f"R{i}", label=label, text=text))
+            record.round = i
     except ReasoningError as exc:
         logger.warning("Debate aborted: %s", exc)
         emit("council.debate", f"Debate degraded: {exc.kind}", status="skip")

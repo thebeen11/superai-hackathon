@@ -115,6 +115,14 @@ export interface WatchItem {
   chg: number;
   alert: string | null;
   sig: number;
+  active: boolean; // scanning on/off — false = paused (no new data pulled)
+}
+
+/** A persisted watchlist override (per-ticker). Absence = tracked + enabled. Backend: /api/watchlists */
+export interface WatchlistEntry {
+  ticker: string;
+  enabled: boolean;
+  deleted: boolean;
 }
 
 export interface TickerItem {

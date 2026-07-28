@@ -140,8 +140,8 @@ export const wtafMock: WtafData = {
       n: 4, key: "debate", label: "Debate Chamber", sub: "adversarial · Bull vs Bear", accent: "amber",
       status: "active", statusText: "Round 2 of 3",
       squad: [
-        { id: "freddy-bull", name: "Freddy-Bull", label: "Bull", glyph: "↑", accent: "green", role: "PM · Momentum bias · Claude Sonnet", status: "active", statusText: "Defending long thesis", queue: 0, throughput: "round 3", tools: ["Claude Sonnet", "Backtrader"], skills: ["Momentum theses", "Long construction", "Capex narrative"], log: ["R1 · proposed Memory basket", "Cited Andie-Tech capex note", "R3 · defending MU long"] },
-        { id: "freddy-bear", name: "Freddy-Bear", label: "Bear", glyph: "↓", accent: "red", role: "PM · Risk bias · GPT-4o", status: "thinking", statusText: "Attacking valuation", queue: 0, throughput: "round 2", tools: ["GPT-4o", "Risk models"], skills: ["Risk attack", "Valuation critique", "Drawdown modeling"], log: ["R2 · MU overvalued", "Flagged capex slowdown H2", "Pushed half-position"] },
+        { id: "freddy-bull", name: "Freddy-Bull", label: "Bull", glyph: "↑", accent: "green", role: "PM · Momentum bias · Claude Sonnet", status: "active", statusText: "Defending long thesis", queue: 0, throughput: "round 5", tools: ["Claude Sonnet", "Backtrader"], skills: ["Momentum theses", "Long construction", "Capex narrative"], log: ["R1 · proposed Memory basket", "R3 · conceded half MU", "R5 · final sizing set"] },
+        { id: "freddy-bear", name: "Freddy-Bear", label: "Bear", glyph: "↓", accent: "red", role: "PM · Risk bias · GPT-4o", status: "thinking", statusText: "Attacking valuation", queue: 0, throughput: "round 6", tools: ["GPT-4o", "Risk models"], skills: ["Risk attack", "Valuation critique", "Drawdown modeling"], log: ["R2 · MU overvalued", "R4 · AVGO concentration risk", "R6 · single-factor warning"] },
       ],
     },
     {
@@ -155,7 +155,7 @@ export const wtafMock: WtafData = {
 
   debate: {
     topic: "Memory & AI-compute basket",
-    round: 2, rounds: 3,
+    round: 6, rounds: 6,
     bull: { name: "Freddy-Bull", model: "Claude Sonnet", accent: "green", stance: "Initiate 6-month long — MU, NVDA, AVGO ride the capex super-cycle; hyperscalers are power-constrained, not demand-constrained." },
     bear: { name: "Freddy-Bear", model: "GPT-4o", accent: "red", stance: "MU looks overvalued — Andie-Tech notes capex slowing into H2. Size half, hedge with a cooling-supplier pair." },
     verdict: "Bull thesis holds, but Bear’s valuation concern is valid — initiate a HALF position in MU, full weight in AVGO.",
@@ -163,6 +163,9 @@ export const wtafMock: WtafData = {
       { who: "bull", round: "R1", label: "Bull · proposes", text: "Across all three Andie desks the signal is one-directional: hyperscaler capex is going up, not down. I propose a Memory & AI-compute basket — MU, NVDA, AVGO — held ~6 months into the buildout." },
       { who: "bear", round: "R2", label: "Bear · attacks", text: "MU is the weak link. Andie-Tech’s own note flags capex pacing slowing into H2, and memory is the most cyclical name in the basket. At this multiple you’re buying peak earnings. Half-size it." },
       { who: "bull", round: "R3", label: "Bull · defends", text: "Fair on MU cyclicality — but AVGO’s custom-silicon backlog is contracted, not spot. I’ll concede a half-position on MU and keep AVGO at full weight; the power/cooling read from Andie-Physical de-risks the thesis." },
+      { who: "bear", round: "R4", label: "Bear · presses", text: "Then the basket rests entirely on AVGO’s backlog holding. That backlog is a customer concentration bet — two hyperscalers, both of whom have publicly floated in-housing their accelerators. The trigger that breaks this: one custom-silicon program slipping a quarter." },
+      { who: "bull", round: "R5", label: "Bull · refines", text: "Accepted, and it’s sized for: half MU, full AVGO, starter NVDA as the liquid hedge on any single-program slip. Six-month hold, reviewed at the Sept CPI print and again on AVGO’s next backlog disclosure." },
+      { who: "bear", round: "R6", label: "Bear · closes", text: "I’ll live with that sizing. The one thing to weigh: this whole basket is a single macro factor — capex. If the Fed turns and financing tightens, MU, AVGO and NVDA all draw down together. There is no diversification here, only conviction." },
       { who: "winston", round: "Verdict", label: "Winston · rules", text: "Bull’s structural thesis holds and is corroborated by the macro bypass — disinflation + dovish Fed = abundant capital (ACE +0.34). Bear’s MU caution is valid. Verdict: half MU, full AVGO, starter NVDA. Re-evaluate at the Sept CPI print." },
     ],
   },
@@ -183,12 +186,12 @@ export const wtafMock: WtafData = {
   ],
 
   watchlist: [
-    { t: "NVDA", n: "NVIDIA", px: 1187.4, chg: +2.31, alert: "8-K filed", sig: +0.8 },
-    { t: "AVGO", n: "Broadcom", px: 1642.0, chg: +1.08, alert: null, sig: +0.6 },
-    { t: "VRT", n: "Vertiv", px: 112.7, chg: +3.94, alert: "3 mentions ↑", sig: +0.9 },
-    { t: "AMD", n: "Adv. Micro", px: 168.2, chg: -0.72, alert: null, sig: +0.2 },
-    { t: "SMCI", n: "Supermicro", px: 48.9, chg: -2.15, alert: "sentiment ↓", sig: -0.4 },
-    { t: "MSFT", n: "Microsoft", px: 472.6, chg: +0.44, alert: null, sig: +0.5 },
+    { t: "NVDA", n: "NVIDIA", px: 1187.4, chg: +2.31, alert: "8-K filed", sig: +0.8, active: true },
+    { t: "AVGO", n: "Broadcom", px: 1642.0, chg: +1.08, alert: null, sig: +0.6, active: true },
+    { t: "VRT", n: "Vertiv", px: 112.7, chg: +3.94, alert: "3 mentions ↑", sig: +0.9, active: true },
+    { t: "AMD", n: "Adv. Micro", px: 168.2, chg: -0.72, alert: null, sig: +0.2, active: true },
+    { t: "SMCI", n: "Supermicro", px: 48.9, chg: -2.15, alert: "sentiment ↓", sig: -0.4, active: true },
+    { t: "MSFT", n: "Microsoft", px: 472.6, chg: +0.44, alert: null, sig: +0.5, active: true },
   ],
 
   ticker: [

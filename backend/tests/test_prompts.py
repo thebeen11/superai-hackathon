@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.prompts import get_prompt, list_prompt_specs, store
+from app.prompts import get_prompt, identity, list_prompt_specs, list_skill_specs, store
 
 
 @pytest.fixture(autouse=True)
@@ -18,24 +18,43 @@ def _isolated_store(monkeypatch):
     return fake
 
 
-def test_all_eleven_prompts_registered_with_unique_keys():
-    specs = list_prompt_specs()
+@pytest.fixture
+def _no_layers(monkeypatch):
+    """Run with identity composition off — `get_prompt` returns the bare task text."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "agent_identity_layers", False)
+
+
+def test_all_eleven_skill_prompts_registered_with_unique_keys():
+    specs = list_skill_specs()
     keys = [s.key for s in specs]
     assert len(specs) == 11
     assert len(set(keys)) == 11
     assert "council.chairman" in keys and "insights.context" in keys
+    assert all(s.layer == "skill" and s.agent for s in specs)
 
 
-def test_default_used_when_no_override():
+def test_catalogue_adds_identity_layers_with_unique_keys():
+    specs = list_prompt_specs()
+    keys = [s.key for s in specs]
+    assert len(set(keys)) == len(keys)
+    # 11 skills + soul + rules + 6 mental models + one personality per agent.
+    assert len(specs) == 11 + 2 + 6 + len(identity.AGENTS)
+    layers = {s.layer for s in specs}
+    assert layers == {"skill", "soul", "rules", "mental_model", "personality"}
+
+
+def test_default_used_when_no_override(_no_layers):
     assert get_prompt("council.chairman").startswith("You are Winston")
 
 
-def test_override_takes_effect():
+def test_override_takes_effect(_no_layers):
     store.set_override("council.chairman", "BE BRIEF.")
     assert get_prompt("council.chairman") == "BE BRIEF."
 
 
-def test_reset_restores_default():
+def test_reset_restores_default(_no_layers):
     store.set_override("council.chairman", "BE BRIEF.")
     store.delete_override("council.chairman")
     assert get_prompt("council.chairman").startswith("You are Winston")
@@ -50,21 +69,21 @@ def test_taxonomy_placeholder_is_filled():
     assert "['Solar', 'AI']" in out
 
 
-def test_unfilled_placeholder_is_left_intact_not_errored():
+def test_unfilled_placeholder_is_left_intact_not_errored(_no_layers):
     # A user who removes the value (or the caller omits it) gets the literal token back,
     # never a KeyError.
     store.set_override("insights.context", "Score against {tracker} only.")
     assert get_prompt("insights.context") == "Score against {tracker} only."
 
 
-def test_user_supplied_braces_are_preserved():
+def test_user_supplied_braces_are_preserved(_no_layers):
     # Prompt text may contain literal braces (e.g. a JSON example); only declared
     # placeholders are substituted, everything else is passed through verbatim.
     store.set_override("dataeng.redact", 'Reply with {"clean_text": "..."}')
     assert get_prompt("dataeng.redact") == 'Reply with {"clean_text": "..."}'
 
 
-def test_override_survives_db_failure_via_in_memory_cache(monkeypatch):
+def test_override_survives_db_failure_via_in_memory_cache(monkeypatch, _no_layers):
     # If the DB write raises, the override still applies within the running process.
     def boom(*_a, **_k):
         raise RuntimeError("db down")
@@ -72,3 +91,111 @@ def test_override_survives_db_failure_via_in_memory_cache(monkeypatch):
     monkeypatch.setattr("app.db.repository.set_prompt_override", boom)
     store.set_override("council.analyst", "IN MEMORY ONLY")
     assert get_prompt("council.analyst") == "IN MEMORY ONLY"
+
+
+# --- Identity layers: soul, rules, mental models, personality ---------------
+
+
+def _headings(text: str) -> list[str]:
+    return [line[3:] for line in text.splitlines() if line.startswith("## ")]
+
+
+def test_composed_prompt_stacks_layers_in_order_and_keeps_the_task():
+    text = get_prompt("council.chairman")
+    heads = _headings(text)
+    assert heads == ["SOUL", "RULES", "MENTAL MODELS", "PERSONALITY", "TASK — Winston · Chairman"]
+    assert "You are Winston" in text          # the original task prompt survives intact
+    assert text.rstrip().endswith("the task wins.")
+
+
+def test_layers_off_is_byte_identical_to_the_bare_task_prompt(monkeypatch):
+    from app.config import settings
+    from app.prompts.registry import list_skill_specs as skills
+
+    composed = get_prompt("council.chairman")
+    monkeypatch.setattr(settings, "agent_identity_layers", False)
+    bare = get_prompt("council.chairman")
+    assert bare == next(s for s in skills() if s.key == "council.chairman").default_template
+    assert bare != composed
+
+
+def test_editing_the_soul_changes_every_agent():
+    store.set_override(identity.SOUL_KEY, "WE ARE THE MACHINE.")
+    for key in ("council.chairman", "dataeng.redact", "discovery.refine"):
+        assert "WE ARE THE MACHINE." in get_prompt(key)
+
+
+def test_personality_is_per_agent():
+    assert "Chairman's voice" in get_prompt("council.chairman")
+    assert "Chairman's voice" not in get_prompt("council.debate.bull")
+    assert "growth PM" in get_prompt("council.debate.bull")
+
+
+def test_desks_share_a_task_prompt_but_not_a_voice():
+    tmt = get_prompt("council.analyst", agent="andie-tech")
+    physical = get_prompt("council.analyst", agent="andie-physical")
+    assert "You are Andie, a buy-side sector analyst" in tmt
+    assert "You are Andie, a buy-side sector analyst" in physical
+    assert "supply chains" in tmt and "supply chains" not in physical
+    assert "grid load" in physical
+
+
+def test_mental_models_follow_the_agent_assignment():
+    # Winston runs Inversion by default; Timo does not.
+    assert "Inversion:" in get_prompt("council.chairman")
+    assert "Inversion:" not in get_prompt("dataeng.redact")
+    identity.set_mental_models("winston", ["mental.pareto_8020"])
+    winston = get_prompt("council.chairman")
+    assert "Inversion:" not in winston and "80/20 (Pareto):" in winston
+
+
+def test_mental_model_assignment_round_trips_and_ignores_unknown_keys():
+    kept = identity.set_mental_models("timo", ["mental.inversion", "not.a.framework"])
+    assert kept == ["mental.inversion"]
+    assert identity.mental_models_for("timo") == ["mental.inversion"]
+    # Assignments are ordered by the library, not by click order.
+    identity.set_mental_models("timo", ["mental.falsification", "mental.first_principles"])
+    assert identity.mental_models_for("timo") == ["mental.first_principles", "mental.falsification"]
+    assert identity.reset_mental_models("timo") == list(identity.get_agent("timo").mental_models)
+
+
+def test_empty_assignment_drops_the_mental_models_section():
+    identity.set_mental_models("winston", [])
+    assert "MENTAL MODELS" not in _headings(get_prompt("council.chairman"))
+
+
+def test_corrupt_assignment_falls_back_to_defaults():
+    store.set_override("assign.mental_models.winston", "{not json")
+    assert identity.mental_models_for("winston") == list(identity.get_agent("winston").mental_models)
+
+
+def test_placeholders_still_fill_inside_a_composed_prompt():
+    out = get_prompt("insights.context", tracker="Solar")
+    assert "SOUL" in out and "'Solar'" in out and "{tracker}" not in out
+
+
+def test_editing_a_mental_model_reaches_every_agent_that_runs_it():
+    store.set_override("mental.base_rates", "COUNT, DO NOT FEEL.")
+    assert "COUNT, DO NOT FEEL." in get_prompt("council.chairman")   # runs base rates
+    assert "COUNT, DO NOT FEEL." not in get_prompt("dataeng.redact")  # does not
+
+
+def test_shared_desk_skill_is_listed_for_every_desk_that_runs_it():
+    from app.council.analyst import DESK_AGENTS
+
+    for agent_id in DESK_AGENTS.values():
+        assert identity.skills_for(agent_id) == ["council.analyst"]
+    # The console's roster and the runtime router must not drift apart.
+    assert set(DESK_AGENTS.values()) == set(identity.agents_running(
+        next(s for s in list_skill_specs() if s.key == "council.analyst")
+    ))
+
+
+def test_tool_only_agents_have_no_skills():
+    assert identity.skills_for("wilfred-video") == []
+
+
+def test_identity_layers_are_editable_like_any_other_prompt():
+    keys = {s.key for s in list_prompt_specs()}
+    assert {identity.SOUL_KEY, identity.RULES_KEY, "mental.inversion"} <= keys
+    assert identity.personality_key("winston") in keys

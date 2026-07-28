@@ -5,23 +5,29 @@
  * Today they fall back to mock data (USE_MOCK); when the backend is ready,
  * only the `apiFetch(...)` lines below matter and the mock branches drop away.
  */
-import type { ContextPreview, WtafData, Source } from "../types";
+import type { ContextPreview, WtafData, Source, WatchlistEntry } from "../types";
 import { wtafMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import {
+  agentEffectivePrompt,
   councilLatest,
   dataengProcess,
   discoverPost,
+  listAgents,
   listItems,
   listPrompts,
+  resetAgentMentalModels,
   resetPrompt,
+  setAgentMentalModels,
   updatePrompt,
 } from "./generated/sdk.gen";
 import type {
+  AgentView,
   Clarify,
   CouncilReport,
   DataEngReport,
   DiscoveryResultOutput,
+  EffectivePrompt,
   PromptView,
 } from "./generated/types.gen";
 import { itemsToWtafData } from "./adapter";
@@ -38,11 +44,12 @@ import { streamSse, type ProgressEvent } from "./sse";
  */
 export async function getSnapshot(): Promise<WtafData> {
   if (USE_MOCK) return mockResolve(wtafMock);
-  const [items, council] = await Promise.all([
+  const [items, council, watchlist] = await Promise.all([
     listItems({ query: { limit: 200 }, throwOnError: true }),
     getCouncil(),
+    getWatchlistOverrides(),
   ]);
-  return itemsToWtafData(items.data ?? [], council);
+  return itemsToWtafData(items.data ?? [], council, watchlist);
 }
 
 /**
@@ -138,9 +145,54 @@ export function listRunningJobs(): Promise<JobSummary[]> {
   return apiFetch<JobSummary[]>("/dataeng/jobs");
 }
 
-/* ============ Agent Console — editable system prompts ============ */
+/* ============ Agent Console — agents + their editable prompt layers ============ */
 
-export type { PromptView };
+export type { AgentView, EffectivePrompt, PromptView };
+
+/** The agent roster in council order, with tools + enabled frameworks. Backend: GET /api/agents */
+export async function getAgents(): Promise<AgentView[]> {
+  if (USE_MOCK) return [];
+  const { data } = await listAgents({ throwOnError: true });
+  return data ?? [];
+}
+
+/** Choose which reasoning frameworks an agent runs. Backend: PUT /api/agents/:id/mental-models */
+export async function saveMentalModels(
+  agentId: string,
+  keys: string[],
+): Promise<AgentView> {
+  const { data } = await setAgentMentalModels({
+    path: { agent_id: agentId },
+    body: { keys },
+    throwOnError: true,
+  });
+  return data!;
+}
+
+/** Restore an agent's built-in frameworks. Backend: DELETE /api/agents/:id/mental-models */
+export async function resetMentalModels(agentId: string): Promise<AgentView> {
+  const { data } = await resetAgentMentalModels({
+    path: { agent_id: agentId },
+    throwOnError: true,
+  });
+  return data!;
+}
+
+/**
+ * The fully composed system prompt an agent sends for one skill — soul, rules, mental
+ * models, personality, task. Backend: GET /api/agents/:id/effective-prompt?key=…
+ */
+export async function getEffectivePrompt(
+  agentId: string,
+  key: string,
+): Promise<EffectivePrompt> {
+  const { data } = await agentEffectivePrompt({
+    path: { agent_id: agentId },
+    query: { key },
+    throwOnError: true,
+  });
+  return data!;
+}
 
 /** All agent system prompts with their default + current text. Backend: GET /api/prompts */
 export async function getPrompts(): Promise<PromptView[]> {
@@ -182,5 +234,30 @@ export function setSourceLive(name: string, live: boolean): Promise<Source> {
   return apiFetch<Source>(`/api/sources/${encodeURIComponent(name)}`, {
     method: "PATCH",
     body: JSON.stringify({ live }),
+  });
+}
+
+/* ============ Watchlist — per-ticker on/off toggle + delete ============ */
+
+/** Persisted per-ticker overrides. Absence of an entry = tracked + enabled. Backend: GET /api/watchlists */
+export function getWatchlistOverrides(): Promise<WatchlistEntry[]> {
+  if (USE_MOCK) return mockResolve([]);
+  return apiFetch<WatchlistEntry[]>("/api/watchlists");
+}
+
+/** Toggle scanning on/off for one ticker. Backend: PUT /api/watchlists/:ticker */
+export function setWatchlistActive(ticker: string, active: boolean): Promise<WatchlistEntry> {
+  if (USE_MOCK) return mockResolve({ ticker, enabled: active, deleted: false });
+  return apiFetch<WatchlistEntry>(`/api/watchlists/${encodeURIComponent(ticker)}`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: active }),
+  });
+}
+
+/** Remove a ticker from the watchlist completely (tombstone). Backend: DELETE /api/watchlists/:ticker */
+export function deleteWatchlistItem(ticker: string): Promise<WatchlistEntry> {
+  if (USE_MOCK) return mockResolve({ ticker, enabled: false, deleted: true });
+  return apiFetch<WatchlistEntry>(`/api/watchlists/${encodeURIComponent(ticker)}`, {
+    method: "DELETE",
   });
 }

@@ -47,6 +47,62 @@ export type AceIndex = {
 };
 
 /**
+ * AgentView
+ *
+ * One agent on the roster: its place in the council, its layers, and its tools.
+ */
+export type AgentView = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Tier
+     */
+    tier: number;
+    /**
+     * Tier Label
+     */
+    tier_label: string;
+    /**
+     * Glyph
+     */
+    glyph: string;
+    /**
+     * Accent
+     */
+    accent: string;
+    /**
+     * Tools
+     */
+    tools: Array<ToolView>;
+    /**
+     * Skill Keys
+     */
+    skill_keys: Array<string>;
+    /**
+     * Personality Key
+     */
+    personality_key: string;
+    /**
+     * Mental Models
+     */
+    mental_models: Array<string>;
+    /**
+     * Available Mental Models
+     */
+    available_mental_models: Array<string>;
+};
+
+/**
  * BriefingItem
  *
  * Tier 5 — one line of the Chairman's daily briefing.
@@ -402,6 +458,30 @@ export type DiscoveryResultOutput = {
 };
 
 /**
+ * EffectivePrompt
+ *
+ * Exactly what an agent's next run sends as its system instruction.
+ */
+export type EffectivePrompt = {
+    /**
+     * Agent
+     */
+    agent: string;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Sections
+     */
+    sections: Array<PromptSection>;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * Evidence
  *
  * A source-anchored quote backing an analyst's call (no-orphan guardrail).
@@ -488,6 +568,18 @@ export type MacroIndicator = {
 };
 
 /**
+ * MentalModelUpdate
+ */
+export type MentalModelUpdate = {
+    /**
+     * Keys
+     *
+     * Mental-model keys to enable; unknown keys are ignored
+     */
+    keys?: Array<string>;
+};
+
+/**
  * Prediction
  *
  * Tier 5 — a resolvable prediction destined for the ledger (Req 7.3).
@@ -540,6 +632,22 @@ export type ProcessingFailure = {
 };
 
 /**
+ * PromptSection
+ *
+ * One heading + body of a composed system prompt.
+ */
+export type PromptSection = {
+    /**
+     * Heading
+     */
+    heading: string;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * PromptUpdate
  */
 export type PromptUpdate = {
@@ -554,7 +662,11 @@ export type PromptUpdate = {
 /**
  * PromptView
  *
- * One editable system prompt + its current/default text for the Agent Console.
+ * One editable block of an agent's system prompt, for the Agent Console.
+ *
+ * `layer` is which part of the agent it is — "soul", "rules", "mental_model",
+ * "personality", or "skill" (the task SOP) — and `agent` the roster id that owns it
+ * (null for the council-wide soul/rules and the shared mental-model library).
  */
 export type PromptView = {
     /**
@@ -589,6 +701,14 @@ export type PromptView = {
      * Is Overridden
      */
     is_overridden: boolean;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Agent
+     */
+    agent?: string | null;
 };
 
 /**
@@ -757,6 +877,30 @@ export type ThemeBasket = {
      * Hold
      */
     hold?: string;
+};
+
+/**
+ * ToolView
+ *
+ * One executable capability an agent can call (read-only in the console).
+ */
+export type ToolView = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Io
+     */
+    io: string;
+    /**
+     * Module
+     */
+    module: string;
 };
 
 /**
@@ -1129,6 +1273,121 @@ export type UpdatePromptResponses = {
 };
 
 export type UpdatePromptResponse = UpdatePromptResponses[keyof UpdatePromptResponses];
+
+export type ListAgentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/agents';
+};
+
+export type ListAgentsResponses = {
+    /**
+     * Response List Agents
+     *
+     * Successful Response
+     */
+    200: Array<AgentView>;
+};
+
+export type ListAgentsResponse = ListAgentsResponses[keyof ListAgentsResponses];
+
+export type ResetAgentMentalModelsData = {
+    body?: never;
+    path: {
+        /**
+         * Agent Id
+         */
+        agent_id: string;
+    };
+    query?: never;
+    url: '/api/agents/{agent_id}/mental-models';
+};
+
+export type ResetAgentMentalModelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResetAgentMentalModelsError = ResetAgentMentalModelsErrors[keyof ResetAgentMentalModelsErrors];
+
+export type ResetAgentMentalModelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AgentView;
+};
+
+export type ResetAgentMentalModelsResponse = ResetAgentMentalModelsResponses[keyof ResetAgentMentalModelsResponses];
+
+export type SetAgentMentalModelsData = {
+    body: MentalModelUpdate;
+    path: {
+        /**
+         * Agent Id
+         */
+        agent_id: string;
+    };
+    query?: never;
+    url: '/api/agents/{agent_id}/mental-models';
+};
+
+export type SetAgentMentalModelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAgentMentalModelsError = SetAgentMentalModelsErrors[keyof SetAgentMentalModelsErrors];
+
+export type SetAgentMentalModelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AgentView;
+};
+
+export type SetAgentMentalModelsResponse = SetAgentMentalModelsResponses[keyof SetAgentMentalModelsResponses];
+
+export type AgentEffectivePromptData = {
+    body?: never;
+    path: {
+        /**
+         * Agent Id
+         */
+        agent_id: string;
+    };
+    query: {
+        /**
+         * Key
+         *
+         * A skill prompt key owned by this agent
+         */
+        key: string;
+    };
+    url: '/api/agents/{agent_id}/effective-prompt';
+};
+
+export type AgentEffectivePromptErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AgentEffectivePromptError = AgentEffectivePromptErrors[keyof AgentEffectivePromptErrors];
+
+export type AgentEffectivePromptResponses = {
+    /**
+     * Successful Response
+     */
+    200: EffectivePrompt;
+};
+
+export type AgentEffectivePromptResponse = AgentEffectivePromptResponses[keyof AgentEffectivePromptResponses];
 
 export type DiscoverGetStreamData = {
     body?: never;

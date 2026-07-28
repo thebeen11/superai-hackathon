@@ -7,6 +7,7 @@ const ICONS: Record<string, string> = {
   command: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
   watchlist: "M12 17.3l-6.2 3.7 1.6-7.1L2 9.2l7.2-.6L12 2l2.8 6.6 7.2.6-5.4 4.7 1.6 7.1z",
   signals: "M3 12h3l3-8 4 16 3-10 2 4h3",
+  predictions: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 12h.01",
   sources: "M12 3c5 0 8 1.3 8 3s-3 3-8 3-8-1.3-8-3 3-3 8-3zM4 6v6c0 1.7 3 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3 3 8 3v-6",
   indicators: "M12 21a9 9 0 1 0-9-9M12 21V12l5-3",
   console: "M4 5h16v14H4zM8 10l2.5 2.5L8 15M13 15h4",
@@ -16,7 +17,8 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/", label: "Command Center", icon: "command" },
   { href: "/watchlist", label: "Watchlist", icon: "watchlist" },
   { href: "/signals", label: "Signal Terminal", icon: "signals" },
-  { href: "/sources", label: "Sources & Ledger", icon: "sources" },
+  { href: "/predictions", label: "Predictions", icon: "predictions" },
+  { href: "/sources", label: "Sources", icon: "sources" },
   { href: "/indicators", label: "Indicators", icon: "indicators" },
   { href: "/console", label: "Agent Console", icon: "console" },
 ];

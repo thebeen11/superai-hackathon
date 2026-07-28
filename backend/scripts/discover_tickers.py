@@ -91,6 +91,30 @@ def _post_json(path: str, payload: dict, timeout: int) -> dict:
         return json.loads(resp.read().decode())
 
 
+def _get_json(path: str, timeout: int) -> object:
+    req = urllib.request.Request(f"{BASE_URL}{path}", method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _skip_tickers() -> set[str]:
+    """Tickers the user has paused or deleted on the watchlist — never re-scan these.
+
+    Best-effort: if the watchlist endpoint is unavailable (older backend), scan everything.
+    """
+    try:
+        overrides = _get_json("/api/watchlists", timeout=30)
+    except Exception as exc:  # noqa: BLE001 - a missing endpoint must not block the scan
+        print(f"    (watchlist filter unavailable: {exc} — scanning all tickers)")
+        return set()
+    skip = {
+        str(o["ticker"]).upper()
+        for o in overrides
+        if isinstance(o, dict) and (o.get("deleted") or not o.get("enabled", True))
+    }
+    return skip
+
+
 def _load_progress() -> dict:
     if PROGRESS_FILE.exists():
         try:
@@ -126,14 +150,15 @@ def main() -> None:
     tickers = _parse_tickers(TICKERS_FILE)
     progress = _load_progress()
     done = set(progress["done"])
-    remaining = [(t, n) for (t, n) in tickers if t not in done]
+    skip = _skip_tickers()  # watchlist tickers the user paused or deleted
+    remaining = [(t, n) for (t, n) in tickers if t not in done and t.upper() not in skip]
     if LIMIT is not None:
         remaining = remaining[:LIMIT]
 
     print(f"Backend:      {BASE_URL}")
     print(f"Ticker file:  {TICKERS_FILE}")
     print(f"Query:        {QUERY_TEMPLATE!r}  (max_results={MAX_RESULTS})")
-    print(f"Total:        {len(tickers)}  |  already done: {len(done)}  |  this run: {len(remaining)}")
+    print(f"Total:        {len(tickers)}  |  already done: {len(done)}  |  watchlist-skipped: {len(skip)}  |  this run: {len(remaining)}")
     print(f"Progress:     {PROGRESS_FILE}\n")
 
     if DRY_RUN:

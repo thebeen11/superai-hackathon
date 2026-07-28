@@ -11,7 +11,14 @@ import type {
 import { ACCENTS, STATE_TONE } from "./accents";
 import { Dot } from "./primitives";
 
-export function AgentAvatar({ a, size = 34 }: { a: Agent; size?: number }) {
+/** Square gradient badge for an agent — needs only its glyph + accent. */
+export function AgentAvatar({
+  a,
+  size = 34,
+}: {
+  a: Pick<Agent, "glyph" | "accent">;
+  size?: number;
+}) {
   const ac = ACCENTS[a.accent] || ACCENTS.blue;
   const txt = a.accent === "chair" ? "#16181f" : "#fff";
   const glyphLen = (a.glyph || "").length;

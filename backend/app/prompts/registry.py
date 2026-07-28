@@ -19,7 +19,13 @@ from . import store
 
 @dataclass(frozen=True)
 class PromptSpec:
-    """One editable system prompt: its identity, default text, and metadata."""
+    """One editable block of an agent's system prompt.
+
+    `layer` says which part of the agent it is — "skill" is the task SOP (the specs
+    below); the identity layers ("soul", "rules", "mental_model", "personality") are
+    registered by `identity.py` and composed around the skill at call time.
+    `agent` is the roster id that owns it (None for the global soul/rules/library).
+    """
 
     key: str
     label: str
@@ -27,9 +33,11 @@ class PromptSpec:
     description: str
     default_template: str
     placeholders: tuple[str, ...] = field(default_factory=tuple)
+    layer: str = "skill"
+    agent: str | None = None
 
 
-_SPECS: tuple[PromptSpec, ...] = (
+_SKILL_SPECS: tuple[PromptSpec, ...] = (
     PromptSpec(
         key="discovery.refine",
         label="Query Refiner",
@@ -48,6 +56,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "If AMBIGUOUS, also provide 1-3 short 'clarifying_questions' that resolve the genuine "
             "ambiguity."
         ),
+        agent="wilfred-news",
     ),
     PromptSpec(
         key="dataeng.redact",
@@ -61,6 +70,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "indicator, or investment decision. Return the cleaned text verbatim from the input — "
             "do NOT paraphrase, summarize, or add anything not present in the source."
         ),
+        agent="timo",
     ),
     PromptSpec(
         key="dataeng.entities",
@@ -74,6 +84,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "Only include entities that are actually present in the text — never guess or invent. "
             "List each alias mention you matched."
         ),
+        agent="timo",
     ),
     PromptSpec(
         key="dataeng.labels",
@@ -88,6 +99,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "If none clearly applies, use 'Unclassified'."
         ),
         placeholders=("sectors",),
+        agent="timo",
     ),
     PromptSpec(
         key="dataeng.themes",
@@ -101,6 +113,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "empty list. Do NOT invent themes outside the list."
         ),
         placeholders=("taxonomy",),
+        agent="timo",
     ),
     PromptSpec(
         key="council.analyst",
@@ -117,6 +130,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "quotes, or sources — cite only what is present. If nothing actionable is present, return "
             "empty highlights and stocks."
         ),
+        agent="andie-tech",
     ),
     PromptSpec(
         key="council.debate.bull",
@@ -128,6 +142,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "notes justify going long specific themes and tickers. Be concrete and cite the desks' "
             "evidence. Give a one-line stance and a tight argument (<120 words)."
         ),
+        agent="freddy-bull",
     ),
     PromptSpec(
         key="council.debate.bear",
@@ -139,6 +154,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "macro headwinds, crowded positioning, ways it fails. Cite the desk notes where you can. "
             "Give a one-line stance and a tight rebuttal (<120 words)."
         ),
+        agent="freddy-bear",
     ),
     PromptSpec(
         key="council.chairman",
@@ -165,6 +181,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "resolve date, and a calibrated probability 0.0-1.0 that the claim resolves TRUE. "
             "Ground everything in the provided material; do not invent companies."
         ),
+        agent="winston",
     ),
     PromptSpec(
         key="council.resolver",
@@ -178,6 +195,7 @@ _SPECS: tuple[PromptSpec, ...] = (
             "true or false when the evidence clearly supports it; otherwise answer unknown. Reply with "
             "the outcome ('true' | 'false' | 'unknown') and a one-line rationale grounded in the evidence."
         ),
+        agent="andie-rubric",
     ),
     PromptSpec(
         key="insights.context",
@@ -193,20 +211,40 @@ _SPECS: tuple[PromptSpec, ...] = (
             "copy the quote exactly from the chosen excerpt."
         ),
         placeholders=("tracker",),
+        agent="andie-rubric",
     ),
 )
 
-PROMPTS: dict[str, PromptSpec] = {spec.key: spec for spec in _SPECS}
+def list_skill_specs() -> list[PromptSpec]:
+    """Just the task prompts — one per reasoning step."""
+    return list(_SKILL_SPECS)
+
+
+def _catalogue() -> dict[str, PromptSpec]:
+    """Every editable block: the task prompts plus the identity layers.
+
+    `identity` is imported lazily because it needs `PromptSpec` from this module;
+    the cache means the roster is assembled once per process.
+    """
+    global _CATALOGUE
+    if _CATALOGUE is None:
+        from . import identity
+
+        _CATALOGUE = {s.key: s for s in (*_SKILL_SPECS, *identity.layer_specs())}
+    return _CATALOGUE
+
+
+_CATALOGUE: dict[str, PromptSpec] | None = None
 
 
 def list_prompt_specs() -> list[PromptSpec]:
     """All prompt specs in registration order (used by the console API)."""
-    return list(_SPECS)
+    return list(_catalogue().values())
 
 
 def get_spec(key: str) -> PromptSpec | None:
     """The spec for `key`, or None if the key is unknown."""
-    return PROMPTS.get(key)
+    return _catalogue().get(key)
 
 
 def _fill(template: str, placeholders: tuple[str, ...], values: dict[str, object]) -> str:
@@ -218,10 +256,22 @@ def _fill(template: str, placeholders: tuple[str, ...], values: dict[str, object
     return text
 
 
-def get_prompt(key: str, **values: object) -> str:
-    """Effective system prompt for `key`: user override or default, with placeholders filled."""
-    spec = PROMPTS[key]
-    template = store.get_override(key) or spec.default_template
+def get_prompt(key: str, *, agent: str | None = None, **values: object) -> str:
+    """Effective system prompt for `key`, with placeholders filled.
+
+    For a task prompt this is the agent's full composed identity — soul, rules, mental
+    models, personality, then the task itself (`identity.compose`). `agent` overrides the
+    spec's owning agent, which is how the three Andie desks share one task prompt while
+    keeping distinct voices. Set `AGENT_IDENTITY_LAYERS=false` to send the bare task text.
+    """
+    from ..config import settings
+    from . import identity
+
+    spec = _catalogue()[key]
+    if spec.layer != "skill" or not settings.agent_identity_layers:
+        template = store.get_override(key) or spec.default_template
+    else:
+        template = identity.render(identity.compose(spec, agent))
     return _fill(template, spec.placeholders, values)
 
 

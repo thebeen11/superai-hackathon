@@ -28,6 +28,13 @@ DESK_SECTORS: dict[str, set[str]] = {
     "Capital": {"Financials", "Consumer Discretionary", "Consumer Staples", "Healthcare"},
 }
 DESK_ORDER = ["TMT", "Physical", "Capital"]
+# Desk → console agent id. The three desks share one task prompt but carry their own
+# personality and mental models (app/prompts/identity.py).
+DESK_AGENTS: dict[str, str] = {
+    "TMT": "andie-tech",
+    "Physical": "andie-physical",
+    "Capital": "andie-capital",
+}
 MAX_STOCKS_PER_DESK = 20  # §12.2 — avoid "lost in the middle" context degradation
 _SNIPPET = 600            # chars of clean_text shown per item to bound the prompt
 
@@ -107,7 +114,8 @@ def analyze_desk(desk: str, items: list[CleanedItem]) -> SectorNote:
     if not items:
         return SectorNote(desk=desk)
     try:
-        out = converse_structured(_AnalystOutput, get_prompt("council.analyst"), _digest(items))
+        system = get_prompt("council.analyst", agent=DESK_AGENTS.get(desk))
+        out = converse_structured(_AnalystOutput, system, _digest(items))
     except ReasoningError as exc:
         logger.warning("Andie-%s reasoning failed: %s", desk, exc)
         return SectorNote(desk=desk, summary=f"Analysis unavailable ({exc.kind}).")

@@ -38,6 +38,7 @@ import type {
   Tier,
   Tracker,
   WatchItem,
+  WatchlistEntry,
   WtafData,
 } from "../types";
 import { tierTopology } from "../tiers";
@@ -79,7 +80,7 @@ export const emptyLiveData: WtafData = {
   debate: {
     topic: "",
     round: 0,
-    rounds: 3,
+    rounds: 6,
     bull: { name: "Freddy-Bull", model: "—", accent: "green", stance: "" },
     bear: { name: "Freddy-Bear", model: "—", accent: "red", stance: "" },
     verdict: "",
@@ -238,17 +239,31 @@ function tickerCounts(items: CleanedItem[]): [string, number][] {
   return [...byTicker.entries()].sort((a, b) => b[1] - a[1]);
 }
 
-function deriveWatchlist(items: CleanedItem[]): WatchItem[] {
+function deriveWatchlist(
+  items: CleanedItem[],
+  overrides: WatchlistEntry[] = [],
+): WatchItem[] {
+  // Persisted per-ticker state, keyed by upper-cased ticker (absence = tracked + enabled).
+  const byTicker = new Map(overrides.map((o) => [o.ticker.toUpperCase(), o]));
   const rows = tickerCounts(items);
   const max = rows.length ? rows[0][1] : 1;
-  return rows.map(([canonical, count]) => ({
-    t: canonical.replace(/^\$/, ""),
-    n: canonical,
-    px: 0, // no market-data tier yet
-    chg: 0,
-    alert: count > 1 ? `${count} mentions` : null,
-    sig: Number((count / max).toFixed(2)),
-  }));
+  return rows
+    .map(([canonical, count]) => {
+      const t = canonical.replace(/^\$/, "");
+      const ov = byTicker.get(t.toUpperCase());
+      return {
+        t,
+        n: canonical,
+        px: 0, // no market-data tier yet
+        chg: 0,
+        alert: count > 1 ? `${count} mentions` : null,
+        sig: Number((count / max).toFixed(2)),
+        active: ov ? ov.enabled : true,
+        _deleted: ov?.deleted ?? false,
+      };
+    })
+    .filter((w) => !w._deleted) // tombstoned tickers leave the watchlist entirely
+    .map(({ _deleted, ...w }) => w); // eslint-disable-line @typescript-eslint/no-unused-vars
 }
 
 function deriveSignalVolume(
@@ -474,7 +489,7 @@ function councilDebate(report: CouncilReport): Debate | null {
   return {
     topic: d.topic ?? "",
     round: d.round ?? 0,
-    rounds: d.rounds ?? 3,
+    rounds: d.rounds ?? 6,
     bull: {
       name: d.bull.name,
       model: d.bull.model,
@@ -635,10 +650,11 @@ export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
 export function itemsToWtafData(
   items: CleanedItem[],
   council?: CouncilReport | null,
+  watchlistOverrides: WatchlistEntry[] = [],
 ): WtafData {
   const sources = deriveSources(items);
   const trackers = deriveTrackers(items);
-  const watchlist = deriveWatchlist(items);
+  const watchlist = deriveWatchlist(items, watchlistOverrides);
   const signalVolume = deriveSignalVolume(items);
   const contextPreview = deriveContextPreview(items);
   const indicators = deriveIndicators(items);

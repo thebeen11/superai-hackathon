@@ -555,6 +555,168 @@
         }
       }
     },
+    "/api/agents": {
+      "get": {
+        "summary": "List Agents",
+        "description": "The agent roster in council order (Tier 1 \u2192 Tier 5).",
+        "operationId": "list_agents",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentView"
+                  },
+                  "type": "array",
+                  "title": "Response List Agents"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/mental-models": {
+      "put": {
+        "summary": "Set Agent Mental Models",
+        "description": "Choose which reasoning frameworks this agent runs (takes effect on the next run).",
+        "operationId": "set_agent_mental_models",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MentalModelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Reset Agent Mental Models",
+        "description": "Restore this agent's built-in set of frameworks.",
+        "operationId": "reset_agent_mental_models",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{agent_id}/effective-prompt": {
+      "get": {
+        "summary": "Agent Effective Prompt",
+        "description": "The fully composed system prompt this agent will send for `key`.\n\nPlaceholders are left as literal tokens (their values are only known mid-run), and the\nJSON output contract that `llm/vertex.py` appends is not included.",
+        "operationId": "agent_effective_prompt",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "A skill prompt key owned by this agent",
+              "title": "Key"
+            },
+            "description": "A skill prompt key owned by this agent"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePrompt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/discover/stream": {
       "get": {
         "summary": "Discover Get Stream",
@@ -1046,6 +1208,87 @@
         "title": "AceIndex",
         "description": "Tier 5 \u2014 the composite AI Capital Environment index (PROJECT_GUIDANCE \u00a78)."
       },
+      "AgentView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "tier_label": {
+            "type": "string",
+            "title": "Tier Label"
+          },
+          "glyph": {
+            "type": "string",
+            "title": "Glyph"
+          },
+          "accent": {
+            "type": "string",
+            "title": "Accent"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolView"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "skill_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skill Keys"
+          },
+          "personality_key": {
+            "type": "string",
+            "title": "Personality Key"
+          },
+          "mental_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mental Models"
+          },
+          "available_mental_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Mental Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "role",
+          "tier",
+          "tier_label",
+          "glyph",
+          "accent",
+          "tools",
+          "skill_keys",
+          "personality_key",
+          "mental_models",
+          "available_mental_models"
+        ],
+        "title": "AgentView",
+        "description": "One agent on the roster: its place in the council, its layers, and its tools."
+      },
       "BriefingItem": {
         "properties": {
           "tone": {
@@ -1373,7 +1616,7 @@
           "rounds": {
             "type": "integer",
             "title": "Rounds",
-            "default": 3
+            "default": 6
           },
           "bull": {
             "$ref": "#/components/schemas/DebateSideMeta"
@@ -1585,6 +1828,38 @@
         "title": "DiscoveryResult",
         "description": "What the Discovery agent returns for a single topic query."
       },
+      "EffectivePrompt": {
+        "properties": {
+          "agent": {
+            "type": "string",
+            "title": "Agent"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PromptSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent",
+          "key",
+          "sections",
+          "text"
+        ],
+        "title": "EffectivePrompt",
+        "description": "Exactly what an agent's next run sends as its system instruction."
+      },
       "Evidence": {
         "properties": {
           "quote": {
@@ -1696,6 +1971,20 @@
         "title": "MacroIndicator",
         "description": "Tier 5 \u2014 a macro/financial indicator score for the dashboard."
       },
+      "MentalModelUpdate": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keys",
+            "description": "Mental-model keys to enable; unknown keys are ignored"
+          }
+        },
+        "type": "object",
+        "title": "MentalModelUpdate"
+      },
       "Prediction": {
         "properties": {
           "claim": {
@@ -1778,6 +2067,25 @@
         "title": "ProcessingFailure",
         "description": "A SourceItem that could not be processed/persisted \u2014 surfaced, not hidden."
       },
+      "PromptSection": {
+        "properties": {
+          "heading": {
+            "type": "string",
+            "title": "Heading"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "heading",
+          "text"
+        ],
+        "title": "PromptSection",
+        "description": "One heading + body of a composed system prompt."
+      },
       "PromptUpdate": {
         "properties": {
           "text": {
@@ -1829,6 +2137,21 @@
           "is_overridden": {
             "type": "boolean",
             "title": "Is Overridden"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer"
+          },
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
           }
         },
         "type": "object",
@@ -1840,10 +2163,11 @@
           "placeholders",
           "default_text",
           "current_text",
-          "is_overridden"
+          "is_overridden",
+          "layer"
         ],
         "title": "PromptView",
-        "description": "One editable system prompt + its current/default text for the Agent Console."
+        "description": "One editable block of an agent's system prompt, for the Agent Console.\n\n`layer` is which part of the agent it is \u2014 \"soul\", \"rules\", \"mental_model\",\n\"personality\", or \"skill\" (the task SOP) \u2014 and `agent` the roster id that owns it\n(null for the council-wide soul/rules and the shared mental-model library)."
       },
       "ResolvedEntity": {
         "properties": {
@@ -2081,6 +2405,35 @@
         ],
         "title": "ThemeBasket",
         "description": "Tier 5 \u2014 a final thematic basket with the Chairman's conviction + hold period."
+      },
+      "ToolView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "io": {
+            "type": "string",
+            "title": "Io"
+          },
+          "module": {
+            "type": "string",
+            "title": "Module"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "io",
+          "module"
+        ],
+        "title": "ToolView",
+        "description": "One executable capability an agent can call (read-only in the console)."
       },
       "TranscriptSegment": {
         "properties": {

@@ -1,0 +1,9 @@
+Backend:      https://council-api-rdi52knupa-as.a.run.app
+Ticker file:  /Users/thebeen/dev/hackathon/superai-hackathon/complete list stock tickers 2026 (1)
+Query:        '{name} ({ticker}) stock news and outlook'  (max_results=10)
+Total:        194  |  already done: 0  |  this run: 194
+Progress:     /Users/thebeen/dev/hackathon/superai-hackathon/backend/discover_tickers_progress.json
+
+[1/194] 000001.SS — SSE Composite Index
+    found 10 sources -> persisted 9, failed 1
+[2/194] 000660.KS — SK hynix Inc.

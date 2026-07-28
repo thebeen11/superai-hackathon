@@ -20,7 +20,13 @@ from ..models import (
     TranscriptSegment,
 )
 from .session import get_session
-from .tables import CleanedItemRow, CouncilSnapshotRow, PredictionRow, PromptOverrideRow
+from .tables import (
+    CleanedItemRow,
+    CouncilSnapshotRow,
+    PredictionRow,
+    PromptOverrideRow,
+    WatchlistOverrideRow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +191,77 @@ def delete_prompt_override(key: str) -> None:
         raise
     finally:
         session.close()
+
+
+# --- Watchlist overrides (per-ticker on/off toggle + delete) ----------------
+
+
+@dataclass(frozen=True)
+class WatchlistOverride:
+    """One user override for a watchlist ticker (absence = tracked + enabled)."""
+
+    ticker: str
+    enabled: bool
+    deleted: bool
+
+
+def list_watchlist_overrides() -> list[WatchlistOverride]:
+    """Every watchlist override row (paused and/or deleted tickers)."""
+    stmt = select(
+        WatchlistOverrideRow.ticker,
+        WatchlistOverrideRow.enabled,
+        WatchlistOverrideRow.deleted,
+    )
+    session = get_session()
+    try:
+        return [
+            WatchlistOverride(ticker=t, enabled=e, deleted=d)
+            for t, e, d in session.execute(stmt)
+        ]
+    finally:
+        session.close()
+
+
+def _upsert_watchlist_override(ticker: str, values: dict) -> WatchlistOverride:
+    """Insert or update one override by ticker, returning the actual persisted row.
+
+    On insert the untouched field takes its column default; on conflict only the given
+    field (plus updated_at) is written, so the other field's prior value is preserved.
+    RETURNING reflects whichever branch ran, so the reported row is always accurate.
+    """
+    now = datetime.now(timezone.utc)
+    insert_values = {"ticker": ticker, **values, "updated_at": now}
+    stmt = (
+        pg_insert(WatchlistOverrideRow)
+        .values(**insert_values)
+        .on_conflict_do_update(index_elements=["ticker"], set_={**values, "updated_at": now})
+        .returning(
+            WatchlistOverrideRow.ticker,
+            WatchlistOverrideRow.enabled,
+            WatchlistOverrideRow.deleted,
+        )
+    )
+    session = get_session()
+    try:
+        t, enabled, deleted = session.execute(stmt).one()
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist watchlist override %s", ticker)
+        raise
+    finally:
+        session.close()
+    return WatchlistOverride(ticker=t, enabled=enabled, deleted=deleted)
+
+
+def set_watchlist_enabled(ticker: str, enabled: bool) -> WatchlistOverride:
+    """Toggle scanning on/off for a ticker (preserves any existing `deleted` state)."""
+    return _upsert_watchlist_override(ticker, {"enabled": enabled})
+
+
+def delete_watchlist_entry(ticker: str) -> WatchlistOverride:
+    """Soft-delete a ticker: tombstone it so it leaves the watchlist and stops being scanned."""
+    return _upsert_watchlist_override(ticker, {"deleted": True})
 
 
 # --- Predictions & the Brier ledger (Tier 3 rubric scoring, §7.3) ------------

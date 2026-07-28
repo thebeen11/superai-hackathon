@@ -22,7 +22,12 @@ from .crawl import (
     stop_daily_crawl_timer,
 )
 from .dataeng import process_discovery_result
-from .db.repository import list_cleaned_items
+from .db.repository import (
+    delete_watchlist_entry,
+    list_cleaned_items,
+    list_watchlist_overrides,
+    set_watchlist_enabled,
+)
 from .discovery import discover, discover_with_refinement
 from .discovery.refine import QueryValidationError
 from .events import Emit
@@ -37,6 +42,7 @@ from .models import (
     DiscoveryResult,
 )
 from .jobs import create_job, get_job, list_jobs
+from .prompts import identity
 from .prompts import store as prompt_store
 from .prompts.registry import PromptSpec, get_spec, list_prompt_specs
 from .sse import sse_from_subscribe, sse_stream
@@ -113,7 +119,12 @@ class ClarifyRequest(BaseModel):
 
 
 class PromptView(BaseModel):
-    """One editable system prompt + its current/default text for the Agent Console."""
+    """One editable block of an agent's system prompt, for the Agent Console.
+
+    `layer` is which part of the agent it is — "soul", "rules", "mental_model",
+    "personality", or "skill" (the task SOP) — and `agent` the roster id that owns it
+    (null for the council-wide soul/rules and the shared mental-model library).
+    """
 
     key: str
     label: str
@@ -123,10 +134,61 @@ class PromptView(BaseModel):
     default_text: str
     current_text: str
     is_overridden: bool
+    layer: str
+    agent: str | None = None
 
 
 class PromptUpdate(BaseModel):
     text: str = Field(..., min_length=1, description="The new system-prompt text")
+
+
+class ToolView(BaseModel):
+    """One executable capability an agent can call (read-only in the console)."""
+
+    name: str
+    description: str
+    io: str
+    module: str
+
+
+class AgentView(BaseModel):
+    """One agent on the roster: its place in the council, its layers, and its tools."""
+
+    id: str
+    name: str
+    role: str
+    tier: int
+    tier_label: str
+    glyph: str
+    accent: str
+    tools: list[ToolView]
+    skill_keys: list[str]
+    personality_key: str
+    mental_models: list[str]
+    available_mental_models: list[str]
+
+
+class MentalModelUpdate(BaseModel):
+    keys: list[str] = Field(
+        default_factory=list,
+        description="Mental-model keys to enable; unknown keys are ignored",
+    )
+
+
+class PromptSection(BaseModel):
+    """One heading + body of a composed system prompt."""
+
+    heading: str
+    text: str
+
+
+class EffectivePrompt(BaseModel):
+    """Exactly what an agent's next run sends as its system instruction."""
+
+    agent: str
+    key: str
+    sections: list[PromptSection]
+    text: str
 
 
 @app.get("/health")
@@ -239,6 +301,8 @@ def _prompt_view(spec: PromptSpec) -> PromptView:
         default_text=spec.default_template,
         current_text=override if override is not None else spec.default_template,
         is_overridden=override is not None,
+        layer=spec.layer,
+        agent=spec.agent,
     )
 
 
@@ -266,6 +330,119 @@ def reset_prompt(key: str) -> PromptView:
         raise HTTPException(status_code=404, detail=f"Unknown prompt key: {key!r}")
     prompt_store.delete_override(key)
     return _prompt_view(spec)
+
+
+# --- Watchlist: per-ticker on/off toggle + delete ----------------------------
+
+
+class WatchlistEntry(BaseModel):
+    """One watchlist override. Absence of an entry means tracked + enabled by default."""
+
+    ticker: str
+    enabled: bool
+    deleted: bool
+
+
+class WatchlistUpdate(BaseModel):
+    enabled: bool = Field(..., description="False pauses scanning for this ticker")
+
+
+@app.get("/api/watchlists", response_model=list[WatchlistEntry])
+def list_watchlists() -> list[WatchlistEntry]:
+    """Every watchlist override — the frontend applies `enabled` and hides `deleted`;
+    the per-ticker scan skips any ticker that is disabled or deleted."""
+    return [
+        WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+        for o in list_watchlist_overrides()
+    ]
+
+
+@app.put("/api/watchlists/{ticker}", response_model=WatchlistEntry)
+def update_watchlist(ticker: str, body: WatchlistUpdate) -> WatchlistEntry:
+    """Toggle scanning on/off for one ticker."""
+    o = set_watchlist_enabled(ticker.upper(), body.enabled)
+    return WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+
+
+@app.delete("/api/watchlists/{ticker}", response_model=WatchlistEntry)
+def remove_watchlist(ticker: str) -> WatchlistEntry:
+    """Remove a ticker from the watchlist completely (tombstone — stops scanning + hides it)."""
+    o = delete_watchlist_entry(ticker.upper())
+    return WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+
+
+# --- Agent Console: the roster (soul, mental models, personality, tools) -----
+
+
+def _agent_view(spec: identity.AgentSpec) -> AgentView:
+    """Build the console view for one agent, including its enabled frameworks."""
+    return AgentView(
+        id=spec.id,
+        name=spec.name,
+        role=spec.role,
+        tier=spec.tier,
+        tier_label=spec.tier_label,
+        glyph=spec.glyph,
+        accent=spec.accent,
+        tools=[ToolView(**vars(t)) for t in spec.tools],
+        skill_keys=identity.skills_for(spec.id),
+        personality_key=identity.personality_key(spec.id),
+        mental_models=identity.mental_models_for(spec.id),
+        available_mental_models=[s.key for s in identity.mental_model_specs()],
+    )
+
+
+@app.get("/api/agents", response_model=list[AgentView])
+def list_agents() -> list[AgentView]:
+    """The agent roster in council order (Tier 1 → Tier 5)."""
+    return [_agent_view(spec) for spec in identity.AGENTS]
+
+
+@app.put("/api/agents/{agent_id}/mental-models", response_model=AgentView)
+def set_agent_mental_models(agent_id: str, body: MentalModelUpdate) -> AgentView:
+    """Choose which reasoning frameworks this agent runs (takes effect on the next run)."""
+    spec = identity.get_agent(agent_id)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id!r}")
+    identity.set_mental_models(agent_id, body.keys)
+    return _agent_view(spec)
+
+
+@app.delete("/api/agents/{agent_id}/mental-models", response_model=AgentView)
+def reset_agent_mental_models(agent_id: str) -> AgentView:
+    """Restore this agent's built-in set of frameworks."""
+    spec = identity.get_agent(agent_id)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id!r}")
+    identity.reset_mental_models(agent_id)
+    return _agent_view(spec)
+
+
+@app.get("/api/agents/{agent_id}/effective-prompt", response_model=EffectivePrompt)
+def agent_effective_prompt(
+    agent_id: str,
+    key: str = Query(..., description="A skill prompt key owned by this agent"),
+) -> EffectivePrompt:
+    """The fully composed system prompt this agent will send for `key`.
+
+    Placeholders are left as literal tokens (their values are only known mid-run), and the
+    JSON output contract that `llm/vertex.py` appends is not included.
+    """
+    agent = identity.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id!r}")
+    skill = get_spec(key)
+    if skill is None or key not in identity.skills_for(agent_id):
+        raise HTTPException(
+            status_code=404, detail=f"{agent_id!r} does not run a skill named {key!r}"
+        )
+    sections = identity.compose(skill, agent_id)
+    return EffectivePrompt(
+        agent=agent_id,
+        key=key,
+        sections=[PromptSection(heading=h, text=t) for h, t in sections],
+        text=identity.render(sections),
+    )
 
 
 # --- SSE streaming variants -------------------------------------------------

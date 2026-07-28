@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # (pro vs flash), so the anti-collusion guardrail is weaker — intentional tradeoff.
     gemini_bull_model: str = "gemini-2.5-pro"
     gemini_bear_model: str = "gemini-2.5-flash"
+    # Alternating Bull/Bear turns in the chamber; each round costs one Gemini call.
+    debate_rounds: int = 6
 
     # --- Daily crawl (day-to-day ingestion) ---
     # `POST /crawl/daily` always works; the in-process timer only runs when enabled.
@@ -56,6 +58,12 @@ class Settings(BaseSettings):
 
     # --- Database (RDS Postgres) ---
     database_url: str | None = None
+
+    # --- Agent identity layers (Agent Console) ---
+    # When on, every system prompt is composed as SOUL + RULES + MENTAL MODELS +
+    # PERSONALITY + the task's own instructions (see app/prompts/identity.py).
+    # Set AGENT_IDENTITY_LAYERS=false to fall back to the bare task prompts.
+    agent_identity_layers: bool = True
 
 
 settings = Settings()
