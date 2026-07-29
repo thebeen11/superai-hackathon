@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
+from ..council import grounding
 from ..db.repository import list_cleaned_items
 from ..llm import ReasoningError, converse_structured
 from ..models import CleanedItem, ContextPreview
@@ -51,6 +52,11 @@ def _digest(items: list[CleanedItem]) -> str:
     return "\n".join(lines)
 
 
+def _hhmmss(seconds: float | None) -> str:
+    s = int(seconds or 0)
+    return f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
 def _host(url: str) -> str:
     try:
         return urlparse(url).hostname or url
@@ -58,18 +64,17 @@ def _host(url: str) -> str:
         return url
 
 
-def _timestamp(item: CleanedItem) -> str:
-    s = int(item.segments[0].start) if item.segments else 0
-    return f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
-
-
 def _preview(item: CleanedItem, tracker: str, quote: str, score: float) -> ContextPreview:
     date = (item.published_at or item.ingested_at.isoformat())[:10]
+    # Where in the video the quote was actually said — this is what "Go to Source" opens.
+    offset = grounding.best_offset(item, quote)
     return ContextPreview(
         tracker=tracker,
         channel=_host(item.source_url),
+        source_url=item.source_url,
         date=date,
-        timestamp=_timestamp(item),
+        timestamp=_hhmmss(offset),
+        timestamp_start=offset,
         quote=f'"{quote}"' if not quote.startswith('"') else quote,
         speaker="Video transcript" if item.source_type.value == "youtube" else "Article",
         score=max(0.0, min(1.0, score)),

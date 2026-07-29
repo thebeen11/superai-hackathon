@@ -555,6 +555,117 @@
         }
       }
     },
+    "/api/watchlists": {
+      "get": {
+        "summary": "List Watchlists",
+        "description": "Every watchlist override \u2014 the frontend applies `enabled` and hides `deleted`;\nthe per-ticker scan skips any ticker that is disabled or deleted.",
+        "operationId": "list_watchlists",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WatchlistEntry"
+                  },
+                  "type": "array",
+                  "title": "Response List Watchlists"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlists/{ticker}": {
+      "put": {
+        "summary": "Update Watchlist",
+        "description": "Toggle scanning on/off for one ticker.",
+        "operationId": "update_watchlist",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Watchlist",
+        "description": "Remove a ticker from the watchlist completely (tombstone \u2014 stops scanning + hides it).",
+        "operationId": "remove_watchlist",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/agents": {
       "get": {
         "summary": "List Agents",
@@ -1289,6 +1400,50 @@
         "title": "AgentView",
         "description": "One agent on the roster: its place in the council, its layers, and its tools."
       },
+      "BearSignpostReport": {
+        "properties": {
+          "signposts": {
+            "items": {
+              "$ref": "#/components/schemas/Signpost"
+            },
+            "type": "array",
+            "title": "Signposts"
+          },
+          "triggered": {
+            "type": "integer",
+            "title": "Triggered",
+            "default": 0
+          },
+          "watch": {
+            "type": "integer",
+            "title": "Watch",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "risk_score": {
+            "type": "number",
+            "title": "Risk Score",
+            "default": 0.0
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": "\u2014"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "BearSignpostReport",
+        "description": "The Macro Analyst's bear-market signpost tracker for one council run."
+      },
       "BriefingItem": {
         "properties": {
           "tone": {
@@ -1298,6 +1453,13 @@
           "text": {
             "type": "string",
             "title": "Text"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
           }
         },
         "type": "object",
@@ -1425,6 +1587,17 @@
             "type": "array",
             "title": "Segments"
           },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
           "published_at": {
             "anyOf": [
               {
@@ -1435,6 +1608,18 @@
               }
             ],
             "title": "Published At"
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At"
           },
           "ingested_at": {
             "type": "string",
@@ -1464,6 +1649,11 @@
             "type": "string",
             "title": "Channel"
           },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "default": ""
+          },
           "date": {
             "type": "string",
             "title": "Date"
@@ -1471,6 +1661,17 @@
           "timestamp": {
             "type": "string",
             "title": "Timestamp"
+          },
+          "timestamp_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp Start"
           },
           "quote": {
             "type": "string",
@@ -1531,6 +1732,16 @@
             "type": "array",
             "title": "Indicators"
           },
+          "macro": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BearSignpostReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ace": {
             "anyOf": [
               {
@@ -1561,6 +1772,13 @@
             },
             "type": "array",
             "title": "Ledger"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
           },
           "source_count": {
             "type": "integer",
@@ -1956,10 +2174,17 @@
             "type": "string",
             "title": "Band"
           },
-          "evidence": {
+          "rationale": {
             "type": "string",
-            "title": "Evidence",
+            "title": "Rationale",
             "default": ""
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
           }
         },
         "type": "object",
@@ -1969,7 +2194,7 @@
           "band"
         ],
         "title": "MacroIndicator",
-        "description": "Tier 5 \u2014 a macro/financial indicator score for the dashboard."
+        "description": "Tier 5 \u2014 a macro indicator score for the dashboard."
       },
       "MentalModelUpdate": {
         "properties": {
@@ -2031,6 +2256,13 @@
               }
             ],
             "title": "Resolved At"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
           }
         },
         "type": "object",
@@ -2223,6 +2455,47 @@
         "title": "SectorNote",
         "description": "Tier 3 \u2014 an Andie desk's daily Investment Highlights & Catalyst Note."
       },
+      "Signpost": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "evidenced": {
+            "type": "boolean",
+            "title": "Evidenced",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "status"
+        ],
+        "title": "Signpost",
+        "description": "One row of the bear-market signpost checklist (app/taxonomy.py BEAR_SIGNPOSTS)."
+      },
       "SkippedSource": {
         "properties": {
           "source_type": {
@@ -2302,6 +2575,69 @@
         ],
         "title": "SourceItem",
         "description": "One discovered piece of content, normalized across sources."
+      },
+      "SourceRef": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "themes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Themes"
+          },
+          "cited_by": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cited By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "source_type",
+          "stream"
+        ],
+        "title": "SourceRef",
+        "description": "One document the council read on a given run \u2014 the audit manifest (\u00a712.6).\n\nRecorded per run rather than derived from the live corpus, so a snapshot still says\nwhat it was actually based on after the corpus moves on. `cited_by` lists the agents\nthat quoted it; an empty list means the council read the document but nothing in the\nfinal report leans on it, which is worth showing rather than hiding."
       },
       "SourceType": {
         "type": "string",
@@ -2397,6 +2733,13 @@
             "type": "string",
             "title": "Hold",
             "default": "\u2014"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
           }
         },
         "type": "object",
@@ -2486,6 +2829,44 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WatchlistEntry": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "enabled",
+          "deleted"
+        ],
+        "title": "WatchlistEntry",
+        "description": "One watchlist override. Absence of an entry means tracked + enabled by default."
+      },
+      "WatchlistUpdate": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "False pauses scanning for this ticker"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "WatchlistUpdate"
       }
     }
   }

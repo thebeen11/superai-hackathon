@@ -148,6 +148,7 @@ export const wtafMock: WtafData = {
       n: 5, key: "chairman", label: "Chairman", sub: "fan-in · final judge", accent: "chair",
       status: "thinking", statusText: "Weighing verdict", bypassIn: true,
       squad: [
+        { id: "macro-analyst", name: "Macro Analyst", label: "Macro", glyph: "MA", accent: "amber", role: "Macro · Bear-signpost tracker (macro bypass)", status: "thinking", statusText: "Grading bear signposts", queue: 10, throughput: "10 signposts", tools: ["Gemini 2.5 Pro", "Macro Vector DB"], skills: ["Fixed signpost checklist", "Evidence grounding", "Cycle-risk composite"], log: ["Curve · inverted 14 months", "Breadth · 7 names carrying", "2/10 triggered · MID CYCLE"] },
         { id: "winston", name: "Winston", label: "Chairman", glyph: "♔", accent: "chair", role: "Chairman · Judge & Allocator", status: "thinking", statusText: "Weighing Bull/Bear verdict", queue: 1, throughput: "Fri 16:00", tools: ["Claude Opus", "Macro Vector DB", "Reporting"], skills: ["Debate adjudication", "ACE index weighting", "Final allocation & hold periods", "Macro-regime sanity check"], log: ["Read debate transcript", "MU → half position", "ACE weights · AI 40 / rates 30 / infl 30"] },
       ],
     },
@@ -174,14 +175,17 @@ export const wtafMock: WtafData = {
     {
       tone: "up",
       text: "Dovish FOMC chatter accelerating — 4 of 6 tracked channels now flag a Sept cut as base case.",
+      evidence: [{ quote: "the balance sheet is still shrinking every month", sourceUrl: "https://example.com/macro-lens-qt" }],
     },
     {
       tone: "neutral",
       text: "AI data-centre capex theme remains the dominant signal; power & cooling names entering the conversation.",
+      evidence: [{ quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 }],
     },
     {
       tone: "down",
       text: "Debate chamber split on memory — Winston ruled half-size MU on Bear’s valuation flag; 2 predictions resolve this week.",
+      evidence: [],
     },
   ],
 
@@ -261,7 +265,9 @@ export const wtafMock: WtafData = {
     tracker: "AI capex super-cycle",
     channel: "Silicon Signal",
     date: "08 JUN 2026",
+    sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1",
     timestamp: "00:42:17",
+    timestampStart: 2537,
     quote:
       '"The hyperscalers just told us capex is going up, not down — they are power-constrained, not demand-constrained. That re-rates the entire data-centre supply chain, cooling and electrical included."',
     speaker: "Host · earnings recap",
@@ -279,6 +285,10 @@ export const wtafMock: WtafData = {
       conviction: 0.82,
       verdict: "Bull holds — full weight",
       hold: "6–12M",
+      evidence: [
+        { quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 },
+        { quote: "capex guidance went up across all four hyperscalers", sourceUrl: "https://example.com/compound-capex" },
+      ],
     },
     {
       name: "Disinflation Beneficiaries",
@@ -290,6 +300,7 @@ export const wtafMock: WtafData = {
       conviction: 0.61,
       verdict: "Half-size — Bear rate risk",
       hold: "6M",
+      evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }],
     },
     {
       name: "Advanced Materials",
@@ -301,6 +312,7 @@ export const wtafMock: WtafData = {
       conviction: 0.48,
       verdict: "Watch only — policy risk",
       hold: "12M",
+      evidence: [],
     },
   ],
 
@@ -319,20 +331,43 @@ export const wtafMock: WtafData = {
   ],
 
   predictions: [
-    { claim: "NVDA re-accelerates DC revenue QoQ", by: "Silicon Signal", resolve: "01 SEP", status: "pending" },
-    { claim: "Fed cuts 25bps at Sept meeting", by: "Macro Lens", resolve: "18 SEP", status: "pending" },
-    { claim: "CPI prints below 3.3% in May", by: "Rate Watch", resolve: "10 JUN", status: "pending" },
-    { claim: "Semis correct >10% on seasonality", by: "Capital Currents", resolve: "01 AUG", status: "pending" },
+    { claim: "NVDA re-accelerates DC revenue QoQ", by: "Silicon Signal", resolve: "01 SEP", status: "pending", evidence: [{ quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 }] },
+    { claim: "Fed cuts 25bps at Sept meeting", by: "Macro Lens", resolve: "18 SEP", status: "pending", evidence: [{ quote: "the balance sheet is still shrinking every month", sourceUrl: "https://example.com/macro-lens-qt" }] },
+    { claim: "CPI prints below 3.3% in May", by: "Rate Watch", resolve: "10 JUN", status: "pending", evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }] },
+    { claim: "Semis correct >10% on seasonality", by: "Capital Currents", resolve: "01 AUG", status: "pending", evidence: [] },
   ],
 
   indicators: [
-    { name: "Macro Outlook", score: +0.4, band: "Positive", evid: "4 channels · expansion language" },
-    { name: "Inflation Traj.", score: +0.2, band: "Neutral", evid: "disinflation, sticky services" },
-    { name: "Rate Policy", score: +0.5, band: "Positive", evid: "dovish FOMC commentary" },
-    { name: "Market Sentiment", score: +0.6, band: "Positive", evid: "risk-on, AI leadership" },
-    { name: "Sector Trends", score: +0.7, band: "Positive", evid: "semis + power broadening" },
-    { name: "Geopolitical Risk", score: -0.3, band: "Negative", evid: "trade & export controls" },
+    { name: "Macro Outlook", score: +0.4, band: "Positive", rationale: "4 channels · expansion language", evidence: [{ quote: "ISM printed 51.4, the second month of expansion", sourceUrl: "https://example.com/rate-watch-ism" }] },
+    { name: "Inflation Traj.", score: +0.2, band: "Neutral", rationale: "disinflation, sticky services", evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }] },
+    { name: "Rate Policy", score: +0.5, band: "Positive", rationale: "dovish FOMC commentary", evidence: [{ quote: "the balance sheet is still shrinking every month", sourceUrl: "https://example.com/macro-lens-qt" }] },
+    { name: "Market Sentiment", score: +0.6, band: "Positive", rationale: "risk-on, AI leadership", evidence: [{ quote: "seven names are doing basically all of the work", sourceUrl: "https://example.com/compound-breadth" }] },
+    { name: "Sector Trends", score: +0.7, band: "Positive", rationale: "semis + power broadening", evidence: [{ quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 }] },
+    { name: "Geopolitical Risk", score: -0.3, band: "Negative", rationale: "trade & export controls", evidence: [] },
   ],
+
+  // The Macro Analyst's fixed bear-signpost checklist (backend: taxonomy.BEAR_SIGNPOSTS).
+  signposts: {
+    triggered: 2,
+    watch: 3,
+    total: 10,
+    riskScore: 0.35,
+    label: "MID CYCLE · WATCH",
+    summary:
+      "Two signposts are lit — a still-inverted curve and narrow leadership — but credit and the labour market are holding. A widening in high-yield spreads would flip the picture.",
+    signposts: [
+      { key: "yield_curve", name: "Yield Curve", status: "Triggered", rationale: "2s10s inverted 14 months and only partly re-steepened", evidenced: true, evidence: [{ quote: "the curve has been inverted for fourteen months now", sourceUrl: "https://example.com/macro-lens-curve" }] },
+      { key: "credit_spreads", name: "Credit Spreads", status: "Clear", rationale: "high-yield spreads still near cycle tights", evidenced: true, evidence: [{ quote: "high yield is not blinking at all here", sourceUrl: "https://example.com/rate-watch-credit" }] },
+      { key: "unemployment", name: "Labour Market", status: "Watch", rationale: "claims drifting up, layoffs still concentrated in tech", evidenced: true, evidence: [{ quote: "continuing claims have been creeping higher for six weeks", sourceUrl: "https://example.com/macro-lens-jobs" }] },
+      { key: "valuation", name: "Valuation", status: "Watch", rationale: "index multiple rich, equity risk premium thin", evidenced: true, evidence: [{ quote: "you are paying twenty two times for the index", sourceUrl: "https://example.com/capital-currents-valuation" }] },
+      { key: "growth", name: "Growth Momentum", status: "Clear", rationale: "ISM back above 50 and rising", evidenced: true, evidence: [{ quote: "ISM printed 51.4, the second month of expansion", sourceUrl: "https://example.com/rate-watch-ism" }] },
+      { key: "breadth", name: "Market Breadth", status: "Triggered", rationale: "equal-weight badly lagging cap-weight", evidenced: true, evidence: [{ quote: "seven names are doing basically all of the work", sourceUrl: "https://example.com/compound-breadth" }] },
+      { key: "policy", name: "Policy & Liquidity", status: "Watch", rationale: "QT ongoing, real rates still restrictive", evidenced: true, evidence: [{ quote: "the balance sheet is still shrinking every month", sourceUrl: "https://example.com/macro-lens-qt" }] },
+      { key: "inflation", name: "Inflation Re-acceleration", status: "Clear", rationale: "core still cooling, services sticky but not turning", evidenced: true, evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }] },
+      { key: "consumer", name: "Consumer Stress", status: "Clear", rationale: "Not evidenced in the current corpus.", evidenced: false, evidence: [] },
+      { key: "sentiment", name: "Positioning & Euphoria", status: "Clear", rationale: "Not evidenced in the current corpus.", evidenced: false, evidence: [] },
+    ],
+  },
 
   sources: [
     { name: "Silicon Signal", kind: "YouTube", freq: "daily", live: true, items: 42 },
@@ -342,5 +377,34 @@ export const wtafMock: WtafData = {
     { name: "The Compound Daily", kind: "RSS", freq: "daily", live: true, items: 33 },
     { name: "SEC EDGAR", kind: "Filings", freq: "realtime", live: true, items: 118 },
     { name: "FedSpeak Wire", kind: "RSS", freq: "realtime", live: false, items: 0 },
+  ],
+
+  // The audit ledger — every document read, with who quoted it. The YouTube row exists
+  // so the `?t=` deep link is exercised in mock mode too.
+  sourceDocs: [
+    { url: "https://www.youtube.com/watch?v=mockSilicon1", title: "Hyperscaler capex recap: power, not demand", kind: "YouTube", host: "youtube.com", author: "Silicon Signal", publishedAt: "2026-07-24", stream: "MICRO", themes: ["AI Infrastructure", "Semiconductors"], tickers: ["$NVDA", "$VRT"], citedBy: ["Andie-TMT", "Winston"] },
+    { url: "https://example.com/macro-lens-qt", title: "The balance sheet is still shrinking", kind: "Web", host: "example.com", author: "Macro Lens", publishedAt: "2026-07-23", stream: "MACRO", themes: ["Monetary Policy"], tickers: [], citedBy: ["Macro Analyst", "Winston"] },
+    { url: "https://example.com/rate-watch-cpi", title: "Core CPI comes in at three tenths", kind: "Web", host: "example.com", author: "Rate Watch", publishedAt: "2026-07-22", stream: "MACRO", themes: ["Inflation"], tickers: [], citedBy: ["Macro Analyst", "Winston"] },
+    { url: "https://example.com/rate-watch-ism", title: "ISM prints 51.4 — second month of expansion", kind: "Web", host: "example.com", author: "Rate Watch", publishedAt: "2026-07-21", stream: "MACRO", themes: ["Growth"], tickers: [], citedBy: ["Macro Analyst", "Winston"] },
+    { url: "https://example.com/compound-breadth", title: "Seven names are doing all the work", kind: "Web", host: "example.com", author: "The Compound Daily", publishedAt: "2026-07-21", stream: "MACRO", themes: ["Market Breadth"], tickers: [], citedBy: ["Macro Analyst", "Winston"] },
+    { url: "https://example.com/compound-capex", title: "Capex guidance rose across all four hyperscalers", kind: "Web", host: "example.com", author: "The Compound Daily", publishedAt: "2026-07-20", stream: "MICRO", themes: ["AI Infrastructure"], tickers: ["$MSFT"], citedBy: ["Winston"] },
+    { url: "https://example.com/macro-lens-curve", title: "Fourteen months of curve inversion", kind: "Web", host: "example.com", author: "Macro Lens", publishedAt: "2026-07-19", stream: "MACRO", themes: ["Rates"], tickers: [], citedBy: ["Macro Analyst"] },
+    { url: "https://example.com/macro-lens-jobs", title: "Continuing claims creep higher", kind: "Web", host: "example.com", author: "Macro Lens", publishedAt: "2026-07-18", stream: "MACRO", themes: ["Labour Market"], tickers: [], citedBy: ["Macro Analyst"] },
+    { url: "https://example.com/rate-watch-credit", title: "High yield is not blinking", kind: "Web", host: "example.com", author: "Rate Watch", publishedAt: "2026-07-17", stream: "MACRO", themes: ["Credit"], tickers: [], citedBy: ["Macro Analyst"] },
+    { url: "https://example.com/capital-currents-valuation", title: "Twenty-two times for the index", kind: "Web", host: "example.com", author: "Capital Currents", publishedAt: "2026-07-16", stream: "MACRO", themes: ["Valuation"], tickers: [], citedBy: ["Macro Analyst"] },
+    // Read, but nothing in the report leaned on it — the ledger shows this rather than hiding it.
+    { url: "https://example.com/capital-currents-seasonality", title: "August seasonality in semis", kind: "Web", host: "example.com", author: "Capital Currents", publishedAt: "2026-07-15", stream: "MICRO", themes: ["Semiconductors"], tickers: ["$AMD"], citedBy: [] },
+  ],
+
+  deskNotes: [
+    {
+      desk: "TMT",
+      summary: "Power and cooling constraints are the binding limit on the AI buildout, not order books.",
+      highlights: ["Hyperscaler capex revised up", "Grid interconnect queues lengthening"],
+      stocks: [
+        { ticker: "$NVDA", conviction: 0.78, horizon: "6-12M", rationale: "Demand visibility intact; supply is the constraint.", evidence: [{ quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 }] },
+        { ticker: "$VRT", conviction: 0.64, horizon: "12M", rationale: "Cooling and electrical pull-through from the same capex.", evidence: [{ quote: "cooling and electrical included", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2601 }] },
+      ],
+    },
   ],
 };

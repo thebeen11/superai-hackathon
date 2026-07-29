@@ -23,7 +23,9 @@ class CleanedItemRow(Base):
     entities = Column(JSONB, nullable=False, default=list)   # [{canonical, mentions[]}]
     themes = Column(JSONB, nullable=False, default=list)     # ["Technology", ...]
     segments = Column(JSONB, nullable=False, default=list)   # [{start, text}]
+    author = Column(Text, nullable=True)                     # byline / channel, when given
     published_at = Column(DateTime(timezone=True), nullable=True)   # nullable (Req 14)
+    retrieved_at = Column(DateTime(timezone=True), nullable=True)   # UTC at fetch time
     ingested_at = Column(DateTime(timezone=True), nullable=False)   # UTC (Req 14)
 
 

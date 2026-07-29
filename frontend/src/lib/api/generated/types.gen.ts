@@ -103,6 +103,42 @@ export type AgentView = {
 };
 
 /**
+ * BearSignpostReport
+ *
+ * The Macro Analyst's bear-market signpost tracker for one council run.
+ */
+export type BearSignpostReport = {
+    /**
+     * Signposts
+     */
+    signposts?: Array<Signpost>;
+    /**
+     * Triggered
+     */
+    triggered?: number;
+    /**
+     * Watch
+     */
+    watch?: number;
+    /**
+     * Total
+     */
+    total?: number;
+    /**
+     * Risk Score
+     */
+    risk_score?: number;
+    /**
+     * Label
+     */
+    label?: string;
+    /**
+     * Summary
+     */
+    summary?: string;
+};
+
+/**
  * BriefingItem
  *
  * Tier 5 — one line of the Chairman's daily briefing.
@@ -116,6 +152,10 @@ export type BriefingItem = {
      * Text
      */
     text: string;
+    /**
+     * Evidence
+     */
+    evidence?: Array<Evidence>;
 };
 
 /**
@@ -201,9 +241,17 @@ export type CleanedItem = {
      */
     segments?: Array<TranscriptSegment>;
     /**
+     * Author
+     */
+    author?: string | null;
+    /**
      * Published At
      */
     published_at?: string | null;
+    /**
+     * Retrieved At
+     */
+    retrieved_at?: string | null;
     /**
      * Ingested At
      */
@@ -229,6 +277,10 @@ export type ContextPreview = {
      */
     channel: string;
     /**
+     * Source Url
+     */
+    source_url?: string;
+    /**
      * Date
      */
     date: string;
@@ -236,6 +288,10 @@ export type ContextPreview = {
      * Timestamp
      */
     timestamp: string;
+    /**
+     * Timestamp Start
+     */
+    timestamp_start?: number | null;
     /**
      * Quote
      */
@@ -269,6 +325,7 @@ export type CouncilReport = {
      * Indicators
      */
     indicators?: Array<MacroIndicator>;
+    macro?: BearSignpostReport | null;
     ace?: AceIndex | null;
     /**
      * Briefing
@@ -282,6 +339,10 @@ export type CouncilReport = {
      * Ledger
      */
     ledger?: Array<LedgerRow>;
+    /**
+     * Sources
+     */
+    sources?: Array<SourceRef>;
     /**
      * Source Count
      */
@@ -546,7 +607,7 @@ export type LedgerRow = {
 /**
  * MacroIndicator
  *
- * Tier 5 — a macro/financial indicator score for the dashboard.
+ * Tier 5 — a macro indicator score for the dashboard.
  */
 export type MacroIndicator = {
     /**
@@ -562,9 +623,13 @@ export type MacroIndicator = {
      */
     band: string;
     /**
+     * Rationale
+     */
+    rationale?: string;
+    /**
      * Evidence
      */
-    evidence?: string;
+    evidence?: Array<Evidence>;
 };
 
 /**
@@ -613,6 +678,10 @@ export type Prediction = {
      * Resolved At
      */
     resolved_at?: string | null;
+    /**
+     * Evidence
+     */
+    evidence?: Array<Evidence>;
 };
 
 /**
@@ -752,6 +821,38 @@ export type SectorNote = {
 };
 
 /**
+ * Signpost
+ *
+ * One row of the bear-market signpost checklist (app/taxonomy.py BEAR_SIGNPOSTS).
+ */
+export type Signpost = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Rationale
+     */
+    rationale?: string;
+    /**
+     * Evidence
+     */
+    evidence?: Array<Evidence>;
+    /**
+     * Evidenced
+     */
+    evidenced?: boolean;
+};
+
+/**
  * SkippedSource
  *
  * A source/branch we could not ingest — surfaced, never silently dropped.
@@ -799,6 +900,45 @@ export type SourceItem = {
      * Retrieved At
      */
     retrieved_at?: string;
+};
+
+/**
+ * SourceRef
+ *
+ * One document the council read on a given run — the audit manifest (§12.6).
+ *
+ * Recorded per run rather than derived from the live corpus, so a snapshot still says
+ * what it was actually based on after the corpus moves on. `cited_by` lists the agents
+ * that quoted it; an empty list means the council read the document but nothing in the
+ * final report leans on it, which is worth showing rather than hiding.
+ */
+export type SourceRef = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Title
+     */
+    title: string;
+    source_type: SourceType;
+    stream: Stream;
+    /**
+     * Author
+     */
+    author?: string | null;
+    /**
+     * Published At
+     */
+    published_at?: string | null;
+    /**
+     * Themes
+     */
+    themes?: Array<string>;
+    /**
+     * Cited By
+     */
+    cited_by?: Array<string>;
 };
 
 /**
@@ -877,6 +1017,10 @@ export type ThemeBasket = {
      * Hold
      */
     hold?: string;
+    /**
+     * Evidence
+     */
+    evidence?: Array<Evidence>;
 };
 
 /**
@@ -935,6 +1079,38 @@ export type ValidationError = {
      * Error Type
      */
     type: string;
+};
+
+/**
+ * WatchlistEntry
+ *
+ * One watchlist override. Absence of an entry means tracked + enabled by default.
+ */
+export type WatchlistEntry = {
+    /**
+     * Ticker
+     */
+    ticker: string;
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+    /**
+     * Deleted
+     */
+    deleted: boolean;
+};
+
+/**
+ * WatchlistUpdate
+ */
+export type WatchlistUpdate = {
+    /**
+     * Enabled
+     *
+     * False pauses scanning for this ticker
+     */
+    enabled: boolean;
 };
 
 export type HealthData = {
@@ -1273,6 +1449,84 @@ export type UpdatePromptResponses = {
 };
 
 export type UpdatePromptResponse = UpdatePromptResponses[keyof UpdatePromptResponses];
+
+export type ListWatchlistsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/watchlists';
+};
+
+export type ListWatchlistsResponses = {
+    /**
+     * Response List Watchlists
+     *
+     * Successful Response
+     */
+    200: Array<WatchlistEntry>;
+};
+
+export type ListWatchlistsResponse = ListWatchlistsResponses[keyof ListWatchlistsResponses];
+
+export type RemoveWatchlistData = {
+    body?: never;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+    };
+    query?: never;
+    url: '/api/watchlists/{ticker}';
+};
+
+export type RemoveWatchlistErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveWatchlistError = RemoveWatchlistErrors[keyof RemoveWatchlistErrors];
+
+export type RemoveWatchlistResponses = {
+    /**
+     * Successful Response
+     */
+    200: WatchlistEntry;
+};
+
+export type RemoveWatchlistResponse = RemoveWatchlistResponses[keyof RemoveWatchlistResponses];
+
+export type UpdateWatchlistData = {
+    body: WatchlistUpdate;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+    };
+    query?: never;
+    url: '/api/watchlists/{ticker}';
+};
+
+export type UpdateWatchlistErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateWatchlistError = UpdateWatchlistErrors[keyof UpdateWatchlistErrors];
+
+export type UpdateWatchlistResponses = {
+    /**
+     * Successful Response
+     */
+    200: WatchlistEntry;
+};
+
+export type UpdateWatchlistResponse = UpdateWatchlistResponses[keyof UpdateWatchlistResponses];
 
 export type ListAgentsData = {
     body?: never;

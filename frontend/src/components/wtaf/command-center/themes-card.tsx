@@ -1,6 +1,8 @@
 "use client";
 import type { Theme } from "@/lib/types";
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Card, EmptyState } from "../primitives";
+import { EvidenceList } from "../source-link";
 
 export function ThemesCard({
   themes,
@@ -11,6 +13,7 @@ export function ThemesCard({
   onOpenDebate: () => void;
   discovering?: boolean;
 }) {
+  const d = useWtafData();
   const riskC: Record<string, string> = { Low: "var(--up)", Med: "var(--amber)", High: "var(--down)" };
   // Conviction is a "higher is better" metric: high = green, mid = amber, low = red.
   const convictionColor = (c: number) =>
@@ -32,6 +35,7 @@ export function ThemesCard({
                 <span className="chip" style={{ fontSize: 9, padding: "1px 6px", color: riskC[t.risk], borderColor: "color-mix(in oklch, " + riskC[t.risk] + " 35%, transparent)" }}>{t.risk} · hold {t.hold}</span>
               </div>
               <div style={{ fontSize: 11, color: "var(--t-lo)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.strat}</div>
+              <EvidenceList items={t.evidence} sources={d.sourceDocs} />
             </div>
             <div style={{ display: "flex", gap: 4 }}>
               {t.stocks.slice(0, 4).map((s) => (<span key={s} className="mono" style={{ fontSize: 9.5, padding: "2px 5px", borderRadius: 5, background: "var(--panel-2)", color: "var(--t-mid)" }}>{s}</span>))}

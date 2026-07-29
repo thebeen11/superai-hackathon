@@ -140,7 +140,28 @@
     "SLVP",
     "SMCI",
     "SMR",
-    "SNDK"
+    "SNDK",
+    "SRE",
+    "STAA",
+    "STX",
+    "STRL",
+    "SYM",
+    "TCOM",
+    "TEM",
+    "TLN",
+    "TM",
+    "TMQ",
+    "TQQQ",
+    "TSLA",
+    "TTD",
+    "TXRH",
+    "UEC",
+    "UMAC",
+    "URNM",
+    "URA",
+    "USAR",
+    "USO",
+    "UVIX"
   ],
   "failed": {
     "3191.HK": "The read operation timed out",
@@ -156,6 +177,7 @@
     "MARA": "The read operation timed out",
     "PL": "The read operation timed out",
     "POET": "The read operation timed out",
-    "RTX": "The read operation timed out"
+    "RTX": "The read operation timed out",
+    "STZ": "The read operation timed out"
   }
 }

@@ -233,6 +233,17 @@ AGENTS: tuple[AgentSpec, ...] = (
         mental_models=("mental.inversion", "mental.falsification"),
     ),
     AgentSpec(
+        id="macro-analyst",
+        name="Macro Analyst",
+        role="Macro · bear-market signpost tracker (macro bypass)",
+        tier=5,
+        tier_label="Chairman",
+        glyph="MA",
+        accent="amber",
+        tools=(GEMINI, DB_ITEMS_READ),
+        mental_models=("mental.inversion", "mental.base_rates", "mental.falsification"),
+    ),
+    AgentSpec(
         id="winston",
         name="Winston",
         role="Chairman · judge & allocator",
@@ -398,6 +409,11 @@ _PERSONALITY_DEFAULTS: dict[str, str] = {
     "freddy-bear": (
         "Dry, skeptical risk PM. You attack the argument, never the arguer, and you lead with the "
         "single strongest objection rather than a list of small ones."
+    ),
+    "macro-analyst": (
+        "Cycle historian's voice — flat, unexcitable, allergic to regime narratives. You grade a "
+        "checklist, you do not tell a story, and you would rather report 'not evidenced' ten times "
+        "than light one signpost the material does not support."
     ),
     "winston": (
         "Chairman's voice: cold, economical, final. You weigh both sides in one pass and rule. "

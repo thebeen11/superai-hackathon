@@ -1,9 +1,11 @@
 "use client";
-/* ============ WTAF — Financial Indicator Dashboard ============ */
+/* ============ WTAF — Macro Indicators ============ */
 import { useState } from "react";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { Card, Ring, MiniBar, EmptyState } from "../primitives";
+import { SignpostsCard } from "../signposts-card";
 import { PageHead, PageButton } from "../shared";
+import { EvidenceList } from "../source-link";
 import { fmtChange, hasQuote } from "@/lib/format";
 
 const PAGE_SIZE = 8;
@@ -20,8 +22,9 @@ export function IndicatorsPage() {
   const watchPage = d.watchlist.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
   return (
     <div>
-      <PageHead title="Financial Indicator Dashboard" sub="industry signal coverage · evidence-backed" />
+      <PageHead title="Macro Indicators" sub="macro regime · cycle signposts · evidence-backed" />
       <div className="grid12">
+        <SignpostsCard />
         {d.indicators.length === 0 && (
           <Card className="span12" loading={discovering}>
             <EmptyState label="No indicators yet" sub="Run a discovery to derive industry signals · rubric scores await Tier 3 (Andie)" />
@@ -35,7 +38,8 @@ export function IndicatorsPage() {
               </Ring>
               <div style={{ flex: 1 }}>
                 <span className="chip" style={{ color: bandC[ind.band], borderColor: `color-mix(in oklch, ${bandC[ind.band]} 40%, transparent)` }}>{ind.band}</span>
-                <div style={{ fontSize: 11.5, color: "var(--t-lo)", marginTop: 8, lineHeight: 1.4, textWrap: "pretty" }}>{ind.evid}</div>
+                <div style={{ fontSize: 11.5, color: "var(--t-lo)", marginTop: 8, lineHeight: 1.4, textWrap: "pretty" }}>{ind.rationale}</div>
+                <EvidenceList items={ind.evidence} sources={d.sourceDocs} emptyLabel="not source-anchored" />
               </div>
             </div>
           </Card>

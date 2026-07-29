@@ -48,7 +48,9 @@ def _build_cleaned_item(item: SourceItem, emit: Emit = noop_emit) -> CleanedItem
         entities=resolved,
         themes=item_themes,
         segments=redaction.segments,
+        author=item.author,
         published_at=item.published_at,
+        retrieved_at=item.retrieved_at,
     )
     return enforce(cleaned, item)  # no-orphan-data guardrail (Req 13)
 

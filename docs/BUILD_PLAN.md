@@ -204,7 +204,7 @@ the **Backtest** to see what that (human-approved) theme would've returned. ~3 c
 | 2. Signal & Tracker Terminal (keyword graphs + heatmap) | ⛔ deferred |
 | 3. Thematic Portfolio & Backtest Sandbox | ✅ Screens 2 + 3 |
 | 4. Source & Agent Management (source chat, cron editor, Prediction Ledger) | ⚠️ reduced to the topic input |
-| 5. Financial Indicator Dashboard (MACRO stream) | ⛔ deferred |
+| 5. Macro Indicators (MACRO stream) | ⛔ deferred |
 
 ---
 
@@ -311,7 +311,7 @@ Goal: a single rendered recommendation that flows through every layer.
 
 ### Milestone 4 — Split the MACRO stream
 - [ ] Route MACRO-labelled transcripts straight to the Chairman.
-- [ ] Build **Financial/Economic Indicator Dashboard**.
+- [ ] Build the **Macro Indicators** dashboard.
 - [ ] Implement **ACE Index** + overlay on `$SMH` / `$QQQ` / `$ARKK`.
 
 ### Milestone 5 — Polish & guardrails

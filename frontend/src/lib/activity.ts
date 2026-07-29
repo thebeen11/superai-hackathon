@@ -9,6 +9,7 @@
  *   council                   → orchestrator-wide (unrouted, "Council")
  *   council.analyst (data.desk)→ Andie  (Tier 3 desk)
  *   council.debate            → Freddy  (Tier 4, Bull/Bear from message)
+ *   council.macro             → Macro Analyst (macro bypass, sits with Tier 5)
  *   council.chairman          → Winston (Tier 5)
  */
 import type { ActivityEntry, AgentStatus, LiveAgentStatus, Tier } from "./types";
@@ -56,6 +57,10 @@ export function routeEvent(evt: ProgressEvent): Routed {
     if (/\bBull\b/i.test(message)) return { agentId: "freddy-bull", agentName: "Freddy-Bull", tierKey: "debate" };
     if (/\bBear\b/i.test(message)) return { agentId: "freddy-bear", agentName: "Freddy-Bear", tierKey: "debate" };
     return { agentId: null, agentName: "Freddy", tierKey: "debate" };
+  }
+
+  if (stage === "council.macro") {
+    return { agentId: "macro-analyst", agentName: "Macro Analyst", tierKey: "chairman" };
   }
 
   if (stage === "council.chairman") {

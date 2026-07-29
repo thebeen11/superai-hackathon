@@ -8,6 +8,7 @@ export type BriefingTone = "up" | "down" | "neutral";
 export type CatalystTone = "orange" | "blue" | "green" | "indigo";
 export type RiskBand = "Low" | "Med" | "High";
 export type IndicatorBand = "Positive" | "Neutral" | "Negative";
+export type SignpostStatus = "Triggered" | "Watch" | "Clear";
 export type Trend = "up" | "down" | "flat";
 
 export interface AceComponent {
@@ -106,6 +107,7 @@ export interface Debate {
 export interface BriefingItem {
   tone: BriefingTone;
   text: string;
+  evidence: Evidence[];
 }
 
 export interface WatchItem {
@@ -186,8 +188,12 @@ export interface Tracker {
 export interface ContextPreview {
   tracker: string;
   channel: string;
+  /** The item the quote came from — makes "Go to Source" a real link. */
+  sourceUrl: string;
   date: string;
   timestamp: string;
+  /** Seconds into a video, for a `?t=` deep link. Absent for articles. */
+  timestampStart?: number;
   quote: string;
   speaker: string;
   score: number;
@@ -204,6 +210,7 @@ export interface Theme {
   /** Chairman's verdict + hold period (Winston, fan-in). */
   verdict?: string;
   hold?: string;
+  evidence: Evidence[];
 }
 
 export interface LedgerRow {
@@ -220,21 +227,85 @@ export interface Prediction {
   by: string;
   resolve: string;
   status: string;
+  evidence: Evidence[];
 }
 
 export interface Indicator {
   name: string;
   score: number;
   band: IndicatorBand;
-  evid: string;
+  rationale: string;
+  evidence: Evidence[];
 }
 
+/** One row of the Macro Analyst's fixed bear-market signpost checklist. */
+export interface Signpost {
+  key: string;
+  name: string;
+  status: SignpostStatus;
+  rationale: string;
+  evidence: Evidence[];
+  /** false → nothing in the corpus spoke to it; the row renders dimmed, not green. */
+  evidenced: boolean;
+}
+
+/** A source-anchored quote backing any AI claim (no-orphan guardrail §12.6). */
+export interface Evidence {
+  quote: string;
+  sourceUrl: string;
+  /** Seconds into a video, so the link can open at the moment it was said. */
+  timestampStart?: number;
+}
+/** @deprecated Use {@link Evidence} — kept so older call sites keep compiling. */
+export type SignpostEvidence = Evidence;
+export interface BearSignposts {
+  signposts: Signpost[];
+  triggered: number;
+  watch: number;
+  total: number;
+  riskScore: number;
+  label: string;
+  summary: string;
+}
+
+/** A channel rollup for the Sources page summary (one row per host). */
 export interface Source {
   name: string;
   kind: string;
   freq: string;
   live: boolean;
   items: number;
+}
+
+/** One document the council actually read — the auditable unit behind every claim. */
+export interface SourceDoc {
+  url: string;
+  title: string;
+  kind: string;
+  host: string;
+  author?: string;
+  publishedAt?: string;
+  stream: string;
+  themes: string[];
+  tickers: string[];
+  /** Agents that quoted this document. Empty = read but nothing leaned on it. */
+  citedBy: string[];
+}
+
+/** Tier 3 — one Andie desk's note, with the per-ticker calls it grounded. */
+export interface DeskNote {
+  desk: string;
+  summary: string;
+  highlights: string[];
+  stocks: StockTake[];
+}
+
+export interface StockTake {
+  ticker: string;
+  conviction: number;
+  horizon: string;
+  rationale: string;
+  evidence: Evidence[];
 }
 
 export interface WtafData {
@@ -259,5 +330,12 @@ export interface WtafData {
   ledger: LedgerRow[];
   predictions: Prediction[];
   indicators: Indicator[];
+  /** null until the Macro Analyst has run (or on pre-existing snapshots). */
+  signposts: BearSignposts | null;
+  /** Channel rollup (one row per host). */
   sources: Source[];
+  /** Every document read, one row each — the audit ledger behind the claims. */
+  sourceDocs: SourceDoc[];
+  /** Tier 3 desk notes, the origin of the per-ticker citations. */
+  deskNotes: DeskNote[];
 }

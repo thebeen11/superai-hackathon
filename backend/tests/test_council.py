@@ -12,13 +12,36 @@ from app.council import orchestrator as orch
 from app.council.analyst import (
     MAX_STOCKS_PER_DESK,
     _AnalystOutput,
-    _LLMEvidence,
     _LLMStock,
     analyze_desk,
     route_to_desks,
 )
-from app.council.chairman import _ChairmanOutput, _LLMAce, _LLMBasket, run_chairman
-from app.models import CleanedItem, SourceType, Stream
+from app.council import grounding
+from app.council.grounding import LLMEvidence as _LLMEvidence
+from app.council.chairman import (
+    _ChairmanOutput,
+    _LLMAce,
+    _LLMBasket,
+    _LLMBriefing,
+    _LLMIndicator,
+    _LLMPrediction,
+    run_chairman,
+)
+from app.models import (
+    BearSignpostReport,
+    BriefingItem,
+    CleanedItem,
+    CouncilReport,
+    Evidence,
+    MacroIndicator,
+    SectorNote,
+    Signpost,
+    SourceRef,
+    SourceType,
+    StockTake,
+    Stream,
+    TranscriptSegment,
+)
 
 
 def _item(url="u", industry="Technology", stream=Stream.MICRO, text="nvidia demand strong",
@@ -125,6 +148,57 @@ def test_chairman_builds_dashboard(monkeypatch):
     assert verdict.ace.value == 0.34
 
 
+def test_chairman_grounds_every_claim_kind(monkeypatch):
+    """Winston's baskets/indicators/briefing/predictions all resolve to real URLs."""
+    macro = [_item(url="macro-url", stream=Stream.MACRO, text="the fed is on hold")]
+    out = _ChairmanOutput(
+        baskets=[_LLMBasket(name="AI Buildout", stocks=["nvda"],
+                            evidence=[_LLMEvidence(quote="on hold", source_index=0)])],
+        indicators=[_LLMIndicator(name="Rates", score=0.3, band="Positive", rationale="steady",
+                                  evidence=[_LLMEvidence(quote="on hold", source_index=0)])],
+        briefing=[_LLMBriefing(tone="up", text="Fed steady",
+                               evidence=[_LLMEvidence(quote="on hold", source_index=0)])],
+        predictions=[_LLMPrediction(claim="no cut", resolve="01 SEP",
+                                    evidence=[_LLMEvidence(quote="on hold", source_index=0)])],
+    )
+    monkeypatch.setattr(chairman_mod, "converse_structured", lambda *a, **k: out)
+    v = run_chairman([], None, macro)
+    for claim in (v.baskets[0], v.indicators[0], v.briefing[0], v.predictions[0]):
+        assert [e.source_url for e in claim.evidence] == ["macro-url"]
+    assert v.indicators[0].rationale == "steady"
+
+
+def test_chairman_keeps_claims_whose_citation_does_not_resolve(monkeypatch):
+    """Unlike a desk's stock take, an ungrounded chairman claim survives un-anchored.
+
+    A conviction with no source is worthless, but a briefing line still carries meaning —
+    so it is kept and shown as unsourced rather than silently deleted.
+    """
+    macro = [_item(url="macro-url", stream=Stream.MACRO)]
+    out = _ChairmanOutput(
+        indicators=[_LLMIndicator(name="Rates", score=0.3,
+                                  evidence=[_LLMEvidence(quote="fake", source_index=99)])],
+        briefing=[_LLMBriefing(tone="up", text="Fed steady",
+                               evidence=[_LLMEvidence(quote="fake", source_index=99)])],
+    )
+    monkeypatch.setattr(chairman_mod, "converse_structured", lambda *a, **k: out)
+    v = run_chairman([], None, macro)
+    assert len(v.indicators) == 1 and v.indicators[0].evidence == []
+    assert len(v.briefing) == 1 and v.briefing[0].evidence == []
+
+
+def test_citable_corpus_includes_desk_cited_micro_sources():
+    """A basket comes out of the debate, so Winston must be able to cite the desks' sources."""
+    macro = [_item(url="macro-url", stream=Stream.MACRO)]
+    micro = [_item(url="micro-cited"), _item(url="micro-unused")]
+    notes = [SectorNote(desk="TMT", stocks=[
+        StockTake(ticker="$NVDA", conviction=0.5, horizon="6M",
+                  evidence=[Evidence(quote="q", source_url="micro-cited")]),
+    ])]
+    corpus = chairman_mod.citable_corpus(macro, notes, micro)
+    assert [it.source_url for it in corpus] == ["macro-url", "micro-cited"]
+
+
 # --- DAG orchestration -------------------------------------------------------
 
 def test_run_council_empty_corpus_saves_empty_snapshot(monkeypatch):
@@ -138,7 +212,8 @@ def test_run_council_empty_corpus_saves_empty_snapshot(monkeypatch):
 
 def test_run_council_runs_full_dag(monkeypatch):
     from app.models import (
-        BriefingItem, DebateRecord, DebateSideMeta, SectorNote, ThemeBasket,
+        BearSignpostReport, BriefingItem, DebateRecord, DebateSideMeta, SectorNote,
+        ThemeBasket,
     )
     from app.council.chairman import ChairmanVerdict
 
@@ -157,19 +232,174 @@ def test_run_council_runs_full_dag(monkeypatch):
         return DebateRecord(bull=DebateSideMeta(name="b", model="m"),
                             bear=DebateSideMeta(name="r", model="n"))
 
-    def fake_chairman(notes, debate, macro, emit=None):
+    def fake_macro(macro, emit=None):
+        calls.append("macro")
+        assert all(i.stream == Stream.MACRO for i in macro)  # macro bypass routes MACRO here
+        return BearSignpostReport(total=10, triggered=2, label="MID CYCLE · WATCH")
+
+    def fake_chairman(notes, debate, macro, emit=None, macro_report=None, micro_items=None):
         calls.append("chairman")
         assert all(i.stream == Stream.MACRO for i in macro)  # macro bypass routes MACRO here
+        assert macro_report is not None and macro_report.triggered == 2  # tracker handed up
+        # Winston needs the desks' micro sources too, or a basket could never cite anything.
+        assert micro_items is not None and all(i.stream == Stream.MICRO for i in micro_items)
         return ChairmanVerdict(verdict="ruling", baskets=[ThemeBasket(name="x")],
                                briefing=[BriefingItem(tone="up", text="y")])
 
     monkeypatch.setattr(orch, "run_analysts", fake_analysts)
     monkeypatch.setattr(orch, "run_debate", fake_debate)
+    monkeypatch.setattr(orch, "run_macro_analyst", fake_macro)
     monkeypatch.setattr(orch, "run_chairman", fake_chairman)
 
     report = orch.run_council()
-    assert calls == ["analysts", "debate", "chairman", "saved"]  # strict DAG order
+    assert calls == ["analysts", "debate", "macro", "chairman", "saved"]  # strict DAG order
+    assert report.macro.triggered == 2                           # tracker persisted
     assert report.debate.verdict == "ruling"
     assert report.debate.transcript[-1].who == "winston"         # verdict stitched in
     assert report.baskets[0].name == "x"
     assert report.source_count == 2
+
+
+# --- Source manifest (§12.6 audit trail) -------------------------------------
+
+def test_manifest_lists_every_document_and_who_cited_it():
+    items = [_item(url="cited-by-desk"), _item(url="cited-by-winston"), _item(url="unused")]
+    report = CouncilReport(
+        sector_notes=[SectorNote(desk="TMT", stocks=[
+            StockTake(ticker="$NVDA", conviction=0.5, horizon="6M",
+                      evidence=[Evidence(quote="q", source_url="cited-by-desk")]),
+        ])],
+        briefing=[BriefingItem(tone="up", text="y",
+                               evidence=[Evidence(quote="q", source_url="cited-by-winston")])],
+        macro=BearSignpostReport(signposts=[
+            Signpost(key="breadth", name="Breadth", status="Triggered",
+                     evidence=[Evidence(quote="q", source_url="cited-by-desk")]),
+        ]),
+    )
+    manifest = {s.url: s.cited_by for s in orch._build_manifest(items, report)}
+    assert manifest["cited-by-desk"] == ["Andie-TMT", "Macro Analyst"]
+    assert manifest["cited-by-winston"] == ["Winston"]
+    # Read but never quoted — still listed, so "we looked and it didn't matter" is visible.
+    assert manifest["unused"] == []
+
+
+# --- Citation timestamps -----------------------------------------------------
+
+def test_best_offset_finds_the_segment_the_quote_came_from():
+    """A video citation must open at the quote, not at 0:00."""
+    item = CleanedItem(
+        source_url="https://www.youtube.com/watch?v=abc", source_type=SourceType.YOUTUBE,
+        title="t", clean_text="body", stream=Stream.MACRO, industry="Unclassified",
+        segments=[
+            TranscriptSegment(start=0.0, text="hello and welcome to the show"),
+            TranscriptSegment(start=142.5, text="continuing claims have been creeping higher"),
+            TranscriptSegment(start=300.0, text="that is all for today"),
+        ],
+    )
+    assert grounding.best_offset(item, "continuing claims have been creeping higher") == 142.5
+    # Nothing overlaps → anchor at the top rather than dropping a verified quote.
+    assert grounding.best_offset(item, "zzz qqq") == 0.0
+    # Articles have no transcript, so there is no offset to give.
+    assert grounding.best_offset(_item(url="a"), "anything") is None
+
+
+# --- Stored-snapshot compatibility -------------------------------------------
+#
+# A whole CouncilReport is persisted as JSON (db/tables.py: council_snapshots.report) and
+# read back through these models, so narrowing a field's type retroactively invalidates
+# every saved run. That failure surfaces as an empty dashboard rather than an error, so it
+# is asserted here instead of being left to review.
+
+def test_legacy_snapshot_with_string_indicator_evidence_still_loads():
+    """`MacroIndicator.evidence` used to be free text; old snapshots must still parse."""
+    legacy = {
+        "indicators": [
+            {"name": "Rate Policy", "score": 0.5, "band": "Positive",
+             "evidence": "dovish FOMC commentary"},
+        ],
+        # Written before these fields existed at all.
+        "briefing": [{"tone": "up", "text": "Fed steady"}],
+        "baskets": [{"name": "AI Buildout"}],
+        "predictions": [{"claim": "no cut", "by": "Macro Lens", "resolve": "01 SEP"}],
+        "source_count": 12,
+    }
+    report = CouncilReport.model_validate(legacy)
+    # The old free-text evidence was really a rationale — keep the words, drop the claim
+    # to a citation it never had.
+    assert report.indicators[0].rationale == "dovish FOMC commentary"
+    assert report.indicators[0].evidence == []
+    # The rest of the snapshot must survive, not just the migrated field.
+    assert report.briefing[0].text == "Fed steady"
+    assert report.baskets[0].name == "AI Buildout"
+    assert report.predictions[0].claim == "no cut"
+    assert report.source_count == 12
+
+
+def test_legacy_migration_does_not_clobber_an_explicit_rationale():
+    report = CouncilReport.model_validate({
+        "indicators": [{"name": "x", "score": 0.0, "band": "Neutral",
+                        "rationale": "real rationale", "evidence": "legacy text"}],
+    })
+    assert report.indicators[0].rationale == "real rationale"
+    assert report.indicators[0].evidence == []
+
+
+def test_current_snapshot_round_trips():
+    """Serialize → deserialize, the check that would have caught the regression."""
+    report = CouncilReport(
+        indicators=[MacroIndicator(name="Rates", score=0.3, band="Positive",
+                                   rationale="steady",
+                                   evidence=[Evidence(quote="q", source_url="u",
+                                                      timestamp_start=142.5)])],
+        sources=[SourceRef(url="u", title="t", source_type=SourceType.WEB,
+                           stream=Stream.MACRO, cited_by=["Winston"])],
+        source_count=1,
+    )
+    again = CouncilReport.model_validate(report.model_dump(mode="json"))
+    assert again.indicators[0].evidence[0].timestamp_start == 142.5
+    assert again.indicators[0].rationale == "steady"
+    assert again.sources[0].cited_by == ["Winston"]
+
+
+def test_repository_serves_legacy_snapshot_and_degrades_on_unreadable(monkeypatch, caplog):
+    """The read path itself, which is where the blank-dashboard regression actually landed."""
+    import types
+    from app.db import repository as repo
+
+    def _session_returning(row):
+        class _Res:
+            def scalars(self):
+                return types.SimpleNamespace(first=lambda: row)
+        return types.SimpleNamespace(execute=lambda stmt: _Res(), close=lambda: None)
+
+    legacy = types.SimpleNamespace(
+        generated_at="2026-07-20T00:00:00Z",
+        report={
+            "indicators": [{"name": "Rate Policy", "score": 0.5, "band": "Positive",
+                            "evidence": "dovish FOMC commentary"}],
+            "debate": {"topic": "t", "round": 1, "rounds": 6,
+                       "bull": {"name": "Freddy-Bull", "model": "m"},
+                       "bear": {"name": "Freddy-Bear", "model": "n"},
+                       "transcript": [{"who": "bull", "round": "R1", "label": "Bull", "text": "buy"}]},
+            "source_count": 42,
+        },
+    )
+    monkeypatch.setattr(repo, "get_session", lambda: _session_returning(legacy))
+    snap = repo.get_latest_council_snapshot()
+    # The whole report must come back, not just the migrated field — a 500 here blanked
+    # debate, baskets, briefing and the ledger all at once.
+    assert snap is not None
+    assert len(snap.debate.transcript) == 1
+    assert snap.indicators[0].rationale == "dovish FOMC commentary"
+    assert snap.source_count == 42
+
+    # A snapshot no migration can rescue degrades to "no snapshot" with a logged reason,
+    # rather than a 500 the frontend turns into an identical, unexplained blank.
+    junk = types.SimpleNamespace(
+        generated_at="2026-07-21T00:00:00Z",
+        report={"indicators": [{"name": "x", "score": "not-a-number", "band": "Positive"}]},
+    )
+    monkeypatch.setattr(repo, "get_session", lambda: _session_returning(junk))
+    with caplog.at_level("ERROR"):
+        assert repo.get_latest_council_snapshot() is None
+    assert "does not match the current models" in caplog.text
