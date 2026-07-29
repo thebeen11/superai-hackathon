@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -42,7 +43,9 @@ def _row_to_model(row: CleanedItemRow) -> CleanedItem:
         entities=[ResolvedEntity(**e) for e in (row.entities or [])],
         themes=list(row.themes or []),
         segments=[TranscriptSegment(**s) for s in (row.segments or [])],
+        author=row.author,
         published_at=row.published_at.isoformat() if row.published_at else None,
+        retrieved_at=row.retrieved_at,
         ingested_at=row.ingested_at,
     )
 
@@ -84,7 +87,9 @@ def _row_values(item: CleanedItem) -> dict:
         "entities": [e.model_dump() for e in item.entities],
         "themes": list(item.themes),
         "segments": [s.model_dump() for s in item.segments],
+        "author": item.author,
         "published_at": item.published_at,
+        "retrieved_at": item.retrieved_at,
         "ingested_at": item.ingested_at,
     }
 
@@ -135,12 +140,30 @@ def save_council_snapshot(report: CouncilReport) -> None:
 
 
 def get_latest_council_snapshot() -> CouncilReport | None:
-    """Read back the most recent council snapshot, or None if none exists yet."""
+    """Read back the most recent council snapshot, or None if none exists yet.
+
+    A snapshot the current models can no longer parse is logged and treated as absent
+    rather than raised. `None` is a state the whole stack already handles — the Tier 3–5
+    cards show their honest "awaiting" state — whereas raising here becomes a 500 that the
+    frontend swallows into an identical blank dashboard, with the reason nowhere the
+    reader can see it. Known shape drift is migrated in the models themselves; this is the
+    backstop for the rest.
+    """
     stmt = select(CouncilSnapshotRow).order_by(CouncilSnapshotRow.generated_at.desc()).limit(1)
     session = get_session()
     try:
         row = session.execute(stmt).scalars().first()
-        return CouncilReport.model_validate(row.report) if row else None
+        if row is None:
+            return None
+        try:
+            return CouncilReport.model_validate(row.report)
+        except ValidationError:
+            logger.exception(
+                "Council snapshot generated_at=%s does not match the current models; "
+                "serving no snapshot. Re-run the council to write a current one.",
+                row.generated_at,
+            )
+            return None
     finally:
         session.close()
 

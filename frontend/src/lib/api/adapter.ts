@@ -18,6 +18,7 @@
  */
 import type {
   Ace,
+  BearSignposts,
   BriefingItem,
   BriefingTone,
   Catalyst,
@@ -25,14 +26,19 @@ import type {
   ContextPreview,
   Debate,
   DebateTurn,
+  DeskNote,
+  Evidence,
   Indicator,
   IndicatorBand,
   LedgerRow,
   Prediction,
   RiskBand,
+  Signpost,
+  SignpostStatus,
   Trend,
   Sentiment,
   Source,
+  SourceDoc,
   SystemStatus,
   Theme,
   Tier,
@@ -46,6 +52,7 @@ import type {
   CleanedItem,
   CouncilReport,
   DebateTurn as ApiDebateTurn,
+  Evidence as ApiEvidence,
 } from "./generated/types.gen";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -103,6 +110,7 @@ export const emptyLiveData: WtafData = {
   contextPreview: {
     tracker: "",
     channel: "",
+    sourceUrl: "",
     date: "",
     timestamp: "",
     quote: "",
@@ -111,10 +119,13 @@ export const emptyLiveData: WtafData = {
   },
   themes: [],
   backtestThemes: [],
+  signposts: null,
   ledger: [],
   predictions: [],
   indicators: [],
   sources: [],
+  sourceDocs: [],
+  deskNotes: [],
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -164,6 +175,36 @@ function deriveSources(items: CleanedItem[]): Source[] {
     }))
     .sort((a, b) => b.items - a.items);
 }
+
+/** One row per document read — the audit ledger, keeping the URL that `deriveSources` drops. */
+function deriveSourceDocs(items: CleanedItem[]): SourceDoc[] {
+  return items.map((it) => ({
+    url: it.source_url,
+    title: it.title || it.source_url,
+    kind: it.source_type === "youtube" ? "YouTube" : "Web",
+    host: hostOf(it.source_url),
+    author: it.author ?? undefined,
+    publishedAt: it.published_at ?? it.ingested_at ?? undefined,
+    stream: it.stream,
+    themes: it.themes ?? [],
+    tickers: (it.entities ?? [])
+      .map((e) => e.canonical)
+      .filter((c) => c.startsWith("$")),
+    citedBy: [],
+  }));
+}
+
+/** Backend `Evidence` → frontend shape, keeping the timestamp the deep link needs. */
+function evidenceOf(e: ApiEvidence): Evidence {
+  return {
+    quote: e.quote,
+    sourceUrl: e.source_url,
+    timestampStart: e.timestamp_start ?? undefined,
+  };
+}
+
+const evidenceList = (e: ApiEvidence[] | undefined | null): Evidence[] =>
+  (e ?? []).map(evidenceOf);
 
 function deriveTrackers(items: CleanedItem[]): Tracker[] {
   // Common day axis across all items, so every tracker's sparkline shares one grid.
@@ -309,7 +350,10 @@ function deriveIndicators(items: CleanedItem[]): Indicator[] {
       name,
       score,
       band: score > 0.5 ? "Positive" : score > 0.2 ? "Neutral" : "Negative",
-      evid: `${count} item${count === 1 ? "" : "s"} · ${hosts.size} source${hosts.size === 1 ? "" : "s"}`,
+      rationale: `${count} item${count === 1 ? "" : "s"} · ${hosts.size} source${hosts.size === 1 ? "" : "s"}`,
+      // Coverage heuristic, not an agent's read — there is no quote to cite until
+      // Winston has scored the indicators himself.
+      evidence: [],
     };
   });
 }
@@ -406,6 +450,8 @@ function deriveThemes(items: CleanedItem[]): Theme[] {
       conviction: 0, // pending Chairman
       verdict: "Awaiting Chairman verdict",
       hold: "—",
+      // A theme rollup, not a Chairman call — there is no quote behind it to cite.
+      evidence: [],
     }));
 }
 
@@ -429,8 +475,10 @@ function deriveContextPreview(items: CleanedItem[]): ContextPreview | null {
   return {
     tracker,
     channel: hostOf(withSegment.source_url),
+    sourceUrl: withSegment.source_url,
     date: ts ? new Date(ts).toISOString().slice(0, 10) : "",
     timestamp: `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`,
+    timestampStart: seg.start,
     quote: `"${seg.text}"`,
     speaker:
       withSegment.source_type === "youtube" ? "Video transcript" : "Article",
@@ -447,6 +495,7 @@ function nowStamp(): string {
 /* ============ Tier 3–5 (the Council) → dashboard ============ */
 
 const INDICATOR_BANDS: IndicatorBand[] = ["Positive", "Neutral", "Negative"];
+const SIGNPOST_STATUSES: SignpostStatus[] = ["Triggered", "Watch", "Clear"];
 const CATALYST_TONES: CatalystTone[] = ["orange", "blue", "green", "indigo"];
 
 function asRisk(s?: string): RiskBand {
@@ -460,6 +509,11 @@ function asBand(s?: string): IndicatorBand {
   return INDICATOR_BANDS.includes(s as IndicatorBand)
     ? (s as IndicatorBand)
     : "Neutral";
+}
+function asSignpostStatus(s?: string): SignpostStatus {
+  return SIGNPOST_STATUSES.includes(s as SignpostStatus)
+    ? (s as SignpostStatus)
+    : "Clear";
 }
 function asBriefingTone(s?: string): BriefingTone {
   return s === "up" || s === "down" ? s : "neutral";
@@ -480,6 +534,7 @@ function councilThemes(report: CouncilReport): Theme[] {
     conviction: clamp01(b.conviction ?? 0),
     verdict: b.verdict || undefined,
     hold: b.hold || undefined,
+    evidence: evidenceList(b.evidence),
   }));
 }
 
@@ -519,8 +574,33 @@ function councilIndicators(report: CouncilReport): Indicator[] {
     name: i.name,
     score: i.score,
     band: asBand(i.band),
-    evid: i.evidence ?? "",
+    rationale: i.rationale ?? "",
+    evidence: evidenceList(i.evidence),
   }));
+}
+
+/** The Macro Analyst's bear-signpost tracker. The checklist is fixed backend-side,
+ *  so the rows arrive complete and in order — pass them through untouched. */
+function councilSignposts(report: CouncilReport): BearSignposts | null {
+  const m = report.macro;
+  if (!m || !m.signposts?.length) return null;
+  const signposts: Signpost[] = m.signposts.map((s) => ({
+    key: s.key,
+    name: s.name,
+    status: asSignpostStatus(s.status),
+    rationale: s.rationale ?? "",
+    evidence: evidenceList(s.evidence),
+    evidenced: s.evidenced ?? true,
+  }));
+  return {
+    signposts,
+    triggered: m.triggered ?? 0,
+    watch: m.watch ?? 0,
+    total: m.total ?? signposts.length,
+    riskScore: clamp01(m.risk_score ?? 0),
+    label: m.label || "—",
+    summary: m.summary ?? "",
+  };
 }
 
 function councilAce(report: CouncilReport): Ace | null {
@@ -539,6 +619,7 @@ function councilBriefing(report: CouncilReport): BriefingItem[] {
   return (report.briefing ?? []).map((b) => ({
     tone: asBriefingTone(b.tone),
     text: b.text,
+    evidence: evidenceList(b.evidence),
   }));
 }
 
@@ -548,6 +629,7 @@ function councilPredictions(report: CouncilReport): Prediction[] {
     by: p.by,
     resolve: p.resolve,
     status: p.status ?? "pending",
+    evidence: evidenceList(p.evidence),
   }));
 }
 
@@ -600,6 +682,62 @@ function councilCatalysts(report: CouncilReport): Catalyst[] {
   });
 }
 
+/** Tier 3 desk notes — the per-ticker calls, each already grounded to a source. */
+function councilDeskNotes(report: CouncilReport): DeskNote[] {
+  return (report.sector_notes ?? []).map((n) => ({
+    desk: n.desk,
+    summary: n.summary ?? "",
+    highlights: n.highlights ?? [],
+    stocks: (n.stocks ?? []).map((s) => ({
+      ticker: s.ticker,
+      conviction: s.conviction,
+      horizon: s.horizon,
+      rationale: s.rationale ?? "",
+      evidence: evidenceList(s.evidence),
+    })),
+  }));
+}
+
+/**
+ * Tag each document with the agents that quoted it.
+ *
+ * Prefers the snapshot's own manifest, which records what that run actually read. Older
+ * snapshots predate it, so fall back to joining every citation in the report by URL —
+ * the ledger still shows "cited by" rather than going blank on historical data.
+ */
+function withCitations(
+  docs: SourceDoc[],
+  report: CouncilReport | null | undefined,
+): SourceDoc[] {
+  if (!report) return docs;
+
+  const byUrl = new Map<string, string[]>();
+  for (const s of report.sources ?? []) {
+    if (s.cited_by?.length) byUrl.set(s.url, s.cited_by);
+  }
+  if (!byUrl.size) {
+    const add = (url: string, agent: string) => {
+      const cur = byUrl.get(url) ?? [];
+      if (!cur.includes(agent)) byUrl.set(url, [...cur, agent]);
+    };
+    for (const n of report.sector_notes ?? [])
+      for (const s of n.stocks ?? [])
+        for (const e of s.evidence ?? []) add(e.source_url, `Andie-${n.desk}`);
+    for (const s of report.macro?.signposts ?? [])
+      for (const e of s.evidence ?? []) add(e.source_url, "Macro Analyst");
+    for (const group of [
+      report.indicators ?? [],
+      report.baskets ?? [],
+      report.briefing ?? [],
+      report.predictions ?? [],
+    ])
+      for (const claim of group)
+        for (const e of claim.evidence ?? []) add(e.source_url, "Winston");
+  }
+
+  return docs.map((d) => ({ ...d, citedBy: byUrl.get(d.url) ?? [] }));
+}
+
 /** Once the council has run, light up Tiers 3–5 in the agent-council flow. */
 function activatedTiers(): Tier[] {
   return tierTopology.map((t) =>
@@ -623,21 +761,25 @@ export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
   const debate = councilDebate(report);
   const themes = councilThemes(report);
   const indicators = councilIndicators(report);
+  const signposts = councilSignposts(report);
   const ace = councilAce(report);
   const briefing = councilBriefing(report);
   const predictions = councilPredictions(report);
   const ledger = councilLedger(report);
   const catalysts = councilCatalysts(report);
+  const deskNotes = councilDeskNotes(report);
   return {
     tiers: activatedTiers(),
     ...(debate ? { debate } : {}),
     ...(themes.length ? { themes } : {}),
     ...(indicators.length ? { indicators } : {}),
+    ...(signposts ? { signposts } : {}),
     ...(ace ? { ace } : {}),
     ...(briefing.length ? { briefing } : {}),
     ...(predictions.length ? { predictions } : {}),
     ...(ledger.length ? { ledger } : {}),
     ...(catalysts.length ? { catalysts } : {}),
+    ...(deskNotes.length ? { deskNotes } : {}),
   };
 }
 
@@ -653,6 +795,7 @@ export function itemsToWtafData(
   watchlistOverrides: WatchlistEntry[] = [],
 ): WtafData {
   const sources = deriveSources(items);
+  const sourceDocs = withCitations(deriveSourceDocs(items), council);
   const trackers = deriveTrackers(items);
   const watchlist = deriveWatchlist(items, watchlistOverrides);
   const signalVolume = deriveSignalVolume(items);
@@ -665,6 +808,7 @@ export function itemsToWtafData(
     now: nowStamp(),
     // --- backend-backed (Layers 1–2), each guarded to keep empty states ---
     ...(sources.length ? { sources } : {}),
+    ...(sourceDocs.length ? { sourceDocs } : {}),
     ...(trackers.length ? { trackers } : {}),
     ...(watchlist.length ? { watchlist } : {}),
     ...(signalVolume ? { signalVolume } : {}),

@@ -7,6 +7,7 @@ import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, MiniBar, EmptyState } from "../primitives";
 import { PageHead, PageButton } from "../shared";
 import { DebateCard } from "../command-center/debate-card";
+import { EvidenceList } from "../source-link";
 import { fmtChange, fmtPrice, hasQuote } from "@/lib/format";
 import { deleteWatchlistItem, setWatchlistActive } from "@/lib/api/wtaf";
 import type { WatchItem } from "@/lib/types";
@@ -185,6 +186,12 @@ export function TickerDetailPage({ ticker }: { ticker: string }) {
   const d = useWtafData();
   const { onOpenDebate } = useShellActions();
   const item = d.watchlist.find((w) => w.t.toUpperCase() === ticker.toUpperCase());
+  // Desk calls and documents are keyed on the "$NVDA" form the backend resolves entities to.
+  const sym = `$${ticker.replace(/^\$/, "").toUpperCase()}`;
+  const takes = d.deskNotes.flatMap((n) =>
+    n.stocks.filter((s) => s.ticker.toUpperCase() === sym).map((take) => ({ desk: n.desk, take })),
+  );
+  const tickerDocs = d.sourceDocs.filter((doc) => doc.tickers.includes(sym));
 
   if (!item) {
     return (
@@ -229,20 +236,46 @@ export function TickerDetailPage({ ticker }: { ticker: string }) {
         {/* Debate Chamber — reuses the app's Bull vs Bear structure */}
         <DebateCard debate={d.debate} tiers={d.tiers} onOpenDebate={onOpenDebate} />
 
-        {/* All sources related to this ticker */}
-        <Card title="Related Sources" sub={`feeding ${item.t}`} className="span5">
-          {d.sources.length === 0 ? (
-            <EmptyState label="No sources yet" sub="run a discovery" />
+        {/* The desk's call on this ticker, with the quotes it was grounded on. */}
+        <Card title="Analyst Evidence" sub={`desk calls on ${item.t}`} className="span5">
+          {takes.length === 0 ? (
+            <EmptyState label="No desk call yet" sub="Awaiting Andie (Tier 3)" />
           ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {d.sources.map((s, i) => (
-              <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < d.sources.length - 1 ? "1px solid var(--stroke)" : "none" }}>
-                <span className="chip" style={{ fontSize: 9, width: 58, justifyContent: "center" }}>{s.kind}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{s.name}</div>
-                  <div className="mono" style={{ fontSize: 10, color: "var(--t-lo)" }}>{s.freq} · {s.items} items</div>
+            {takes.map(({ desk, take }, i) => (
+              <div key={`${desk}-${i}`} style={{ padding: "10px 0", borderBottom: i < takes.length - 1 ? "1px solid var(--stroke)" : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="chip" style={{ fontSize: 9 }}>Andie-{desk}</span>
+                  <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: take.conviction >= 0 ? "var(--up)" : "var(--down)" }}>
+                    {take.conviction >= 0 ? "+" : ""}{take.conviction.toFixed(2)}
+                  </span>
+                  <span className="mono" style={{ fontSize: 10.5, color: "var(--t-lo)" }}>{take.horizon}</span>
                 </div>
-                <span style={{ width: 7, height: 7, borderRadius: 99, flexShrink: 0, background: s.live ? "var(--up)" : "var(--t-faint)", boxShadow: s.live ? "0 0 7px var(--up)" : "none" }} />
+                {take.rationale && (
+                  <div style={{ fontSize: 11.5, color: "var(--t-lo)", marginTop: 4, lineHeight: 1.4, textWrap: "pretty" }}>{take.rationale}</div>
+                )}
+                <EvidenceList items={take.evidence} sources={d.sourceDocs} />
+              </div>
+            ))}
+          </div>
+          )}
+        </Card>
+
+        {/* Every document that mentions this ticker — clickable, so the call is checkable. */}
+        <Card title="Related Sources" sub={`${tickerDocs.length} mentioning ${item.t}`} className="span7">
+          {tickerDocs.length === 0 ? (
+            <EmptyState label="No sources mention this ticker" sub="run a discovery" />
+          ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {tickerDocs.slice(0, 12).map((doc, i) => (
+              <div key={doc.url} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < Math.min(tickerDocs.length, 12) - 1 ? "1px solid var(--stroke)" : "none" }}>
+                <span className="chip" style={{ fontSize: 9, width: 58, flexShrink: 0, justifyContent: "center" }}>{doc.kind}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 500, color: "var(--t-hi)" }} title={doc.url}>
+                    {doc.title} ↗
+                  </a>
+                  <div className="mono" style={{ fontSize: 10, color: "var(--t-lo)", marginTop: 2 }}>{doc.author || doc.host} · {doc.stream}</div>
+                </div>
               </div>
             ))}
           </div>

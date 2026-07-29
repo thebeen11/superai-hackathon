@@ -19,7 +19,7 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/signals", label: "Signal Terminal", icon: "signals" },
   { href: "/predictions", label: "Predictions", icon: "predictions" },
   { href: "/sources", label: "Sources", icon: "sources" },
-  { href: "/indicators", label: "Indicators", icon: "indicators" },
+  { href: "/indicators", label: "Macro Indicators", icon: "indicators" },
   { href: "/console", label: "Agent Console", icon: "console" },
 ];
 

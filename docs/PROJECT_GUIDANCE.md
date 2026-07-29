@@ -54,7 +54,7 @@ take-profit targets. Recommendations are expressed as:
 
 **End outcome:**
 
-1. A **Financial/Economic Indicator Dashboard** (fed by the MACRO data stream).
+1. A **Macro Indicators** dashboard (fed by the MACRO data stream).
 2. **Thematic portfolios** of stock recommendations (e.g. "Memory Chips for the AI
    Buildout: Micron, SK Hynix, SanDisk") each with an **estimated holding period**.
 3. **Backtest** validation: "if you invested $10,000 in this theme, how much would
@@ -124,7 +124,7 @@ graph TD
         MacroDB -->|macro context| C1[Winston - Chairman]:::chairman
         DebateTranscript --> C1
         C1 -->|Verdict| Portfolios[Final Thematic Portfolios + hold periods]
-        C1 -->|Macro| Dash[Financial Indicators Dashboard]
+        C1 -->|Macro| Dash[Macro Indicators Dashboard]
     end
 
     Portfolios --> UI{Dashboard UI}:::user
@@ -211,8 +211,26 @@ The ultimate judge & macro allocator.
   valuation concern is valid → initiate a half-position in Micron"_) and constructs the
   final stock baskets with hold periods.
 - **Macro dashboard:** consumes the `[MACRO]` data routed straight to him (the Macro
-  Bypass) to populate the Financial Indicator Dashboard (inflation, Fed rates,
+  Bypass) to populate the Macro Indicators dashboard (inflation, Fed rates,
   sentiment), ensuring micro portfolios fit the macro environment.
+
+### Macro Bypass — the Macro Analyst (bear-market signpost tracker)
+
+A second consumer of the `[MACRO]` stream, running just upstream of Winston. It grades a
+**fixed** checklist of ten classic late-cycle signposts — yield curve, credit spreads,
+labour market, valuation, growth momentum, breadth, policy & liquidity, inflation
+re-acceleration, consumer stress, positioning — each as **Triggered / Watch / Clear**, and
+rolls them into an "N of M triggered" cycle-risk composite.
+
+- **Why the checklist is fixed:** a tracker is only worth reading if the same rows are
+  graded every run. The agent scores the signposts; it never chooses them
+  (`backend/app/taxonomy.py: BEAR_SIGNPOSTS`).
+- **No orphan alarms (§12.6):** a Triggered/Watch call must cite a real excerpt. Cited
+  sources that don't exist are dropped, and a signpost left without grounded evidence is
+  downgraded to `Clear` and flagged *unevidenced* — "nothing in the corpus spoke to it" is
+  displayed differently from "we checked and it's clear".
+- **Output:** the tracker renders on the **Macro Indicators** page, and is handed to
+  Winston so his indicator scores cannot call the regime benign while signposts are lit.
 
 ---
 
@@ -365,7 +383,8 @@ class CompositeSignalGenerator:
    What-If scenarios ("what if inflation prints 3.5% tomorrow?").
 4. **Sources & Agents** — Onboarding Chat, **Cron Manager** table, agent heartbeat;
    Prediction Ledger leaderboard.
-5. **Financial Indicator Dashboard** — macro indicators (Winston-driven), watchlist,
+5. **Macro Indicators** — macro indicators (Winston-driven), the bear-market
+   signpost tracker (Macro Analyst), watchlist,
    key events.
 
 ---

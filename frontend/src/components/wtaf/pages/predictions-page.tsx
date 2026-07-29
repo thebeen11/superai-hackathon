@@ -3,6 +3,7 @@
 import { useWtafData } from "@/providers/wtaf-provider";
 import { Card, EmptyState } from "../primitives";
 import { PageHead } from "../shared";
+import { EvidenceList } from "../source-link";
 
 export function PredictionsPage() {
   const d = useWtafData();
@@ -185,6 +186,7 @@ export function PredictionsPage() {
                     >
                       {p.by}
                     </div>
+                    <EvidenceList items={p.evidence} sources={d.sourceDocs} />
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses } from './types.gen';
+import type { AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListWatchlistsData, ListWatchlistsResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -114,6 +114,35 @@ export const resetPrompt = <ThrowOnError extends boolean = false>(options: Optio
  */
 export const updatePrompt = <ThrowOnError extends boolean = false>(options: Options<UpdatePromptData, ThrowOnError>): RequestResult<UpdatePromptResponses, UpdatePromptErrors, ThrowOnError> => (options.client ?? client).put<UpdatePromptResponses, UpdatePromptErrors, ThrowOnError>({
     url: '/api/prompts/{key}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Watchlists
+ *
+ * Every watchlist override — the frontend applies `enabled` and hides `deleted`;
+ * the per-ticker scan skips any ticker that is disabled or deleted.
+ */
+export const listWatchlists = <ThrowOnError extends boolean = false>(options?: Options<ListWatchlistsData, ThrowOnError>): RequestResult<ListWatchlistsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListWatchlistsResponses, unknown, ThrowOnError>({ url: '/api/watchlists', ...options });
+
+/**
+ * Remove Watchlist
+ *
+ * Remove a ticker from the watchlist completely (tombstone — stops scanning + hides it).
+ */
+export const removeWatchlist = <ThrowOnError extends boolean = false>(options: Options<RemoveWatchlistData, ThrowOnError>): RequestResult<RemoveWatchlistResponses, RemoveWatchlistErrors, ThrowOnError> => (options.client ?? client).delete<RemoveWatchlistResponses, RemoveWatchlistErrors, ThrowOnError>({ url: '/api/watchlists/{ticker}', ...options });
+
+/**
+ * Update Watchlist
+ *
+ * Toggle scanning on/off for one ticker.
+ */
+export const updateWatchlist = <ThrowOnError extends boolean = false>(options: Options<UpdateWatchlistData, ThrowOnError>): RequestResult<UpdateWatchlistResponses, UpdateWatchlistErrors, ThrowOnError> => (options.client ?? client).put<UpdateWatchlistResponses, UpdateWatchlistErrors, ThrowOnError>({
+    url: '/api/watchlists/{ticker}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

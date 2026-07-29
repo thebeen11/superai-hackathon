@@ -43,6 +43,35 @@ SECTORS: list[str] = [
 
 UNCLASSIFIED = "Unclassified"
 
+# The fixed bear-market signpost checklist the Macro Analyst scores every run
+# (app/council/macro.py). Deliberately closed: a *fixed* list is what makes the tracker
+# comparable run-over-run — the model grades these and only these, it never invents a
+# signpost. (key, display name, what would trigger it).
+BEAR_SIGNPOSTS: tuple[tuple[str, str, str], ...] = (
+    ("yield_curve", "Yield Curve",
+     "2s10s inverted, or re-steepening out of a deep inversion"),
+    ("credit_spreads", "Credit Spreads",
+     "High-yield / investment-grade spreads widening off the lows"),
+    ("unemployment", "Labour Market",
+     "Unemployment rising off cycle lows; layoffs broadening beyond one sector"),
+    ("valuation", "Valuation",
+     "Index multiples stretched versus history; thin or negative equity risk premium"),
+    ("growth", "Growth Momentum",
+     "ISM / PMI rolling over — below 50 and still falling"),
+    ("breadth", "Market Breadth",
+     "Leadership narrowing into a handful of mega-caps; equal-weight lagging"),
+    ("policy", "Policy & Liquidity",
+     "Tightening, QT, or restrictive real rates draining system liquidity"),
+    ("inflation", "Inflation Re-acceleration",
+     "Inflation turning back up and forcing a more hawkish policy path"),
+    ("consumer", "Consumer Stress",
+     "Delinquencies rising, savings drawn down, visible trade-down behaviour"),
+    ("sentiment", "Positioning & Euphoria",
+     "Speculative froth, rising leverage, retail chasing the tape"),
+)
+
+SIGNPOST_STATUSES: tuple[str, ...] = ("Triggered", "Watch", "Clear")
+
 # Built-in alias → canonical ticker (Req 9.1). Lowercased keys.
 COMPANY_ALIASES: dict[str, str] = {
     "zuck": "$META",

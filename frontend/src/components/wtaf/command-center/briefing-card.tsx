@@ -1,7 +1,9 @@
 "use client";
 import type { Agent, BriefingItem } from "@/lib/types";
+import { useWtafData } from "@/providers/wtaf-provider";
 import { Card, EmptyState } from "../primitives";
 import { AgentAvatar } from "../agents";
+import { EvidenceList } from "../source-link";
 
 export function BriefingCard({
   briefing,
@@ -10,6 +12,7 @@ export function BriefingCard({
   briefing: BriefingItem[];
   chairman: Agent;
 }) {
+  const d = useWtafData();
   const toneColor: Record<string, string> = {
     up: "var(--up)",
     down: "var(--down)",
@@ -51,16 +54,19 @@ export function BriefingCard({
                 boxShadow: `0 0 7px ${toneColor[b.tone]}`,
               }}
             />
-            <span
-              style={{
-                fontSize: 12.5,
-                lineHeight: 1.45,
-                color: "var(--t-mid)",
-                textWrap: "pretty",
-              }}
-            >
-              {b.text}
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <span
+                style={{
+                  fontSize: 12.5,
+                  lineHeight: 1.45,
+                  color: "var(--t-mid)",
+                  textWrap: "pretty",
+                }}
+              >
+                {b.text}
+              </span>
+              <EvidenceList items={b.evidence} sources={d.sourceDocs} />
+            </div>
           </div>
         ))}
       </div>

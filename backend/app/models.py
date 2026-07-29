@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def _now() -> datetime:
@@ -130,7 +130,9 @@ class CleanedItem(BaseModel):
     entities: list[ResolvedEntity] = Field(default_factory=list)
     themes: list[str] = Field(default_factory=list)  # from Market_Theme_Taxonomy
     segments: list[TranscriptSegment] = Field(default_factory=list)  # video provenance
+    author: str | None = None                        # byline / channel name, when the source gives one
     published_at: str | None = None                  # ISO8601, nullable (Req 14)
+    retrieved_at: datetime | None = None             # UTC when Discovery fetched it
     ingested_at: datetime = Field(default_factory=_now)  # UTC at persist time (Req 14)
 
 
@@ -159,8 +161,10 @@ class ContextPreview(BaseModel):
 
     tracker: str
     channel: str            # host of the source (e.g. "youtube.com")
+    source_url: str = ""    # the item the quote came from — makes the preview clickable
     date: str               # YYYY-MM-DD, or "" if unknown
     timestamp: str          # HH:MM:SS into the transcript, "00:00:00" for articles
+    timestamp_start: float | None = None  # seconds into a video, for a ?t= deep link
     quote: str
     speaker: str            # "Video transcript" | "Article"
     score: float            # 0..1 relevance to the tracker concept
@@ -240,15 +244,57 @@ class ThemeBasket(BaseModel):
     conviction: float = 0.0         # 0..1 confidence
     verdict: str = ""               # the Chairman's call
     hold: str = "—"                 # hold period, e.g. "6–12M"
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class MacroIndicator(BaseModel):
-    """Tier 5 — a macro/financial indicator score for the dashboard."""
+    """Tier 5 — a macro indicator score for the dashboard."""
 
     name: str                       # e.g. "Inflation Trajectory"
     score: float                    # -1.0 .. +1.0
     band: str                       # Positive | Neutral | Negative
-    evidence: str = ""              # short evidence summary
+    rationale: str = ""             # one line explaining the score
+    evidence: list[Evidence] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_evidence(cls, data):
+        """Read snapshots written before `evidence` became a list of citations.
+
+        A whole CouncilReport is persisted as JSON and read back through this model, so
+        narrowing a field's type here retroactively invalidates every stored run — which
+        surfaces as a blank dashboard rather than an error anyone can act on. The old
+        free-text `evidence` really was a rationale, so that is where it lands: the
+        indicator keeps its explanatory line and simply carries no citation, which is the
+        honest rendering of a run made before citations existed.
+        """
+        if isinstance(data, dict) and isinstance(data.get("evidence"), str):
+            legacy = data["evidence"]
+            data = {**data, "rationale": data.get("rationale") or legacy, "evidence": []}
+        return data
+
+
+class Signpost(BaseModel):
+    """One row of the bear-market signpost checklist (app/taxonomy.py BEAR_SIGNPOSTS)."""
+
+    key: str                        # stable checklist id, e.g. "yield_curve"
+    name: str                       # display name
+    status: str                     # Triggered | Watch | Clear
+    rationale: str = ""             # one line, grounded in the excerpts
+    evidence: list[Evidence] = Field(default_factory=list)
+    evidenced: bool = True          # False → nothing in the corpus speaks to it
+
+
+class BearSignpostReport(BaseModel):
+    """The Macro Analyst's bear-market signpost tracker for one council run."""
+
+    signposts: list[Signpost] = Field(default_factory=list)
+    triggered: int = 0
+    watch: int = 0
+    total: int = 0
+    risk_score: float = 0.0         # 0.0 (contained) .. 1.0 (every signpost lit)
+    label: str = "—"                # e.g. "LATE CYCLE · ELEVATED"
+    summary: str = ""
 
 
 class AceComponent(BaseModel):
@@ -271,6 +317,7 @@ class BriefingItem(BaseModel):
 
     tone: str                       # up | down | neutral
     text: str
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class Prediction(BaseModel):
@@ -283,6 +330,7 @@ class Prediction(BaseModel):
     probability: float = 0.5        # forecast confidence 0..1 (for Brier scoring)
     outcome: bool | None = None     # True/False once resolved, else None
     resolved_at: datetime | None = None
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class LedgerRow(BaseModel):
@@ -296,6 +344,25 @@ class LedgerRow(BaseModel):
     trend: str = "flat"             # "up" | "down" | "flat" vs the previous snapshot
 
 
+class SourceRef(BaseModel):
+    """One document the council read on a given run — the audit manifest (§12.6).
+
+    Recorded per run rather than derived from the live corpus, so a snapshot still says
+    what it was actually based on after the corpus moves on. `cited_by` lists the agents
+    that quoted it; an empty list means the council read the document but nothing in the
+    final report leans on it, which is worth showing rather than hiding.
+    """
+
+    url: str
+    title: str
+    source_type: SourceType
+    stream: Stream
+    author: str | None = None
+    published_at: str | None = None
+    themes: list[str] = Field(default_factory=list)
+    cited_by: list[str] = Field(default_factory=list)  # e.g. ["Andie-TMT", "Winston"]
+
+
 class CouncilReport(BaseModel):
     """The full Tier 3–5 output for one run, persisted as the latest snapshot."""
 
@@ -303,10 +370,12 @@ class CouncilReport(BaseModel):
     debate: DebateRecord | None = None
     baskets: list[ThemeBasket] = Field(default_factory=list)
     indicators: list[MacroIndicator] = Field(default_factory=list)
+    macro: BearSignpostReport | None = None
     ace: AceIndex | None = None
     briefing: list[BriefingItem] = Field(default_factory=list)
     predictions: list[Prediction] = Field(default_factory=list)
     ledger: list[LedgerRow] = Field(default_factory=list)
+    sources: list[SourceRef] = Field(default_factory=list)  # every document read this run
     source_count: int = 0
     generated_at: datetime = Field(default_factory=_now)
 

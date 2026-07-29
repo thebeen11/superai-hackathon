@@ -26,12 +26,13 @@ def _no_layers(monkeypatch):
     monkeypatch.setattr(settings, "agent_identity_layers", False)
 
 
-def test_all_eleven_skill_prompts_registered_with_unique_keys():
+def test_all_twelve_skill_prompts_registered_with_unique_keys():
     specs = list_skill_specs()
     keys = [s.key for s in specs]
-    assert len(specs) == 11
-    assert len(set(keys)) == 11
+    assert len(specs) == 12
+    assert len(set(keys)) == 12
     assert "council.chairman" in keys and "insights.context" in keys
+    assert "council.macro" in keys
     assert all(s.layer == "skill" and s.agent for s in specs)
 
 
@@ -39,14 +40,29 @@ def test_catalogue_adds_identity_layers_with_unique_keys():
     specs = list_prompt_specs()
     keys = [s.key for s in specs]
     assert len(set(keys)) == len(keys)
-    # 11 skills + soul + rules + 6 mental models + one personality per agent.
-    assert len(specs) == 11 + 2 + 6 + len(identity.AGENTS)
+    # 12 skills + soul + rules + 6 mental models + one personality per agent.
+    assert len(specs) == 12 + 2 + 6 + len(identity.AGENTS)
     layers = {s.layer for s in specs}
     assert layers == {"skill", "soul", "rules", "mental_model", "personality"}
 
 
 def test_default_used_when_no_override(_no_layers):
     assert get_prompt("council.chairman").startswith("You are Winston")
+
+
+def test_citing_agents_all_state_the_index_citation_contract(_no_layers):
+    """Every agent that emits evidence must ask for excerpt indices, not free-text URLs.
+
+    Grounding maps `source_index` back to a real source; a prompt that forgets to ask for
+    it silently produces un-anchored claims (which is exactly how the Chairman used to
+    behave), so the contract is asserted rather than left to review.
+    """
+    for key in ("council.chairman", "council.analyst", "council.macro"):
+        text = get_prompt(key).lower()
+        assert "index" in text or "indices" in text, f"{key} does not ask for a source index"
+    chairman = get_prompt("council.chairman")
+    assert "SOURCES" in chairman
+    assert "basket, indicator, briefing bullet and prediction" in chairman
 
 
 def test_override_takes_effect(_no_layers):

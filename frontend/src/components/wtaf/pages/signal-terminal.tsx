@@ -277,7 +277,7 @@ export function SignalTerminal() {
         )}
 
         <Card
-          title="Indicator Heatmap"
+          title="Macro Indicator Heatmap"
           sub="rubric scores · last 8 weeks"
           className="span12"
           loading={discovering && d.indicators.length === 0}

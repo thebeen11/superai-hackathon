@@ -5,6 +5,7 @@ import type { ContextPreview } from "@/lib/types";
 import { getContextPreview } from "@/lib/api/wtaf";
 import { useWtafData } from "@/providers/wtaf-provider";
 import { Dot } from "../primitives";
+import { sourceHref } from "../source-link";
 import { Modal } from "./modal";
 
 export function ContextModal({ trackerName, onClose }: { trackerName: string; onClose: () => void }) {
@@ -49,9 +50,22 @@ export function ContextModal({ trackerName, onClose }: { trackerName: string; on
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
               <div className="mono" style={{ fontSize: 12, color: "var(--t-mid)" }}>timestamp <span style={{ color: "var(--blue-bright)" }}>{c.timestamp}</span></div>
-              <button className="primary-btn" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                Go to Source · {c.timestamp}</button>
+              {c.sourceUrl ? (
+                <a
+                  href={sourceHref(c.sourceUrl, c.timestampStart)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="primary-btn"
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  Go to Source · {c.timestamp}
+                </a>
+              ) : (
+                <span className="mono" style={{ fontSize: 11, color: "var(--t-faint)" }}>
+                  no source link
+                </span>
+              )}
             </div>
           </>
         )}

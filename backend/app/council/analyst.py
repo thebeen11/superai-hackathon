@@ -16,8 +16,9 @@ from pydantic import BaseModel, Field
 
 from ..events import Emit, noop_emit
 from ..llm import ReasoningError, converse_structured
-from ..models import CleanedItem, Evidence, SectorNote, StockTake
+from ..models import CleanedItem, SectorNote, StockTake
 from ..prompts import get_prompt
+from . import grounding
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +37,6 @@ DESK_AGENTS: dict[str, str] = {
     "Capital": "andie-capital",
 }
 MAX_STOCKS_PER_DESK = 20  # §12.2 — avoid "lost in the middle" context degradation
-_SNIPPET = 600            # chars of clean_text shown per item to bound the prompt
-
-
-class _LLMEvidence(BaseModel):
-    quote: str
-    source_index: int  # index into the numbered excerpt list shown in the prompt
 
 
 class _LLMStock(BaseModel):
@@ -49,7 +44,7 @@ class _LLMStock(BaseModel):
     conviction: float
     horizon: str = ""
     rationale: str = ""
-    evidence: list[_LLMEvidence] = Field(default_factory=list)
+    evidence: list[grounding.LLMEvidence] = Field(default_factory=list)
 
 
 class _AnalystOutput(BaseModel):
@@ -69,30 +64,23 @@ def route_to_desks(items: list[CleanedItem]) -> dict[str, list[CleanedItem]]:
     return buckets
 
 
+def _tickers(item: CleanedItem) -> str:
+    """The resolved tickers, so a stock take can be attributed without re-reading the body."""
+    return "tickers=[%s]" % ", ".join(
+        e.canonical for e in item.entities if e.canonical.startswith("$")
+    )
+
+
 def _digest(items: list[CleanedItem]) -> str:
     """Numbered, length-bounded excerpt list the analyst cites back into."""
-    lines: list[str] = []
-    for i, it in enumerate(items):
-        tickers = ", ".join(e.canonical for e in it.entities if e.canonical.startswith("$"))
-        text = it.clean_text[:_SNIPPET].replace("\n", " ")
-        lines.append(
-            f"[{i}] title={it.title!r} tickers=[{tickers}] url={it.source_url}\n    {text}"
-        )
-    return "\n".join(lines)
+    return grounding.digest(items, extra=_tickers)
 
 
 def _ground_stocks(out: _AnalystOutput, items: list[CleanedItem]) -> list[StockTake]:
     """Map cited source indices back to real URLs; drop ungrounded stocks (no-orphan)."""
     stocks: list[StockTake] = []
     for s in out.stocks[:MAX_STOCKS_PER_DESK]:
-        evidence: list[Evidence] = []
-        for ev in s.evidence:
-            if 0 <= ev.source_index < len(items):
-                src = items[ev.source_index]
-                ts = src.segments[0].start if src.segments else None
-                evidence.append(
-                    Evidence(quote=ev.quote, source_url=src.source_url, timestamp_start=ts)
-                )
+        evidence = grounding.ground(s.evidence, items)
         if not evidence:
             logger.info("Dropping ungrounded stock take %s (no valid source)", s.ticker)
             continue

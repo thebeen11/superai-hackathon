@@ -70,6 +70,7 @@ function labelFromProgress(evt: ProgressEvent): DiscoveryStatus {
   // Tier 3–5 council stages (auto-chained after data engineering).
   else if (evt.stage === "council.analyst") text = "Analyst desks…";
   else if (evt.stage === "council.debate") text = "Debating…";
+  else if (evt.stage === "council.macro") text = "Macro signposts…";
   else if (evt.stage === "council.chairman") text = "Chairman verdict…";
   else if (evt.stage === "council") text = "Convening council…";
   else if (evt.stage.startsWith("discover")) text = "Searching…";
