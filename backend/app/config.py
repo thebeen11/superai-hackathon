@@ -34,14 +34,17 @@ class Settings(BaseSettings):
     # service account is used automatically; locally run `gcloud auth application-default
     # login`. If `gcp_project` is unset, google-auth resolves it from ADC.
     gcp_project: str | None = None
-    vertex_location: str = "us-central1"
-    gemini_model: str = "gemini-2.5-pro"
+    # Gemini 3.x is served on the `global` endpoint, not the regional ones — asking
+    # us-central1 for gemini-3.1-pro-preview / gemini-3.6-flash returns 404.
+    vertex_location: str = "global"
+    gemini_model: str = "gemini-3.1-pro-preview"
     gemini_max_retries: int = 3
     # Tier 4 (Freddy) debates Bull vs Bear. Originally two *different* model families to
     # curb collusion (PROJECT_GUIDANCE §11); on Gemini-only these are the same family
-    # (pro vs flash), so the anti-collusion guardrail is weaker — intentional tradeoff.
-    gemini_bull_model: str = "gemini-2.5-pro"
-    gemini_bear_model: str = "gemini-2.5-flash"
+    # (3.1 Pro vs 3.6 Flash), so the anti-collusion guardrail is weaker — intentional
+    # tradeoff.
+    gemini_bull_model: str = "gemini-3.1-pro-preview"
+    gemini_bear_model: str = "gemini-3.6-flash"
     # Alternating Bull/Bear turns in the chamber; each round costs one Gemini call.
     debate_rounds: int = 6
 

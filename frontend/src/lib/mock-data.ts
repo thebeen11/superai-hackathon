@@ -148,7 +148,7 @@ export const wtafMock: WtafData = {
       n: 5, key: "chairman", label: "Chairman", sub: "fan-in · final judge", accent: "chair",
       status: "thinking", statusText: "Weighing verdict", bypassIn: true,
       squad: [
-        { id: "macro-analyst", name: "Macro Analyst", label: "Macro", glyph: "MA", accent: "amber", role: "Macro · Bear-signpost tracker (macro bypass)", status: "thinking", statusText: "Grading bear signposts", queue: 10, throughput: "10 signposts", tools: ["Gemini 2.5 Pro", "Macro Vector DB"], skills: ["Fixed signpost checklist", "Evidence grounding", "Cycle-risk composite"], log: ["Curve · inverted 14 months", "Breadth · 7 names carrying", "2/10 triggered · MID CYCLE"] },
+        { id: "macro-analyst", name: "Macro Analyst", label: "Macro", glyph: "MA", accent: "amber", role: "Macro · Bear-signpost tracker (macro bypass)", status: "thinking", statusText: "Grading bear signposts", queue: 10, throughput: "10 signposts", tools: ["Gemini 3.1 Pro", "Macro Vector DB"], skills: ["Fixed signpost checklist", "Evidence grounding", "Cycle-risk composite"], log: ["Curve · inverted 14 months", "Breadth · 7 names carrying", "2/10 triggered · MID CYCLE"] },
         { id: "winston", name: "Winston", label: "Chairman", glyph: "♔", accent: "chair", role: "Chairman · Judge & Allocator", status: "thinking", statusText: "Weighing Bull/Bear verdict", queue: 1, throughput: "Fri 16:00", tools: ["Claude Opus", "Macro Vector DB", "Reporting"], skills: ["Debate adjudication", "ACE index weighting", "Final allocation & hold periods", "Macro-regime sanity check"], log: ["Read debate transcript", "MU → half position", "ACE weights · AI 40 / rates 30 / infl 30"] },
       ],
     },
