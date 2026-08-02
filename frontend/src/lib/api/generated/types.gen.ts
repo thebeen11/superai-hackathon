@@ -1113,6 +1113,185 @@ export type WatchlistUpdate = {
     enabled: boolean;
 };
 
+/**
+ * YoutubeChannel
+ *
+ * A channel the Commander subscribed to on the Sources page.
+ */
+export type YoutubeChannel = {
+    /**
+     * Channel Id
+     */
+    channel_id: string;
+    /**
+     * Handle
+     */
+    handle?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Thumbnail
+     */
+    thumbnail?: string | null;
+    /**
+     * Subscriber Count
+     */
+    subscriber_count?: number | null;
+    /**
+     * Enabled
+     */
+    enabled?: boolean;
+    /**
+     * Deleted
+     */
+    deleted?: boolean;
+    /**
+     * Added At
+     */
+    added_at?: string | null;
+    /**
+     * Last Polled At
+     */
+    last_polled_at?: string | null;
+    /**
+     * Last Error
+     */
+    last_error?: string | null;
+    /**
+     * Video Count
+     */
+    video_count?: number;
+};
+
+/**
+ * YoutubeChannelAdded
+ *
+ * The new subscription plus what its first ingest actually found.
+ */
+export type YoutubeChannelAdded = {
+    channel: YoutubeChannel;
+    ingest: YoutubeIngestReport;
+};
+
+/**
+ * YoutubeChannelCreate
+ */
+export type YoutubeChannelCreate = {
+    /**
+     * Id
+     *
+     * Channel URL, @handle, or UC… id — anything Supadata can resolve
+     */
+    id: string;
+    /**
+     * Backfill
+     *
+     * Videos to pull immediately (default YOUTUBE_CHANNEL_BACKFILL)
+     */
+    backfill?: number | null;
+};
+
+/**
+ * YoutubeChannelUpdate
+ */
+export type YoutubeChannelUpdate = {
+    /**
+     * Enabled
+     *
+     * False pauses polling for this channel
+     */
+    enabled: boolean;
+};
+
+/**
+ * YoutubeIngestReport
+ *
+ * Outcome of ingesting one channel (or a whole poll) — surfaced, never silently dropped.
+ */
+export type YoutubeIngestReport = {
+    /**
+     * Channels
+     */
+    channels?: number;
+    /**
+     * Videos Seen
+     */
+    videos_seen?: number;
+    /**
+     * Persisted
+     */
+    persisted?: number;
+    /**
+     * Failed
+     */
+    failed?: number;
+    /**
+     * Matched
+     */
+    matched?: number;
+    /**
+     * Errors
+     */
+    errors?: Array<string>;
+};
+
+/**
+ * YoutubeMatch
+ *
+ * One watchlist-relevant moment in one video — the persisted evidence unit.
+ *
+ * `timestamp_start` is resolved with `council.grounding.best_offset`, the same routine the
+ * analysts use, so a match deep-links to the exact second the ticker was discussed.
+ */
+export type YoutubeMatch = {
+    /**
+     * Video Url
+     */
+    video_url: string;
+    /**
+     * Video Id
+     */
+    video_id: string;
+    /**
+     * Channel Id
+     */
+    channel_id: string;
+    /**
+     * Ticker
+     */
+    ticker: string;
+    /**
+     * Quote
+     */
+    quote: string;
+    /**
+     * Timestamp Start
+     */
+    timestamp_start?: number | null;
+    /**
+     * Relevance
+     */
+    relevance?: number;
+    /**
+     * Title
+     */
+    title?: string;
+    /**
+     * Channel Name
+     */
+    channel_name?: string | null;
+    /**
+     * Published At
+     */
+    published_at?: string | null;
+    /**
+     * Matched At
+     */
+    matched_at?: string;
+};
+
 export type HealthData = {
     body?: never;
     path?: never;
@@ -1527,6 +1706,197 @@ export type UpdateWatchlistResponses = {
 };
 
 export type UpdateWatchlistResponse = UpdateWatchlistResponses[keyof UpdateWatchlistResponses];
+
+export type ListYoutubeChannelsEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/sources/youtube/channels';
+};
+
+export type ListYoutubeChannelsEndpointResponses = {
+    /**
+     * Response List Youtube Channels Endpoint
+     *
+     * Successful Response
+     */
+    200: Array<YoutubeChannel>;
+};
+
+export type ListYoutubeChannelsEndpointResponse = ListYoutubeChannelsEndpointResponses[keyof ListYoutubeChannelsEndpointResponses];
+
+export type AddYoutubeChannelData = {
+    body: YoutubeChannelCreate;
+    path?: never;
+    query?: never;
+    url: '/api/sources/youtube/channels';
+};
+
+export type AddYoutubeChannelErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddYoutubeChannelError = AddYoutubeChannelErrors[keyof AddYoutubeChannelErrors];
+
+export type AddYoutubeChannelResponses = {
+    /**
+     * Successful Response
+     */
+    200: YoutubeChannelAdded;
+};
+
+export type AddYoutubeChannelResponse = AddYoutubeChannelResponses[keyof AddYoutubeChannelResponses];
+
+export type RemoveYoutubeChannelData = {
+    body?: never;
+    path: {
+        /**
+         * Channel Id
+         */
+        channel_id: string;
+    };
+    query?: never;
+    url: '/api/sources/youtube/channels/{channel_id}';
+};
+
+export type RemoveYoutubeChannelErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveYoutubeChannelError = RemoveYoutubeChannelErrors[keyof RemoveYoutubeChannelErrors];
+
+export type RemoveYoutubeChannelResponses = {
+    /**
+     * Successful Response
+     */
+    200: YoutubeChannel;
+};
+
+export type RemoveYoutubeChannelResponse = RemoveYoutubeChannelResponses[keyof RemoveYoutubeChannelResponses];
+
+export type UpdateYoutubeChannelData = {
+    body: YoutubeChannelUpdate;
+    path: {
+        /**
+         * Channel Id
+         */
+        channel_id: string;
+    };
+    query?: never;
+    url: '/api/sources/youtube/channels/{channel_id}';
+};
+
+export type UpdateYoutubeChannelErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateYoutubeChannelError = UpdateYoutubeChannelErrors[keyof UpdateYoutubeChannelErrors];
+
+export type UpdateYoutubeChannelResponses = {
+    /**
+     * Successful Response
+     */
+    200: YoutubeChannel;
+};
+
+export type UpdateYoutubeChannelResponse = UpdateYoutubeChannelResponses[keyof UpdateYoutubeChannelResponses];
+
+export type RefreshYoutubeChannelData = {
+    body?: never;
+    path: {
+        /**
+         * Channel Id
+         */
+        channel_id: string;
+    };
+    query?: never;
+    url: '/api/sources/youtube/channels/{channel_id}/refresh';
+};
+
+export type RefreshYoutubeChannelErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RefreshYoutubeChannelError = RefreshYoutubeChannelErrors[keyof RefreshYoutubeChannelErrors];
+
+export type RefreshYoutubeChannelResponses = {
+    /**
+     * Successful Response
+     */
+    200: YoutubeIngestReport;
+};
+
+export type RefreshYoutubeChannelResponse = RefreshYoutubeChannelResponses[keyof RefreshYoutubeChannelResponses];
+
+export type PollYoutubeChannelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/sources/youtube/poll';
+};
+
+export type PollYoutubeChannelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: YoutubeIngestReport;
+};
+
+export type PollYoutubeChannelsResponse = PollYoutubeChannelsResponses[keyof PollYoutubeChannelsResponses];
+
+export type ListYoutubeMatchesEndpointData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Ticker
+         *
+         * Canonical symbol, e.g. $NVDA
+         */
+        ticker?: string | null;
+        /**
+         * Channel Id
+         */
+        channel_id?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/sources/youtube/matches';
+};
+
+export type ListYoutubeMatchesEndpointErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListYoutubeMatchesEndpointError = ListYoutubeMatchesEndpointErrors[keyof ListYoutubeMatchesEndpointErrors];
+
+export type ListYoutubeMatchesEndpointResponses = {
+    /**
+     * Response List Youtube Matches Endpoint
+     *
+     * Successful Response
+     */
+    200: Array<YoutubeMatch>;
+};
+
+export type ListYoutubeMatchesEndpointResponse = ListYoutubeMatchesEndpointResponses[keyof ListYoutubeMatchesEndpointResponses];
 
 export type ListAgentsData = {
     body?: never;

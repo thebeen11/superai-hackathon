@@ -24,12 +24,21 @@ from .crawl import (
 from .dataeng import process_discovery_result
 from .db.repository import (
     delete_watchlist_entry,
+    delete_youtube_channel,
+    get_youtube_channel,
     list_cleaned_items,
     list_watchlist_overrides,
+    list_youtube_channels,
+    list_youtube_matches,
+    save_youtube_channel,
     set_watchlist_enabled,
+    set_youtube_channel_enabled,
 )
 from .discovery import discover, discover_with_refinement
 from .discovery.refine import QueryValidationError
+from .discovery.supadata import SupadataError
+from .discovery.youtube_channel import SourceUnavailable, resolve_channel
+from .discovery.youtube_ingest import ingest_all_enabled_channels, ingest_channel
 from .events import Emit
 from .insights.context import tracker_context
 from .models import (
@@ -40,12 +49,16 @@ from .models import (
     CouncilReport,
     DataEngReport,
     DiscoveryResult,
+    YoutubeChannel,
+    YoutubeIngestReport,
+    YoutubeMatch,
 )
 from .jobs import create_job, get_job, list_jobs
 from .prompts import identity
 from .prompts import store as prompt_store
 from .prompts.registry import PromptSpec, get_spec, list_prompt_specs
 from .sse import sse_from_subscribe, sse_stream
+from .youtube_poll import start_youtube_poll_timer, stop_youtube_poll_timer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -63,8 +76,12 @@ def _operation_id(route: APIRoute) -> str:
 async def _lifespan(app: FastAPI):
     if settings.daily_crawl_enabled:
         start_daily_crawl_timer()
+    # No key means no channel ingestion is possible, so don't spin a thread that can only fail.
+    if settings.youtube_poll_enabled and settings.supadata_api_key:
+        start_youtube_poll_timer()
     yield
     stop_daily_crawl_timer()
+    stop_youtube_poll_timer()
 
 
 app = FastAPI(
@@ -369,6 +386,118 @@ def remove_watchlist(ticker: str) -> WatchlistEntry:
     """Remove a ticker from the watchlist completely (tombstone — stops scanning + hides it)."""
     o = delete_watchlist_entry(ticker.upper())
     return WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+
+
+# --- Sources → YouTube: channel subscriptions -------------------------------
+
+
+class YoutubeChannelCreate(BaseModel):
+    id: str = Field(
+        ...,
+        description="Channel URL, @handle, or UC… id — anything Supadata can resolve",
+    )
+    backfill: int | None = Field(
+        None, ge=1, le=50,
+        description="Videos to pull immediately (default YOUTUBE_CHANNEL_BACKFILL)",
+    )
+
+
+class YoutubeChannelUpdate(BaseModel):
+    enabled: bool = Field(..., description="False pauses polling for this channel")
+
+
+class YoutubeChannelAdded(BaseModel):
+    """The new subscription plus what its first ingest actually found."""
+
+    channel: YoutubeChannel
+    ingest: YoutubeIngestReport
+
+
+@app.get("/api/sources/youtube/channels", response_model=list[YoutubeChannel])
+def list_youtube_channels_endpoint() -> list[YoutubeChannel]:
+    """Every subscribed channel (tombstoned ones excluded), newest first."""
+    return list_youtube_channels()
+
+
+@app.post("/api/sources/youtube/channels", response_model=YoutubeChannelAdded)
+def add_youtube_channel(body: YoutubeChannelCreate) -> YoutubeChannelAdded:
+    """Subscribe to a channel and immediately backfill its most recent videos.
+
+    Re-adding a tombstoned channel revives it rather than duplicating it, and the backfill
+    skips videos already ingested — so an accidental delete costs no Supadata credits.
+    """
+    try:
+        resolved = resolve_channel(body.id.strip())
+    except SourceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except SupadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = get_youtube_channel(resolved.channel_id)
+    if existing and not existing.deleted:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Already following {existing.name}",
+        )
+
+    channel = save_youtube_channel(resolved)
+    try:
+        report = ingest_channel(
+            channel, limit=body.backfill or settings.youtube_channel_backfill
+        )
+    except Exception as exc:  # noqa: BLE001 - the subscription stands even if the first pull fails
+        # The channel row is already committed, so failing the request here would leave the
+        # user with an error and a subscription that appears on the next load. Report the
+        # failure in the payload instead; the next poll retries.
+        logging.getLogger(__name__).warning(
+            "Backfill failed for %s: %s", resolved.channel_id, exc
+        )
+        report = YoutubeIngestReport(channels=1, errors=[str(exc)])
+    return YoutubeChannelAdded(channel=channel, ingest=report)
+
+
+@app.put("/api/sources/youtube/channels/{channel_id}", response_model=YoutubeChannel)
+def update_youtube_channel(channel_id: str, body: YoutubeChannelUpdate) -> YoutubeChannel:
+    """Pause or resume polling for one channel."""
+    return set_youtube_channel_enabled(channel_id, body.enabled)
+
+
+@app.delete("/api/sources/youtube/channels/{channel_id}", response_model=YoutubeChannel)
+def remove_youtube_channel(channel_id: str) -> YoutubeChannel:
+    """Unfollow a channel (tombstone — stops polling; its ingested videos are retained)."""
+    return delete_youtube_channel(channel_id)
+
+
+@app.post("/api/sources/youtube/channels/{channel_id}/refresh", response_model=YoutubeIngestReport)
+def refresh_youtube_channel(channel_id: str) -> YoutubeIngestReport:
+    """Pull one channel's new videos now, without waiting for the poll interval."""
+    channel = get_youtube_channel(channel_id)
+    if channel is None or channel.deleted:
+        raise HTTPException(status_code=404, detail=f"Unknown channel: {channel_id!r}")
+    try:
+        return ingest_channel(channel)
+    except SourceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/sources/youtube/poll", response_model=YoutubeIngestReport)
+def poll_youtube_channels() -> YoutubeIngestReport:
+    """Poll every enabled channel — the Cloud Scheduler hook (see deploy.sh).
+
+    Cloud Run scales to zero, so the in-process timer is for local runs only; in prod this
+    endpoint is the real trigger.
+    """
+    return ingest_all_enabled_channels()
+
+
+@app.get("/api/sources/youtube/matches", response_model=list[YoutubeMatch])
+def list_youtube_matches_endpoint(
+    ticker: str | None = Query(None, description="Canonical symbol, e.g. $NVDA"),
+    channel_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[YoutubeMatch]:
+    """Watchlist moments found in subscribed channels' transcripts, newest first."""
+    return list_youtube_matches(ticker=ticker, channel_id=channel_id, limit=limit)
 
 
 # --- Agent Console: the roster (soul, mental models, personality, tools) -----

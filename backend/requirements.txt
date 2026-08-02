@@ -73,6 +73,7 @@ httptools==0.8.0
 httpx==0.28.1
     # via
     #   google-genai
+    #   hedge-fund-council-backend
     #   openai
 idna==3.18
     # via

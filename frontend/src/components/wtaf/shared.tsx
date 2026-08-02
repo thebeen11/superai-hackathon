@@ -41,6 +41,63 @@ export function Stat({ label, value, color }: { label: string; value: ReactNode;
   );
 }
 
+/**
+ * On/off pill for "is this thing being scanned" (watchlist tickers, YouTube channels).
+ * Pattern mirrors the Agent Console mental-model switch.
+ */
+export function ScanToggle({ on, pending, onToggle, titleOn, titleOff }: {
+  on: boolean;
+  pending: boolean;
+  onToggle: () => void;
+  titleOn?: string;
+  titleOff?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={pending}
+      aria-pressed={on}
+      title={on ? (titleOn ?? "Scanning on — click to pause") : (titleOff ?? "Scanning paused — click to resume")}
+      style={{
+        width: 34, height: 19, borderRadius: 99, flexShrink: 0, position: "relative",
+        border: "1px solid " + (on ? "color-mix(in oklch, var(--orange-bright) 55%, transparent)" : "var(--stroke-hi)"),
+        background: on ? "color-mix(in oklch, var(--orange-bright) 26%, transparent)" : "var(--panel-2)",
+        cursor: pending ? "default" : "pointer", opacity: pending ? 0.5 : 1, transition: "background .15s",
+      }}
+    >
+      <span style={{ position: "absolute", top: 2, left: on ? 16 : 2, width: 13, height: 13, borderRadius: 99, background: on ? "var(--orange-bright)" : "var(--t-faint)", boxShadow: on ? "0 0 8px var(--orange-bright)" : "none", transition: "left .15s" }} />
+    </button>
+  );
+}
+
+/** Small square glyph button for row actions (delete, confirm, refresh). */
+export function IconButton({ children, title, onClick, disabled, danger }: {
+  children: ReactNode;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 13, lineHeight: 1, borderRadius: 7, flexShrink: 0,
+        background: "var(--panel-2)", border: "1px solid " + (danger ? "color-mix(in oklch, var(--down) 45%, transparent)" : "var(--stroke)"),
+        color: danger ? "var(--down)" : "var(--t-mid)",
+        cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.4 : 1, transition: "opacity .15s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** Overlay/drawer actions the shell exposes to pages/cards via `useShellActions()`. */
 export interface ShellActions {
   onOpenAgent: (agentId: string) => void;

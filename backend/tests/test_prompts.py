@@ -26,13 +26,13 @@ def _no_layers(monkeypatch):
     monkeypatch.setattr(settings, "agent_identity_layers", False)
 
 
-def test_all_twelve_skill_prompts_registered_with_unique_keys():
+def test_all_skill_prompts_registered_with_unique_keys():
     specs = list_skill_specs()
     keys = [s.key for s in specs]
-    assert len(specs) == 12
-    assert len(set(keys)) == 12
+    assert len(specs) == 13
+    assert len(set(keys)) == len(specs)
     assert "council.chairman" in keys and "insights.context" in keys
-    assert "council.macro" in keys
+    assert "council.macro" in keys and "insights.watchlist_match" in keys
     assert all(s.layer == "skill" and s.agent for s in specs)
 
 
@@ -40,8 +40,8 @@ def test_catalogue_adds_identity_layers_with_unique_keys():
     specs = list_prompt_specs()
     keys = [s.key for s in specs]
     assert len(set(keys)) == len(keys)
-    # 12 skills + soul + rules + 6 mental models + one personality per agent.
-    assert len(specs) == 12 + 2 + 6 + len(identity.AGENTS)
+    # every skill + soul + rules + 6 mental models + one personality per agent.
+    assert len(specs) == len(list_skill_specs()) + 2 + 6 + len(identity.AGENTS)
     layers = {s.layer for s in specs}
     assert layers == {"skill", "soul", "rules", "mental_model", "personality"}
 

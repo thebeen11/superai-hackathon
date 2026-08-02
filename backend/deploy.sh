@@ -49,6 +49,7 @@ SQL_DB_VERSION="${SQL_DB_VERSION:-POSTGRES_16}"
 DB_PASSWORD="${DB_PASSWORD:?set DB_PASSWORD to a strong password}"
 EXA_API_KEY="${EXA_API_KEY:?set EXA_API_KEY}"
 YOUTUBE_API_KEY="${YOUTUBE_API_KEY:?set YOUTUBE_API_KEY}"
+SUPADATA_API_KEY="${SUPADATA_API_KEY:?set SUPADATA_API_KEY}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 # Tier 4 debate sides (Bull vs Bear). Kept overridable so the chamber can be re-tiered
 # without a code change.
@@ -160,9 +161,10 @@ provision() {
   fi
 
   echo "==> Secrets"
-  upsert_secret EXA_API_KEY     "${EXA_API_KEY}"
-  upsert_secret YOUTUBE_API_KEY "${YOUTUBE_API_KEY}"
-  upsert_secret DATABASE_URL    "${DATABASE_URL}"
+  upsert_secret EXA_API_KEY      "${EXA_API_KEY}"
+  upsert_secret YOUTUBE_API_KEY  "${YOUTUBE_API_KEY}"
+  upsert_secret SUPADATA_API_KEY "${SUPADATA_API_KEY}"
+  upsert_secret DATABASE_URL     "${DATABASE_URL}"
 
   # The Cloud Run revision runs as a service account that must read the secrets AT DEPLOY TIME,
   # so grant its roles BEFORE deploying (granting after the deploy is too late — the deploy 403s
@@ -218,8 +220,8 @@ deploy() {
     --service-account="$(service_account)" \
     --add-cloudsql-instances="${CONNECTION_NAME}" \
     --min-instances=1 --max-instances=1 --no-cpu-throttling --timeout=3600 \
-    --set-env-vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL},GEMINI_BULL_MODEL=${GEMINI_BULL_MODEL},GEMINI_BEAR_MODEL=${GEMINI_BEAR_MODEL}" \
-    --set-secrets="EXA_API_KEY=EXA_API_KEY:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
+    --set-env-vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL},GEMINI_BULL_MODEL=${GEMINI_BULL_MODEL},GEMINI_BEAR_MODEL=${GEMINI_BEAR_MODEL},YOUTUBE_POLL_ENABLED=false" \
+    --set-secrets="EXA_API_KEY=EXA_API_KEY:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,SUPADATA_API_KEY=SUPADATA_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
 
   echo "==> Cloud Scheduler: daily crawl (00:30 UTC, crawls yesterday's news)"
   gcloud_read run services describe "${SERVICE}" --region "${REGION}" --format='value(status.url)' \
@@ -232,6 +234,18 @@ deploy() {
   gcloud scheduler jobs "${verb}" http daily-crawl --location "${REGION}" \
     --schedule="30 0 * * *" --time-zone="Etc/UTC" \
     --uri="${SERVICE_URL}/crawl/daily" --http-method=POST \
+    --attempt-deadline=1800s
+
+  echo "==> Cloud Scheduler: YouTube channel poll (daily, 01:30 UTC)"
+  # The in-process poll timer is disabled in prod (YOUTUBE_POLL_ENABLED=false above) because
+  # Cloud Run scales to zero; Scheduler is the real trigger. Supadata bills per credit, so
+  # keep this interval coarse. Offset an hour from the daily crawl above so the two don't
+  # contend — that job also convenes the council, which is the heaviest thing we run.
+  verb=create
+  gcloud scheduler jobs describe youtube-poll --location "${REGION}" >/dev/null 2>&1 && verb=update
+  gcloud scheduler jobs "${verb}" http youtube-poll --location "${REGION}" \
+    --schedule="30 1 * * *" --time-zone="Etc/UTC" \
+    --uri="${SERVICE_URL}/api/sources/youtube/poll" --http-method=POST \
     --attempt-deadline=1800s
 }
 

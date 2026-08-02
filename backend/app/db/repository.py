@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..models import (
@@ -19,6 +19,8 @@ from ..models import (
     SourceType,
     Stream,
     TranscriptSegment,
+    YoutubeChannel,
+    YoutubeMatch,
 )
 from .session import get_session
 from .tables import (
@@ -27,6 +29,9 @@ from .tables import (
     PredictionRow,
     PromptOverrideRow,
     WatchlistOverrideRow,
+    YoutubeChannelRow,
+    YoutubeMatchRow,
+    YoutubeVideoRow,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +77,27 @@ def list_cleaned_items(
     try:
         rows = session.execute(stmt).scalars().all()
         return [_row_to_model(r) for r in rows]
+    finally:
+        session.close()
+
+
+def list_cleaned_items_by_urls(urls: list[str]) -> list[CleanedItem]:
+    """The persisted rows for specific source URLs, newest first.
+
+    `process_discovery_result` reports counts, not items, so a caller that needs to do more
+    with what it just ingested (e.g. match transcripts against the watchlist) reads the rows
+    back through this — and gets exactly what survived the guardrail, not what it submitted.
+    """
+    if not urls:
+        return []
+    stmt = (
+        select(CleanedItemRow)
+        .where(CleanedItemRow.source_url.in_(urls))
+        .order_by(CleanedItemRow.ingested_at.desc())
+    )
+    session = get_session()
+    try:
+        return [_row_to_model(r) for r in session.execute(stmt).scalars().all()]
     finally:
         session.close()
 
@@ -285,6 +311,275 @@ def set_watchlist_enabled(ticker: str, enabled: bool) -> WatchlistOverride:
 def delete_watchlist_entry(ticker: str) -> WatchlistOverride:
     """Soft-delete a ticker: tombstone it so it leaves the watchlist and stops being scanned."""
     return _upsert_watchlist_override(ticker, {"deleted": True})
+
+
+# --- YouTube channel subscriptions (Sources → YouTube) ----------------------
+
+
+def _channel_to_model(row: YoutubeChannelRow, video_count: int = 0) -> YoutubeChannel:
+    return YoutubeChannel(
+        channel_id=row.channel_id,
+        handle=row.handle,
+        name=row.name,
+        thumbnail=row.thumbnail,
+        subscriber_count=row.subscriber_count,
+        enabled=row.enabled,
+        deleted=row.deleted,
+        added_at=row.added_at,
+        last_polled_at=row.last_polled_at,
+        last_error=row.last_error,
+        video_count=video_count,
+    )
+
+
+def list_youtube_channels(*, include_deleted: bool = False) -> list[YoutubeChannel]:
+    """Subscribed channels, newest first, each with its ingested-video count."""
+    stmt = select(YoutubeChannelRow).order_by(YoutubeChannelRow.added_at.desc())
+    if not include_deleted:
+        stmt = stmt.where(YoutubeChannelRow.deleted.is_(False))
+
+    counts_stmt = select(
+        YoutubeVideoRow.channel_id, func.count(YoutubeVideoRow.video_id)
+    ).group_by(YoutubeVideoRow.channel_id)
+
+    session = get_session()
+    try:
+        counts = dict(session.execute(counts_stmt).all())
+        rows = session.execute(stmt).scalars().all()
+        return [_channel_to_model(r, counts.get(r.channel_id, 0)) for r in rows]
+    finally:
+        session.close()
+
+
+def get_youtube_channel(channel_id: str) -> YoutubeChannel | None:
+    """One channel by id, including tombstoned ones (so re-adding can revive them)."""
+    stmt = select(YoutubeChannelRow).where(YoutubeChannelRow.channel_id == channel_id)
+    session = get_session()
+    try:
+        row = session.execute(stmt).scalars().first()
+        return _channel_to_model(row) if row else None
+    finally:
+        session.close()
+
+
+_CHANNEL_COLUMNS = (
+    YoutubeChannelRow.channel_id,
+    YoutubeChannelRow.handle,
+    YoutubeChannelRow.name,
+    YoutubeChannelRow.thumbnail,
+    YoutubeChannelRow.subscriber_count,
+    YoutubeChannelRow.enabled,
+    YoutubeChannelRow.deleted,
+    YoutubeChannelRow.added_at,
+    YoutubeChannelRow.last_polled_at,
+    YoutubeChannelRow.last_error,
+)
+
+
+def _upsert_youtube_channel(channel_id: str, values: dict) -> YoutubeChannel:
+    """Insert or update one channel, returning the actual persisted row.
+
+    Mirrors `_upsert_watchlist_override`: only `values` is written on conflict, so a toggle
+    that supplies just `{enabled: False}` preserves the channel's name, thumbnail and poll
+    history. `name` is NOT NULL, so an insert that never happens through `save_youtube_channel`
+    (e.g. toggling a channel that was purged from the table) needs a placeholder — it is an
+    insert-only default and is never allowed into the conflict update.
+    """
+    now = datetime.now(timezone.utc)
+    insert_values = {
+        "channel_id": channel_id,
+        "name": channel_id,   # insert-only placeholder; overwritten by the real subscribe
+        "added_at": now,
+        **values,
+    }
+    stmt = (
+        pg_insert(YoutubeChannelRow)
+        .values(**insert_values)
+        .on_conflict_do_update(index_elements=["channel_id"], set_=values)
+        .returning(*_CHANNEL_COLUMNS)
+    )
+    session = get_session()
+    try:
+        row = session.execute(stmt).one()
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist YouTube channel %s", channel_id)
+        raise
+    finally:
+        session.close()
+    return _channel_to_model(row)
+
+
+def save_youtube_channel(channel: YoutubeChannel) -> YoutubeChannel:
+    """Subscribe to a channel (or revive a tombstoned one, refreshing its metadata)."""
+    return _upsert_youtube_channel(
+        channel.channel_id,
+        {
+            "handle": channel.handle,
+            "name": channel.name,
+            "thumbnail": channel.thumbnail,
+            "subscriber_count": channel.subscriber_count,
+            "enabled": True,
+            "deleted": False,
+        },
+    )
+
+
+def set_youtube_channel_enabled(channel_id: str, enabled: bool) -> YoutubeChannel:
+    """Pause or resume polling for one channel (preserves any existing `deleted` state)."""
+    return _upsert_youtube_channel(channel_id, {"enabled": enabled})
+
+
+def delete_youtube_channel(channel_id: str) -> YoutubeChannel:
+    """Unsubscribe: tombstone the channel so polling stops (its cleaned_items are retained)."""
+    return _upsert_youtube_channel(channel_id, {"deleted": True})
+
+
+def mark_youtube_channel_polled(channel_id: str, error: str | None = None) -> None:
+    """Stamp the last poll time and its outcome. Never raises — this is bookkeeping."""
+    now = datetime.now(timezone.utc)
+    stmt = (
+        pg_insert(YoutubeChannelRow)
+        .values(
+            channel_id=channel_id,
+            name=channel_id,
+            added_at=now,
+            last_polled_at=now,
+            last_error=error,
+        )
+        .on_conflict_do_update(
+            index_elements=["channel_id"],
+            set_={"last_polled_at": now, "last_error": error},
+        )
+    )
+    session = get_session()
+    try:
+        session.execute(stmt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.warning("Could not stamp poll time for channel %s", channel_id, exc_info=True)
+    finally:
+        session.close()
+
+
+def known_video_ids(channel_id: str) -> set[str]:
+    """Videos already fetched for this channel — the credit-saving skip list."""
+    stmt = select(YoutubeVideoRow.video_id).where(YoutubeVideoRow.channel_id == channel_id)
+    session = get_session()
+    try:
+        return {v for (v,) in session.execute(stmt)}
+    finally:
+        session.close()
+
+
+def record_youtube_videos(rows: list[dict]) -> None:
+    """Record videos we spent a transcript credit on, whether or not they survived the pipeline.
+
+    Idempotent by `video_id`: re-recording refreshes `persisted` (an item that failed the
+    guardrail on one run may succeed after a prompt change) without re-inserting.
+    """
+    if not rows:
+        return
+    now = datetime.now(timezone.utc)
+    values = [{**r, "fetched_at": now} for r in rows]
+    stmt = pg_insert(YoutubeVideoRow).values(values)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["video_id"],
+        set_={
+            "persisted": stmt.excluded.persisted,
+            "title": stmt.excluded.title,
+            "fetched_at": stmt.excluded.fetched_at,
+        },
+    )
+    session = get_session()
+    try:
+        session.execute(stmt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to record %d YouTube videos", len(rows))
+        raise
+    finally:
+        session.close()
+
+
+def _match_to_model(row: YoutubeMatchRow) -> YoutubeMatch:
+    return YoutubeMatch(
+        video_url=row.video_url,
+        video_id=row.video_id,
+        channel_id=row.channel_id,
+        ticker=row.ticker,
+        quote=row.quote,
+        timestamp_start=row.timestamp_start,
+        relevance=row.relevance,
+        title=row.title,
+        channel_name=row.channel_name,
+        published_at=row.published_at.isoformat() if row.published_at else None,
+        matched_at=row.matched_at,
+    )
+
+
+def save_youtube_matches(matches: list[YoutubeMatch]) -> int:
+    """Upsert watchlist moments, one per (video, ticker). Returns how many were written."""
+    if not matches:
+        return 0
+    values = [
+        {
+            "video_url": m.video_url,
+            "video_id": m.video_id,
+            "channel_id": m.channel_id,
+            "ticker": m.ticker,
+            "quote": m.quote,
+            "timestamp_start": m.timestamp_start,
+            "relevance": m.relevance,
+            "title": m.title,
+            "channel_name": m.channel_name,
+            "published_at": m.published_at,
+            "matched_at": m.matched_at,
+        }
+        for m in matches
+    ]
+    stmt = pg_insert(YoutubeMatchRow).values(values)
+    update_cols = {
+        c: getattr(stmt.excluded, c)
+        for c in ("quote", "timestamp_start", "relevance", "title", "channel_name", "matched_at")
+    }
+    stmt = stmt.on_conflict_do_update(
+        constraint="uq_youtube_match_video_ticker", set_=update_cols
+    )
+    session = get_session()
+    try:
+        session.execute(stmt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist %d YouTube watchlist matches", len(matches))
+        raise
+    finally:
+        session.close()
+    return len(matches)
+
+
+def list_youtube_matches(
+    *, ticker: str | None = None, channel_id: str | None = None, limit: int = 50
+) -> list[YoutubeMatch]:
+    """Watchlist moments, strongest-first within newest-first, with optional filters."""
+    stmt = select(YoutubeMatchRow).order_by(
+        YoutubeMatchRow.matched_at.desc(), YoutubeMatchRow.relevance.desc()
+    )
+    if ticker:
+        stmt = stmt.where(YoutubeMatchRow.ticker == ticker)
+    if channel_id:
+        stmt = stmt.where(YoutubeMatchRow.channel_id == channel_id)
+    stmt = stmt.limit(limit)
+
+    session = get_session()
+    try:
+        return [_match_to_model(r) for r in session.execute(stmt).scalars().all()]
+    finally:
+        session.close()
 
 
 # --- Predictions & the Brier ledger (Tier 3 rubric scoring, §7.3) ------------

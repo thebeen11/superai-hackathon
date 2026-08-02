@@ -250,6 +250,29 @@ _SKILL_SPECS: tuple[PromptSpec, ...] = (
         placeholders=("tracker",),
         agent="andie-rubric",
     ),
+    PromptSpec(
+        key="insights.watchlist_match",
+        label="Watchlist Moment Judge",
+        group="Insights",
+        description=(
+            "Picks the moment in a video transcript that most substantively discusses a "
+            "watchlist ticker, and scores it 0..1."
+        ),
+        default_template=(
+            "You are a research analyst reading a video transcript, looking for what it says about "
+            "{ticker} ({company}). You are given the transcript as a numbered list of consecutive "
+            "chunks. Pick the SINGLE chunk that most substantively discusses this company — its "
+            "business, results, valuation, products, competitors, or outlook. Judge meaning and "
+            "synonyms, not literal word overlap: the speaker may use the company name, a product "
+            "name, or a pronoun rather than the ticker. Return its integer index, a verbatim quote "
+            "(<=300 chars) copied exactly from that chunk, a relevance score from 0.0 to 1.0, and a "
+            "one-line reason. Score honestly: a passing name-drop in a list of tickers is around "
+            "0.2, while sustained discussion or a specific claim about the company is above 0.7. "
+            "Never invent text — copy the quote exactly from the chosen chunk."
+        ),
+        placeholders=("ticker", "company"),
+        agent="andie-rubric",
+    ),
 )
 
 def list_skill_specs() -> list[PromptSpec]:

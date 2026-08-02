@@ -32,13 +32,29 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * FastAPI reports a human-readable reason in `detail` ("Already following Bloomberg",
+ * "Could not resolve a channel from …"). Those are the messages the UI shows inline, so
+ * prefer them over the generic status line; fall back when the body isn't JSON.
+ */
+async function errorMessage(res: Response, path: string): Promise<string> {
+  try {
+    const body = await res.json();
+    const detail = (body as { detail?: unknown })?.detail;
+    if (typeof detail === "string" && detail) return detail;
+  } catch {
+    // non-JSON error body — fall through to the generic message
+  }
+  return `Request failed: ${path} (${res.status})`;
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
   });
   if (!res.ok) {
-    throw new ApiError(`Request failed: ${path} (${res.status})`, res.status);
+    throw new ApiError(await errorMessage(res, path), res.status);
   }
   return res.json() as Promise<T>;
 }
