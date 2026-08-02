@@ -2,7 +2,7 @@
 
 Two adversarial personas argue over the Andie desk notes for six rounds so a single
 sycophantic model can't rubber-stamp its own thesis (PROJECT_GUIDANCE §0, §11). The
-two sides run on different Gemini models (Bull = Gemini 2.5 Pro, Bear = Gemini 2.5
+two sides run on different Gemini models (Bull = Gemini 3.1 Pro, Bear = Gemini 3.6
 Flash). NOTE: on the Gemini-only stack these are the same model family, so this is a
 weaker anti-collusion guardrail than the original two-family (Claude vs Nova) setup —
 an intentional tradeoff. The full transcript is logged and handed up to the Chairman,
@@ -22,8 +22,8 @@ from ..prompts import get_prompt
 
 logger = logging.getLogger(__name__)
 
-_BULL_NAME, _BULL_MODEL = "Freddy-Bull", "Gemini 2.5 Pro"
-_BEAR_NAME, _BEAR_MODEL = "Freddy-Bear", "Gemini 2.5 Flash"
+_BULL_NAME, _BULL_MODEL = "Freddy-Bull", "Gemini 3.1 Pro"
+_BEAR_NAME, _BEAR_MODEL = "Freddy-Bear", "Gemini 3.6 Flash"
 
 # The chamber: strict alternation, Bull opens, Bear speaks last before Winston rules.
 # `settings.debate_rounds` slices this, so lowering it truncates from the end.

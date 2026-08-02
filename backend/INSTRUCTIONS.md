@@ -225,7 +225,8 @@ uv run pytest        # unit tests; no network or DB needed (the LLM + DB are moc
 - **`PermissionDenied` / `403` from Vertex** → run `gcloud auth application-default login`,
   confirm `GCP_PROJECT` is set, the Vertex AI API is enabled, and (on Cloud Run) the service
   account has `roles/aiplatform.user`. A `404` usually means the `GEMINI_MODEL` id isn't
-  available in `VERTEX_LOCATION`.
+  available in `VERTEX_LOCATION` — the Gemini 3.x ids are served only on `global`, so a
+  regional value like `us-central1` will 404 on every call. Set `VERTEX_LOCATION=global`.
 - **`EXA_API_KEY not set` in `skipped`** → add the Exa key to `backend/.env` and restart.
 - **No results, both sources skipped** → expected if neither `EXA_API_KEY` nor
   `YOUTUBE_API_KEY` is set; the run still succeeds, just with empty `items`.

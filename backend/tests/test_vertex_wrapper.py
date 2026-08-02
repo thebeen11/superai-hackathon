@@ -118,7 +118,7 @@ def test_default_model_comes_from_settings(monkeypatch):
 
     client = _Capture(['{"value": 1}'])
     _patch_client(monkeypatch, client)
-    monkeypatch.setattr(vertex.settings, "gemini_model", "gemini-2.5-pro")
+    monkeypatch.setattr(vertex.settings, "gemini_model", "gemini-3.1-pro-preview")
     vertex.converse_structured(_Schema, "sys", "user", max_retries=0)
-    assert seen["model"] == "gemini-2.5-pro"
+    assert seen["model"] == "gemini-3.1-pro-preview"
     assert seen["config"]["response_mime_type"] == "application/json"

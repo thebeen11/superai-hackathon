@@ -49,10 +49,15 @@ SQL_DB_VERSION="${SQL_DB_VERSION:-POSTGRES_16}"
 DB_PASSWORD="${DB_PASSWORD:?set DB_PASSWORD to a strong password}"
 EXA_API_KEY="${EXA_API_KEY:?set EXA_API_KEY}"
 YOUTUBE_API_KEY="${YOUTUBE_API_KEY:?set YOUTUBE_API_KEY}"
-GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-pro}"
-# Vertex region for Gemini — defaults to REGION, but override if your REGION doesn't
-# serve the model (e.g. VERTEX_LOCATION=us-central1 for the widest model coverage).
-VERTEX_LOCATION="${VERTEX_LOCATION:-$REGION}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
+# Tier 4 debate sides (Bull vs Bear). Kept overridable so the chamber can be re-tiered
+# without a code change.
+GEMINI_BULL_MODEL="${GEMINI_BULL_MODEL:-gemini-3.1-pro-preview}"
+GEMINI_BEAR_MODEL="${GEMINI_BEAR_MODEL:-gemini-3.6-flash}"
+# Vertex endpoint for Gemini. Defaults to `global`, NOT to REGION: the Gemini 3.x model
+# ids above are only served on the global endpoint and 404 on regional ones (including
+# us-central1). Only override this if you pin GEMINI_MODEL back to a 2.5-era model.
+VERTEX_LOCATION="${VERTEX_LOCATION:-global}"
 # -----------------------------------------------------------------------------
 
 CONNECTION_NAME="${PROJECT_ID}:${REGION}:${SQL_INSTANCE}"
@@ -213,7 +218,7 @@ deploy() {
     --service-account="$(service_account)" \
     --add-cloudsql-instances="${CONNECTION_NAME}" \
     --min-instances=1 --max-instances=1 --no-cpu-throttling --timeout=3600 \
-    --set-env-vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL}" \
+    --set-env-vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL},GEMINI_BULL_MODEL=${GEMINI_BULL_MODEL},GEMINI_BEAR_MODEL=${GEMINI_BEAR_MODEL}" \
     --set-secrets="EXA_API_KEY=EXA_API_KEY:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
 
   echo "==> Cloud Scheduler: daily crawl (00:30 UTC, crawls yesterday's news)"

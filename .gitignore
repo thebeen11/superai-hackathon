@@ -21,6 +21,7 @@ __pycache__/
 # OS
 .DS_Store
 
+graphify-out
 
 .vscode/
 # OS
@@ -29,6 +30,7 @@ __pycache__/
 # Handoff / design bundles
 hackathon-handoff.zip
 *.zip
+
 
 # Deploy scratch (contains secrets in user-data)
 .deploy/

@@ -154,7 +154,10 @@ def converse_structured(
                 contents=user_content,
                 config={
                     "system_instruction": system_with_schema,
-                    "temperature": 0.0,
+                    # No temperature: Gemini 3 is tuned for its default (1.0), and forcing
+                    # it low risks looping / degraded reasoning on complex tasks. Schema
+                    # conformance comes from JSON mode + Pydantic validation + the retry
+                    # loop below, not from determinism.
                     "response_mime_type": "application/json",
                 },
             )
