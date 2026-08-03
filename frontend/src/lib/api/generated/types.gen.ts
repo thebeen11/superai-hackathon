@@ -1166,16 +1166,6 @@ export type YoutubeChannel = {
 };
 
 /**
- * YoutubeChannelAdded
- *
- * The new subscription plus what its first ingest actually found.
- */
-export type YoutubeChannelAdded = {
-    channel: YoutubeChannel;
-    ingest: YoutubeIngestReport;
-};
-
-/**
  * YoutubeChannelCreate
  */
 export type YoutubeChannelCreate = {
@@ -1185,12 +1175,6 @@ export type YoutubeChannelCreate = {
      * Channel URL, @handle, or UC… id — anything Supadata can resolve
      */
     id: string;
-    /**
-     * Backfill
-     *
-     * Videos to pull immediately (default YOUTUBE_CHANNEL_BACKFILL)
-     */
-    backfill?: number | null;
 };
 
 /**
@@ -1235,6 +1219,30 @@ export type YoutubeIngestReport = {
      * Errors
      */
     errors?: Array<string>;
+};
+
+/**
+ * YoutubeJobRef
+ *
+ * A running (or just-finished) ingest, so a client can attach to its progress stream.
+ *
+ * Ingest takes minutes per video, so it never runs inside a request. The caller gets one
+ * of these back and follows `GET /api/jobs/{job_id}/stream`; a client that reloads
+ * mid-ingest finds the same job again through `GET /api/sources/youtube/jobs`.
+ */
+export type YoutubeJobRef = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Channel Id
+     */
+    channel_id?: string | null;
+    /**
+     * Status
+     */
+    status?: string;
 };
 
 /**
@@ -1745,7 +1753,7 @@ export type AddYoutubeChannelResponses = {
     /**
      * Successful Response
      */
-    200: YoutubeChannelAdded;
+    200: YoutubeChannel;
 };
 
 export type AddYoutubeChannelResponse = AddYoutubeChannelResponses[keyof AddYoutubeChannelResponses];
@@ -1840,6 +1848,41 @@ export type RefreshYoutubeChannelResponses = {
 
 export type RefreshYoutubeChannelResponse = RefreshYoutubeChannelResponses[keyof RefreshYoutubeChannelResponses];
 
+export type RefreshYoutubeChannelStreamData = {
+    body?: never;
+    path: {
+        /**
+         * Channel Id
+         */
+        channel_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * Videos to pull (default: poll limit)
+         */
+        limit?: number | null;
+    };
+    url: '/api/sources/youtube/channels/{channel_id}/refresh/stream';
+};
+
+export type RefreshYoutubeChannelStreamErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RefreshYoutubeChannelStreamError = RefreshYoutubeChannelStreamErrors[keyof RefreshYoutubeChannelStreamErrors];
+
+export type RefreshYoutubeChannelStreamResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type PollYoutubeChannelsData = {
     body?: never;
     path?: never;
@@ -1851,10 +1894,28 @@ export type PollYoutubeChannelsResponses = {
     /**
      * Successful Response
      */
-    200: YoutubeIngestReport;
+    202: YoutubeJobRef;
 };
 
 export type PollYoutubeChannelsResponse = PollYoutubeChannelsResponses[keyof PollYoutubeChannelsResponses];
+
+export type ListYoutubeJobsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/sources/youtube/jobs';
+};
+
+export type ListYoutubeJobsResponses = {
+    /**
+     * Response List Youtube Jobs
+     *
+     * Successful Response
+     */
+    200: Array<YoutubeJobRef>;
+};
+
+export type ListYoutubeJobsResponse = ListYoutubeJobsResponses[keyof ListYoutubeJobsResponses];
 
 export type ListYoutubeMatchesEndpointData = {
     body?: never;
@@ -2168,6 +2229,34 @@ export type DataengJobStreamErrors = {
 export type DataengJobStreamError = DataengJobStreamErrors[keyof DataengJobStreamErrors];
 
 export type DataengJobStreamResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type JobStreamData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/jobs/{job_id}/stream';
+};
+
+export type JobStreamErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type JobStreamError = JobStreamErrors[keyof JobStreamErrors];
+
+export type JobStreamResponses = {
     /**
      * Successful Response
      */

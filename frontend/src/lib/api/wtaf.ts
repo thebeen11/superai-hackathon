@@ -12,6 +12,7 @@ import type {
   WatchlistEntry,
   YoutubeChannel,
   YoutubeIngestReport,
+  YoutubeJobRef,
   YoutubeMatch,
 } from "../types";
 import { wtafMock, youtubeChannelsMock, youtubeMatchesMock } from "../mock-data";
@@ -342,7 +343,14 @@ function toMatch(r: RawMatch): YoutubeMatch {
   };
 }
 
-function toReport(r: RawReport): YoutubeIngestReport {
+/**
+ * Map the backend's snake_case ingest report to camelCase.
+ *
+ * Exported because the streamed variant bypasses `apiFetch` entirely — `streamSse` hands
+ * back the raw `result` frame, so the caller must map it here rather than trusting a
+ * camelCase type annotation over snake_case data.
+ */
+export function toYoutubeIngestReport(r: RawReport): YoutubeIngestReport {
   return {
     channels: r.channels,
     videosSeen: r.videos_seen,
@@ -361,34 +369,54 @@ export async function getYoutubeChannels(): Promise<YoutubeChannel[]> {
 }
 
 /**
- * Follow a channel and backfill its recent videos.
+ * Follow a channel. Returns as soon as it resolves — nothing is fetched yet.
  *
- * `id` is anything Supadata resolves — a URL, an @handle, or a UC… id. The call blocks
- * until the backfill finishes, so the returned report says what was actually ingested.
- * Backend: POST /api/sources/youtube/channels
+ * `id` is anything Supadata resolves — a URL, an @handle, or a UC… id. Pulling the videos
+ * is a separate background job: stream {@link youtubeRefreshStreamPath} through
+ * `runLiveJob`. Backend: POST /api/sources/youtube/channels
  */
-export async function addYoutubeChannelSubscription(
-  id: string,
-): Promise<{ channel: YoutubeChannel; ingest: YoutubeIngestReport }> {
+export async function addYoutubeChannelSubscription(id: string): Promise<YoutubeChannel> {
   if (USE_MOCK) {
-    const channel: YoutubeChannel = {
+    return mockResolve({
       channelId: `UC${id}`,
       handle: id,
       name: id.replace(/^@/, ""),
       enabled: true,
       deleted: false,
       videoCount: 0,
-    };
-    return mockResolve({
-      channel,
-      ingest: { channels: 1, videosSeen: 0, persisted: 0, failed: 0, matched: 0, errors: [] },
     });
   }
-  const raw = await apiFetch<{ channel: RawChannel; ingest: RawReport }>(
-    "/api/sources/youtube/channels",
-    { method: "POST", body: JSON.stringify({ id }) },
+  const raw = await apiFetch<RawChannel>("/api/sources/youtube/channels", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+  return toChannel(raw);
+}
+
+/**
+ * SSE path that ingests one channel's new videos, reporting progress as it goes.
+ *
+ * Ingest takes minutes per video, so it never runs inside a request. Feed this to
+ * `runLiveJob` from the provider; the work continues server-side even if the stream drops.
+ */
+export function youtubeRefreshStreamPath(channelId: string, limit?: number): string {
+  const qs = limit ? `?limit=${limit}` : "";
+  return `/api/sources/youtube/channels/${encodeURIComponent(channelId)}/refresh/stream${qs}`;
+}
+
+/** Attach to a background job already in flight (after a reload). Backend: GET /api/jobs/:id/stream */
+export function jobStreamPath(jobId: string): string {
+  return `/api/jobs/${encodeURIComponent(jobId)}/stream`;
+}
+
+/** Ingests currently running, so a reloaded page can reattach. Backend: GET /api/sources/youtube/jobs */
+export function getRunningYoutubeJobs(): Promise<YoutubeJobRef[]> {
+  if (USE_MOCK) return mockResolve([]);
+  return apiFetch<{ job_id: string; channel_id: string | null; status: string }[]>(
+    "/api/sources/youtube/jobs",
+  ).then((rows) =>
+    rows.map((r) => ({ jobId: r.job_id, channelId: r.channel_id ?? undefined, status: r.status })),
   );
-  return { channel: toChannel(raw.channel), ingest: toReport(raw.ingest) };
 }
 
 /** Pause or resume polling. Backend: PUT /api/sources/youtube/channels/:id */
@@ -418,20 +446,6 @@ export async function deleteYoutubeChannel(channelId: string): Promise<YoutubeCh
     { method: "DELETE" },
   );
   return toChannel(raw);
-}
-
-/** Pull one channel's new videos now. Backend: POST /api/sources/youtube/channels/:id/refresh */
-export async function refreshYoutubeChannelNow(channelId: string): Promise<YoutubeIngestReport> {
-  if (USE_MOCK) {
-    return mockResolve({
-      channels: 1, videosSeen: 0, persisted: 0, failed: 0, matched: 0, errors: [],
-    });
-  }
-  const raw = await apiFetch<RawReport>(
-    `/api/sources/youtube/channels/${encodeURIComponent(channelId)}/refresh`,
-    { method: "POST" },
-  );
-  return toReport(raw);
 }
 
 /**

@@ -8,20 +8,32 @@
  *
  * This tab owns its own data (the global snapshot is assembled from `GET /items` and knows
  * nothing about subscriptions), so it fetches on mount and after every mutation.
+ *
+ * Following a channel and FETCHING it are separate: subscribing returns instantly, then the
+ * ingest runs as a background job — minutes per video — streamed into the shell's Activity
+ * Log. Closing the tab does not abandon it, and a reload reattaches to whatever is still
+ * running.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addYoutubeChannelSubscription,
   deleteYoutubeChannel,
+  getRunningYoutubeJobs,
   getYoutubeChannels,
   getYoutubeMatches,
-  refreshYoutubeChannelNow,
+  jobStreamPath,
   setYoutubeChannelEnabled,
+  toYoutubeIngestReport,
+  youtubeRefreshStreamPath,
 } from "@/lib/api/wtaf";
+import { useWtaf } from "@/providers/wtaf-provider";
 import type { YoutubeChannel, YoutubeMatch } from "@/lib/types";
-import { Card, EmptyState } from "../primitives";
+import { Card, Dot, EmptyState } from "../primitives";
 import { Field, IconButton, ScanToggle } from "../shared";
 import { fmtOffset, sourceHref } from "../source-link";
+
+/** Videos pulled when a channel is first followed. Mirrors YOUTUBE_CHANNEL_BACKFILL. */
+const BACKFILL = 5;
 
 /** Optimistic overlay, same shape the watchlist page uses. */
 type Overlay = Record<string, { enabled?: boolean }>;
@@ -61,7 +73,11 @@ function Notice({ text, tone = "error" }: { text: string; tone?: "error" | "ok" 
 
 /* ---------------- add form ---------------- */
 
-function AddChannel({ onAdded }: { onAdded: () => Promise<void> }) {
+function AddChannel({
+  onFollowed,
+}: {
+  onFollowed: (channel: YoutubeChannel) => void;
+}) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -74,20 +90,12 @@ function AddChannel({ onAdded }: { onAdded: () => Promise<void> }) {
     setNotice(null);
     setOk(null);
     try {
-      const { channel, ingest } = await addYoutubeChannelSubscription(id);
+      // Resolves in well under a second — the fetching is a background job kicked off by
+      // the parent, so this never sits waiting on transcripts.
+      const channel = await addYoutubeChannelSubscription(id);
       setValue("");
-      await onAdded();
-      // The subscription is saved even when the first pull fails, so say which happened
-      // rather than reporting a success the backfill didn't actually achieve.
-      if (ingest.errors.length) {
-        setNotice(`Following ${channel.name}, but the first pull failed: ${ingest.errors[0]}`);
-        return;
-      }
-      const found = ingest.persisted
-        ? `${ingest.persisted} video${ingest.persisted === 1 ? "" : "s"} ingested`
-        : "no new videos yet";
-      const matched = ingest.matched ? `, ${ingest.matched} watchlist match` : "";
-      setOk(`Following ${channel.name} — ${found}${matched}`);
+      setOk(`Following ${channel.name} — fetching its recent videos…`);
+      onFollowed(channel);
     } catch (e) {
       setNotice((e as Error)?.message ?? "Could not follow that channel");
     } finally {
@@ -124,8 +132,10 @@ function AddChannel({ onAdded }: { onAdded: () => Promise<void> }) {
       {notice && <Notice text={notice} />}
       {ok && <Notice text={ok} tone="ok" />}
       <div className="mono" style={{ fontSize: 10, color: "var(--t-faint)", marginTop: 8 }}>
-        New videos are pulled automatically once a day — use ⟳ on a channel to check now.
-        Transcripts are metered, so following a channel backfills only its most recent videos.
+        Reading a video takes a few minutes, so fetching runs in the background — watch it in
+        the Activity Log; you can leave this page. New videos are pulled once a day; ⟳ checks
+        a channel now. Transcripts are metered, so following one backfills its {BACKFILL} most
+        recent videos.
       </div>
     </div>
   );
@@ -140,6 +150,7 @@ function ChannelRow({
   onDelete,
   onRefresh,
   pending,
+  fetching,
   notice,
   confirming,
   setConfirming,
@@ -150,6 +161,8 @@ function ChannelRow({
   onDelete: () => void;
   onRefresh: () => void;
   pending: boolean;
+  /** A background ingest is running for this channel. */
+  fetching: boolean;
   notice?: string;
   confirming: boolean;
   setConfirming: (id: string | null) => void;
@@ -197,6 +210,15 @@ function ChannelRow({
             .filter(Boolean)
             .join(" · ")}
         </div>
+        {fetching && (
+          <div
+            className="mono"
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, marginTop: 4, color: "var(--blue-bright)" }}
+          >
+            <Dot tone="var(--blue-bright)" pulse />
+            reading new videos — see the Activity Log
+          </div>
+        )}
         {channel.lastError && <Notice text={channel.lastError} />}
         {notice && <Notice text={notice} />}
       </div>
@@ -219,7 +241,11 @@ function ChannelRow({
             titleOn="Polling on — click to pause"
             titleOff="Polling paused — click to resume"
           />
-          <IconButton title="Check for new videos now" onClick={onRefresh} disabled={pending}>
+          <IconButton
+            title={fetching ? "Already fetching" : "Check for new videos now"}
+            onClick={onRefresh}
+            disabled={pending || fetching}
+          >
             ⟳
           </IconButton>
           <IconButton
@@ -313,9 +339,58 @@ export function SourcesYoutube() {
     }
   }, []);
 
+  // Channels with an ingest in flight. Cleared when the stream resolves, so the row's
+  // indicator tracks the real job rather than a local guess.
+  const [fetching, setFetching] = useState<Record<string, boolean>>({});
+  const { runLiveJob } = useWtaf();
+
+  /**
+   * Follow a background ingest to completion, refreshing the list when it lands.
+   *
+   * The work belongs to the server, not this component: if the stream drops (navigation,
+   * network) the job keeps running and is picked up again by the reattach effect below.
+   */
+  const followJob = useCallback(
+    async (channelId: string, path: string) => {
+      setFetching((f) => ({ ...f, [channelId]: true }));
+      setNotice((n) => {
+        const next = { ...n };
+        delete next[channelId];
+        return next;
+      });
+      try {
+        // The stream's `result` frame is the backend's raw snake_case payload, so map it
+        // rather than annotating it as camelCase and reading undefined fields.
+        const raw = await runLiveJob<Parameters<typeof toYoutubeIngestReport>[0]>(path);
+        const report = toYoutubeIngestReport(raw);
+        if (report.errors.length) {
+          setNotice((n) => ({ ...n, [channelId]: report.errors[0] }));
+        }
+      } catch (e) {
+        setNotice((n) => ({ ...n, [channelId]: (e as Error)?.message ?? "Fetch failed" }));
+      } finally {
+        setFetching((f) => ({ ...f, [channelId]: false }));
+        await revalidate();
+      }
+    },
+    [runLiveJob, revalidate],
+  );
+
+  // Reattach to ingests still running from a previous page view — a reload mid-backfill
+  // should show the work continuing, not an idle row. Runs once per mount.
+  const reattachedRef = useRef(false);
   useEffect(() => {
     void revalidate();
-  }, [revalidate]);
+    if (reattachedRef.current) return;
+    reattachedRef.current = true;
+    void getRunningYoutubeJobs()
+      .then((jobs) => {
+        for (const job of jobs) {
+          if (job.channelId) void followJob(job.channelId, jobStreamPath(job.jobId));
+        }
+      })
+      .catch(() => { /* no jobs endpoint / offline — nothing to reattach to */ });
+  }, [revalidate, followJob]);
 
   const clearOverlay = (id: string) =>
     setOverlay((o) => {
@@ -352,7 +427,16 @@ export function SourcesYoutube() {
   return (
     <div className="grid12">
       <Card title="Follow a channel" sub="its new videos become council evidence" className="span12">
-        <AddChannel onAdded={revalidate} />
+        <AddChannel
+          onFollowed={(channel) => {
+            // Show the row straight away, then stream its backfill in the background.
+            void revalidate();
+            void followJob(
+              channel.channelId,
+              youtubeRefreshStreamPath(channel.channelId, BACKFILL),
+            );
+          }}
+        />
       </Card>
 
       <Card
@@ -375,6 +459,7 @@ export function SourcesYoutube() {
                 channel={c}
                 last={i === rows.length - 1}
                 pending={!!pending[c.channelId]}
+                fetching={!!fetching[c.channelId]}
                 notice={notice[c.channelId]}
                 confirming={confirming === c.channelId}
                 setConfirming={setConfirming}
@@ -387,7 +472,7 @@ export function SourcesYoutube() {
                   void mutate(c.channelId, {}, () => deleteYoutubeChannel(c.channelId))
                 }
                 onRefresh={() =>
-                  void mutate(c.channelId, {}, () => refreshYoutubeChannelNow(c.channelId))
+                  void followJob(c.channelId, youtubeRefreshStreamPath(c.channelId))
                 }
               />
             ))}

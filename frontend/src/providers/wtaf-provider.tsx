@@ -21,7 +21,7 @@ import {
 } from "react";
 import type { ActivityEntry, LiveAgentStatus, WtafData } from "@/lib/types";
 import { discoverAndProcessStream, getSnapshot, reconnectJobStream } from "@/lib/api/wtaf";
-import { isTerminalStreamError, type ProgressEvent } from "@/lib/api/sse";
+import { isTerminalStreamError, streamSse, type ProgressEvent, type SseInit } from "@/lib/api/sse";
 import { toEntry, toLiveStatus } from "@/lib/activity";
 import type { DataEngReport } from "@/lib/api/generated/types.gen";
 
@@ -105,6 +105,12 @@ interface WtafState {
   revalidate: () => Promise<void>;
   /** Run a live discovery, then refetch the snapshot. */
   discover: (query: string) => Promise<DataEngReport>;
+  /**
+   * Stream any single background-job endpoint into the shared activity feed, then refetch
+   * the snapshot. Used by ingests that run too long to sit inside a request (YouTube
+   * channel backfills). Resolves with the job's terminal result.
+   */
+  runLiveJob: <T>(path: string, init?: SseInit, onJob?: (jobId: string) => void) => Promise<T>;
 }
 
 const WtafContext = createContext<WtafState | null>(null);
@@ -174,11 +180,43 @@ export function WtafProvider({ children }: { children: ReactNode }) {
     void loadSnapshot();
   }, [loadSnapshot]);
 
+  // Several runs can stream at once (a discovery plus two channel refreshes), so
+  // `discovering` is reference-counted — the first to finish must not clear the others'
+  // loading state.
+  const liveRunsRef = useRef(0);
+  const beginLive = useCallback(() => {
+    liveRunsRef.current += 1;
+    setDiscovering(true);
+  }, []);
+  const endLive = useCallback(() => {
+    liveRunsRef.current = Math.max(0, liveRunsRef.current - 1);
+    if (liveRunsRef.current === 0) setDiscovering(false);
+  }, []);
+
+  const runLiveJob = useCallback(
+    async <T,>(path: string, init?: SseInit, onJob?: (jobId: string) => void): Promise<T> => {
+      beginLive();
+      try {
+        const result = await streamSse<T>(path, init ?? { method: "POST" }, handleProgress, onJob);
+        await loadSnapshot({ silent: true });
+        return result;
+      } finally {
+        endLive();
+      }
+    },
+    [beginLive, endLive, handleProgress, loadSnapshot],
+  );
+
   // Live discovery: stream the ingest (cards show loaders via `discovering`), stash
   // the job id so a reload can reconnect, then silently refetch so new items appear.
+  //
+  // Not routed through `runLiveJob`: discovery is TWO chained streams (/discover/stream
+  // then /dataeng/process/stream) rather than one endpoint, and it owns extra state — the
+  // status badge and the reconnect marker. Both paths still funnel into `handleProgress`,
+  // which is the single sink that matters.
   const discover = useCallback(
     async (query: string): Promise<DataEngReport> => {
-      setDiscovering(true);
+      beginLive();
       setDiscoveryStatus({ tone: "info", text: "Refining…" });
       // A new run = a fresh log; clear prior activity + live statuses.
       setActivity([]);
@@ -200,10 +238,10 @@ export function WtafProvider({ children }: { children: ReactNode }) {
         if (isTerminalStreamError(e)) clearActiveJob();
         throw e;
       } finally {
-        setDiscovering(false);
+        endLive();
       }
     },
-    [loadSnapshot, handleProgress],
+    [beginLive, endLive, loadSnapshot, handleProgress],
   );
 
   // Initial load, plus reconnect to an in-flight discovery after a page reload.
@@ -216,7 +254,7 @@ export function WtafProvider({ children }: { children: ReactNode }) {
       const active = readActiveJob();
       if (!active) return;
 
-      setDiscovering(true);
+      beginLive();
       setDiscoveryStatus({ tone: "info", text: "Reconnecting…" });
       try {
         const report = await reconnectJobStream(active.jobId, (evt) => {
@@ -231,14 +269,14 @@ export function WtafProvider({ children }: { children: ReactNode }) {
         // marker. A transient abort (another reload) keeps it so we can resume again.
         if (isTerminalStreamError(e)) clearActiveJob();
       } finally {
-        if (!cancelled) setDiscovering(false);
+        endLive();
       }
     })();
     return () => { cancelled = true; };
-  }, [loadSnapshot, handleProgress]);
+  }, [beginLive, endLive, loadSnapshot, handleProgress]);
 
   return (
-    <WtafContext.Provider value={{ data, loading, discovering, discoveryStatus, activity, liveStatus, error, refresh, revalidate, discover }}>
+    <WtafContext.Provider value={{ data, loading, discovering, discoveryStatus, activity, liveStatus, error, refresh, revalidate, discover, runLiveJob }}>
       {children}
     </WtafContext.Provider>
   );

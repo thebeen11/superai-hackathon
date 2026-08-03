@@ -690,7 +690,7 @@
       },
       "post": {
         "summary": "Add Youtube Channel",
-        "description": "Subscribe to a channel and immediately backfill its most recent videos.\n\nRe-adding a tombstoned channel revives it rather than duplicating it, and the backfill\nskips videos already ingested \u2014 so an accidental delete costs no Supadata credits.",
+        "description": "Subscribe to a channel. Returns as soon as the channel resolves \u2014 no ingest here.\n\nPulling the backfill takes minutes per video (four Gemini calls each, plus a judge call\nper matched ticker), so it is a separate streamed call: follow up with\n`POST /api/sources/youtube/channels/{id}/refresh/stream` to watch it run.\n\nRe-adding a tombstoned channel revives it rather than duplicating it.",
         "operationId": "add_youtube_channel",
         "requestBody": {
           "content": {
@@ -708,7 +708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/YoutubeChannelAdded"
+                  "$ref": "#/components/schemas/YoutubeChannel"
                 }
               }
             }
@@ -817,7 +817,7 @@
     "/api/sources/youtube/channels/{channel_id}/refresh": {
       "post": {
         "summary": "Refresh Youtube Channel",
-        "description": "Pull one channel's new videos now, without waiting for the poll interval.",
+        "description": "Pull one channel's new videos now, blocking until done.\n\nKept for scripted callers that want the report in the response. Interactive clients\nshould use the `/stream` variant \u2014 this one can take minutes per video.",
         "operationId": "refresh_youtube_channel",
         "parameters": [
           {
@@ -854,18 +854,99 @@
         }
       }
     },
+    "/api/sources/youtube/channels/{channel_id}/refresh/stream": {
+      "post": {
+        "summary": "Refresh Youtube Channel Stream",
+        "description": "Pull one channel's new videos, streaming progress as SSE.\n\nThe work runs on a background thread that outlives the response, so closing the tab\ndoes not abandon a half-finished ingest \u2014 reattach later via\n`GET /api/jobs/{job_id}/stream`. The job id arrives as a leading `job` frame.",
+        "operationId": "refresh_youtube_channel_stream",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Channel Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 50,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Videos to pull (default: poll limit)",
+              "title": "Limit"
+            },
+            "description": "Videos to pull (default: poll limit)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sources/youtube/poll": {
       "post": {
         "summary": "Poll Youtube Channels",
-        "description": "Poll every enabled channel \u2014 the Cloud Scheduler hook (see deploy.sh).\n\nCloud Run scales to zero, so the in-process timer is for local runs only; in prod this\nendpoint is the real trigger.",
+        "description": "Poll every enabled channel \u2014 the Cloud Scheduler hook (see deploy.sh).\n\nReturns 202 immediately and runs detached: a poll over several channels can exceed\nScheduler's attempt deadline, and a timeout there would retry the whole thing and\nre-buy transcripts. Per-channel failures are recorded on the channel row (`last_error`)\nand shown in the UI; overall progress is on the returned job.",
         "operationId": "poll_youtube_channels",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeJobRef"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/jobs": {
+      "get": {
+        "summary": "List Youtube Jobs",
+        "description": "In-flight ingests, so a client that reloads mid-run can reattach to their streams.",
+        "operationId": "list_youtube_jobs",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/YoutubeIngestReport"
+                  "items": {
+                    "$ref": "#/components/schemas/YoutubeJobRef"
+                  },
+                  "type": "array",
+                  "title": "Response List Youtube Jobs"
                 }
               }
             }
@@ -1334,8 +1415,46 @@
     "/dataeng/jobs/{job_id}/stream": {
       "get": {
         "summary": "Dataeng Job Stream",
-        "description": "Reconnect to a job: replay its progress so far, then stream live to completion.",
+        "description": "Reconnect to a job: replay its progress so far, then stream live to completion.\n\nKept at this path for existing clients; `/api/jobs/{id}/stream` is the same thing under\na name that isn't specific to Data Engineering.",
         "operationId": "dataeng_job_stream",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/stream": {
+      "get": {
+        "summary": "Job Stream",
+        "description": "Attach to any background job: replay its progress, then stream live to completion.",
+        "operationId": "job_stream",
         "parameters": [
           {
             "name": "job_id",
@@ -3258,43 +3377,12 @@
         "title": "YoutubeChannel",
         "description": "A channel the Commander subscribed to on the Sources page."
       },
-      "YoutubeChannelAdded": {
-        "properties": {
-          "channel": {
-            "$ref": "#/components/schemas/YoutubeChannel"
-          },
-          "ingest": {
-            "$ref": "#/components/schemas/YoutubeIngestReport"
-          }
-        },
-        "type": "object",
-        "required": [
-          "channel",
-          "ingest"
-        ],
-        "title": "YoutubeChannelAdded",
-        "description": "The new subscription plus what its first ingest actually found."
-      },
       "YoutubeChannelCreate": {
         "properties": {
           "id": {
             "type": "string",
             "title": "Id",
             "description": "Channel URL, @handle, or UC\u2026 id \u2014 anything Supadata can resolve"
-          },
-          "backfill": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 50.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Backfill",
-            "description": "Videos to pull immediately (default YOUTUBE_CHANNEL_BACKFILL)"
           }
         },
         "type": "object",
@@ -3355,6 +3443,36 @@
         "type": "object",
         "title": "YoutubeIngestReport",
         "description": "Outcome of ingesting one channel (or a whole poll) \u2014 surfaced, never silently dropped."
+      },
+      "YoutubeJobRef": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "YoutubeJobRef",
+        "description": "A running (or just-finished) ingest, so a client can attach to its progress stream.\n\nIngest takes minutes per video, so it never runs inside a request. The caller gets one\nof these back and follows `GET /api/jobs/{job_id}/stream`; a client that reloads\nmid-ingest finds the same job again through `GET /api/sources/youtube/jobs`."
       },
       "YoutubeMatch": {
         "properties": {

@@ -319,6 +319,14 @@ export interface YoutubeMatch {
   matchedAt: string;
 }
 
+/** A background ingest in flight, so a reloaded page can reattach to its progress stream. */
+export interface YoutubeJobRef {
+  jobId: string;
+  /** Undefined for a whole-poll job covering every channel. */
+  channelId?: string;
+  status: string;
+}
+
 /** What one channel ingest (or a whole poll) actually found. */
 export interface YoutubeIngestReport {
   channels: number;

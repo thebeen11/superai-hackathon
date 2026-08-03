@@ -215,6 +215,19 @@ class YoutubeMatch(BaseModel):
     matched_at: datetime = Field(default_factory=_now)
 
 
+class YoutubeJobRef(BaseModel):
+    """A running (or just-finished) ingest, so a client can attach to its progress stream.
+
+    Ingest takes minutes per video, so it never runs inside a request. The caller gets one
+    of these back and follows `GET /api/jobs/{job_id}/stream`; a client that reloads
+    mid-ingest finds the same job again through `GET /api/sources/youtube/jobs`.
+    """
+
+    job_id: str
+    channel_id: str | None = None   # None for a whole-poll job
+    status: str = "running"         # running | done | error
+
+
 class YoutubeIngestReport(BaseModel):
     """Outcome of ingesting one channel (or a whole poll) — surfaced, never silently dropped."""
 

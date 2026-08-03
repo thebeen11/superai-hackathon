@@ -6,6 +6,8 @@ Engineering guardrail rejects it, so the next poll doesn't buy it again.
 """
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 from app.discovery import youtube_ingest
@@ -187,3 +189,101 @@ def test_disabled_channels_are_not_polled(monkeypatch, wiring):
         lambda *a, **k: pytest.fail("a paused channel must never be ingested"),
     )
     assert youtube_ingest.ingest_all_enabled_channels().channels == 0
+
+
+# --- API: subscribing must not ingest, and a channel must not ingest twice at once ---
+
+@pytest.fixture(autouse=True)
+def _clean_job_registry():
+    """The job registry is process-global; a job left running would leak into other tests."""
+    from app import jobs
+
+    jobs._jobs.clear()
+    yield
+    jobs._jobs.clear()
+
+
+@pytest.fixture
+def client():
+    from fastapi.testclient import TestClient
+    from app import main
+
+    return TestClient(main.app)
+
+
+def test_subscribing_does_not_ingest(client, monkeypatch):
+    """The whole point of the split: following a channel must not wait on transcripts."""
+    from app import main
+
+    monkeypatch.setattr(main, "resolve_channel", lambda ident: _channel())
+    monkeypatch.setattr(main, "get_youtube_channel", lambda cid: None)
+    monkeypatch.setattr(main, "save_youtube_channel", lambda ch: ch)
+    monkeypatch.setattr(
+        main, "ingest_channel",
+        lambda *a, **k: pytest.fail("subscribing must not trigger an ingest"),
+    )
+
+    res = client.post("/api/sources/youtube/channels", json={"id": "@test"})
+
+    assert res.status_code == 200
+    assert res.json()["channel_id"] == "UCtest"
+
+
+def test_a_second_stream_attaches_to_the_running_job(client, monkeypatch):
+    """Two concurrent ingests would re-buy every transcript before either records them."""
+    from app import main
+    from app.jobs import create_job
+
+    monkeypatch.setattr(main, "get_youtube_channel", lambda cid: _channel())
+    monkeypatch.setattr(
+        main, "ingest_channel",
+        lambda *a, **k: pytest.fail("a second ingest must not start"),
+    )
+    # Still running when the request arrives — that is what triggers the attach. Finished
+    # from another thread so the replayed stream reaches its terminal frame and closes.
+    running = create_job("youtube", "UCtest")
+    running.add_event({"stage": "discover.youtube.channel", "status": "progress",
+                       "message": "already going", "data": {}, "ts": 0})
+    threading.Timer(0.15, lambda: running.finish({"persisted": 0})).start()
+
+    with client.stream(
+        "POST", "/api/sources/youtube/channels/UCtest/refresh/stream"
+    ) as res:
+        assert res.status_code == 200
+        body = "".join(res.iter_text())
+    assert "already going" in body      # replayed what the running job had already done
+    assert "event: result" in body
+
+
+def test_blocking_refresh_conflicts_while_a_job_runs(client, monkeypatch):
+    from app import main
+    from app.jobs import create_job
+
+    monkeypatch.setattr(main, "get_youtube_channel", lambda cid: _channel())
+    create_job("youtube", "UCtest")
+    monkeypatch.setattr(
+        main, "ingest_channel",
+        lambda *a, **k: pytest.fail("a second ingest must not start"),
+    )
+
+    res = client.post("/api/sources/youtube/channels/UCtest/refresh")
+
+    assert res.status_code == 409
+    assert "Already fetching" in res.json()["detail"]
+
+
+def test_poll_returns_immediately_and_registers_a_job(client, monkeypatch):
+    from app import main
+
+    slow = threading.Event()
+    monkeypatch.setattr(
+        main, "ingest_all_enabled_channels", lambda emit=None: slow.wait(timeout=2)
+    )
+
+    res = client.post("/api/sources/youtube/poll")
+
+    assert res.status_code == 202
+    job_id = res.json()["job_id"]
+    listed = client.get("/api/sources/youtube/jobs").json()
+    assert any(j["job_id"] == job_id and j["channel_id"] is None for j in listed)
+    slow.set()
