@@ -24,12 +24,21 @@ from .crawl import (
 from .dataeng import process_discovery_result
 from .db.repository import (
     delete_watchlist_entry,
+    delete_youtube_channel,
+    get_youtube_channel,
     list_cleaned_items,
     list_watchlist_overrides,
+    list_youtube_channels,
+    list_youtube_matches,
+    save_youtube_channel,
     set_watchlist_enabled,
+    set_youtube_channel_enabled,
 )
 from .discovery import discover, discover_with_refinement
 from .discovery.refine import QueryValidationError
+from .discovery.supadata import SupadataError
+from .discovery.youtube_channel import SourceUnavailable, resolve_channel
+from .discovery.youtube_ingest import ingest_all_enabled_channels, ingest_channel
 from .events import Emit
 from .insights.context import tracker_context
 from .models import (
@@ -40,12 +49,17 @@ from .models import (
     CouncilReport,
     DataEngReport,
     DiscoveryResult,
+    YoutubeChannel,
+    YoutubeIngestReport,
+    YoutubeJobRef,
+    YoutubeMatch,
 )
 from .jobs import create_job, get_job, list_jobs
 from .prompts import identity
 from .prompts import store as prompt_store
 from .prompts.registry import PromptSpec, get_spec, list_prompt_specs
-from .sse import sse_from_subscribe, sse_stream
+from .sse import run_detached, sse_from_subscribe, sse_stream
+from .youtube_poll import start_youtube_poll_timer, stop_youtube_poll_timer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -63,8 +77,12 @@ def _operation_id(route: APIRoute) -> str:
 async def _lifespan(app: FastAPI):
     if settings.daily_crawl_enabled:
         start_daily_crawl_timer()
+    # No key means no channel ingestion is possible, so don't spin a thread that can only fail.
+    if settings.youtube_poll_enabled and settings.supadata_api_key:
+        start_youtube_poll_timer()
     yield
     stop_daily_crawl_timer()
+    stop_youtube_poll_timer()
 
 
 app = FastAPI(
@@ -371,6 +389,184 @@ def remove_watchlist(ticker: str) -> WatchlistEntry:
     return WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
 
 
+# --- Sources → YouTube: channel subscriptions -------------------------------
+#
+# Ingest never runs inside a request: four Gemini calls per video plus a judge call per
+# matched ticker puts a five-video backfill in the tens of minutes. Subscribing is instant;
+# fetching is a background job the client attaches to (streamed) or polls for (detached).
+
+# Label for the whole-poll job, distinguishing it from per-channel jobs (labelled by id).
+_POLL_JOB_LABEL = "*all-channels*"
+
+
+class YoutubeChannelCreate(BaseModel):
+    id: str = Field(
+        ...,
+        description="Channel URL, @handle, or UC… id — anything Supadata can resolve",
+    )
+    # No `backfill` here: subscribing no longer fetches anything. Pass `?limit=` to
+    # `/channels/{id}/refresh/stream` to choose how much of the back catalogue to pull.
+
+
+class YoutubeChannelUpdate(BaseModel):
+    enabled: bool = Field(..., description="False pauses polling for this channel")
+
+
+def _running_youtube_job(channel_id: str | None) -> dict | None:
+    """The in-flight ingest for `channel_id` (or the whole-poll job), if there is one.
+
+    Ingesting the same channel twice concurrently would fetch every transcript twice before
+    either run records to `youtube_videos` — Supadata bills per transcript, so the guard is
+    a cost control, not just tidiness.
+    """
+    label = channel_id or _POLL_JOB_LABEL
+    for summary in list_jobs(status="running"):
+        if summary["kind"] == "youtube" and summary["query"] == label:
+            return summary
+    return None
+
+
+@app.get("/api/sources/youtube/channels", response_model=list[YoutubeChannel])
+def list_youtube_channels_endpoint() -> list[YoutubeChannel]:
+    """Every subscribed channel (tombstoned ones excluded), newest first."""
+    return list_youtube_channels()
+
+
+@app.post("/api/sources/youtube/channels", response_model=YoutubeChannel)
+def add_youtube_channel(body: YoutubeChannelCreate) -> YoutubeChannel:
+    """Subscribe to a channel. Returns as soon as the channel resolves — no ingest here.
+
+    Pulling the backfill takes minutes per video (four Gemini calls each, plus a judge call
+    per matched ticker), so it is a separate streamed call: follow up with
+    `POST /api/sources/youtube/channels/{id}/refresh/stream` to watch it run.
+
+    Re-adding a tombstoned channel revives it rather than duplicating it.
+    """
+    try:
+        resolved = resolve_channel(body.id.strip())
+    except SourceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except SupadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = get_youtube_channel(resolved.channel_id)
+    if existing and not existing.deleted:
+        raise HTTPException(status_code=409, detail=f"Already following {existing.name}")
+
+    return save_youtube_channel(resolved)
+
+
+@app.put("/api/sources/youtube/channels/{channel_id}", response_model=YoutubeChannel)
+def update_youtube_channel(channel_id: str, body: YoutubeChannelUpdate) -> YoutubeChannel:
+    """Pause or resume polling for one channel."""
+    return set_youtube_channel_enabled(channel_id, body.enabled)
+
+
+@app.delete("/api/sources/youtube/channels/{channel_id}", response_model=YoutubeChannel)
+def remove_youtube_channel(channel_id: str) -> YoutubeChannel:
+    """Unfollow a channel (tombstone — stops polling; its ingested videos are retained)."""
+    return delete_youtube_channel(channel_id)
+
+
+def _channel_or_404(channel_id: str) -> YoutubeChannel:
+    channel = get_youtube_channel(channel_id)
+    if channel is None or channel.deleted:
+        raise HTTPException(status_code=404, detail=f"Unknown channel: {channel_id!r}")
+    return channel
+
+
+@app.post("/api/sources/youtube/channels/{channel_id}/refresh", response_model=YoutubeIngestReport)
+def refresh_youtube_channel(channel_id: str) -> YoutubeIngestReport:
+    """Pull one channel's new videos now, blocking until done.
+
+    Kept for scripted callers that want the report in the response. Interactive clients
+    should use the `/stream` variant — this one can take minutes per video.
+    """
+    channel = _channel_or_404(channel_id)
+    running = _running_youtube_job(channel_id)
+    if running is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Already fetching {channel.name}; follow /api/jobs/{running['id']}/stream",
+        )
+    try:
+        return ingest_channel(channel)
+    except SourceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/sources/youtube/channels/{channel_id}/refresh/stream")
+def refresh_youtube_channel_stream(
+    channel_id: str,
+    limit: int | None = Query(None, ge=1, le=50, description="Videos to pull (default: poll limit)"),
+):
+    """Pull one channel's new videos, streaming progress as SSE.
+
+    The work runs on a background thread that outlives the response, so closing the tab
+    does not abandon a half-finished ingest — reattach later via
+    `GET /api/jobs/{job_id}/stream`. The job id arrives as a leading `job` frame.
+    """
+    channel = _channel_or_404(channel_id)
+
+    # Already fetching this channel: attach to that run instead of starting a second one,
+    # which would re-buy every transcript. `subscribe()` replays what it has missed first,
+    # so a second viewer sees the whole run, not just the tail.
+    running = _running_youtube_job(channel_id)
+    if running is not None:
+        existing = get_job(running["id"])
+        if existing is not None:
+            return sse_from_subscribe(existing.subscribe())
+
+    job = create_job("youtube", channel_id)
+
+    def work(emit: Emit) -> YoutubeIngestReport:
+        return ingest_channel(channel, limit=limit, emit=emit)
+
+    return sse_stream(work, job=job)
+
+
+@app.post("/api/sources/youtube/poll", response_model=YoutubeJobRef, status_code=202)
+def poll_youtube_channels() -> YoutubeJobRef:
+    """Poll every enabled channel — the Cloud Scheduler hook (see deploy.sh).
+
+    Returns 202 immediately and runs detached: a poll over several channels can exceed
+    Scheduler's attempt deadline, and a timeout there would retry the whole thing and
+    re-buy transcripts. Per-channel failures are recorded on the channel row (`last_error`)
+    and shown in the UI; overall progress is on the returned job.
+    """
+    running = _running_youtube_job(None)
+    if running is not None:
+        return YoutubeJobRef(job_id=running["id"], status=running["status"])
+
+    job = create_job("youtube", _POLL_JOB_LABEL)
+    run_detached(job, ingest_all_enabled_channels)
+    return YoutubeJobRef(job_id=job.id)
+
+
+@app.get("/api/sources/youtube/jobs", response_model=list[YoutubeJobRef])
+def list_youtube_jobs() -> list[YoutubeJobRef]:
+    """In-flight ingests, so a client that reloads mid-run can reattach to their streams."""
+    return [
+        YoutubeJobRef(
+            job_id=j["id"],
+            channel_id=None if j["query"] == _POLL_JOB_LABEL else j["query"],
+            status=j["status"],
+        )
+        for j in list_jobs(status="running")
+        if j["kind"] == "youtube"
+    ]
+
+
+@app.get("/api/sources/youtube/matches", response_model=list[YoutubeMatch])
+def list_youtube_matches_endpoint(
+    ticker: str | None = Query(None, description="Canonical symbol, e.g. $NVDA"),
+    channel_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[YoutubeMatch]:
+    """Watchlist moments found in subscribed channels' transcripts, newest first."""
+    return list_youtube_matches(ticker=ticker, channel_id=channel_id, limit=limit)
+
+
 # --- Agent Console: the roster (soul, mental models, personality, tools) -----
 
 
@@ -507,7 +703,17 @@ def dataeng_jobs(status: str | None = Query("running", description="Filter by jo
 
 @app.get("/dataeng/jobs/{job_id}/stream")
 def dataeng_job_stream(job_id: str):
-    """Reconnect to a job: replay its progress so far, then stream live to completion."""
+    """Reconnect to a job: replay its progress so far, then stream live to completion.
+
+    Kept at this path for existing clients; `/api/jobs/{id}/stream` is the same thing under
+    a name that isn't specific to Data Engineering.
+    """
+    return job_stream(job_id)
+
+
+@app.get("/api/jobs/{job_id}/stream")
+def job_stream(job_id: str):
+    """Attach to any background job: replay its progress, then stream live to completion."""
     job = get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")

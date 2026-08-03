@@ -107,3 +107,63 @@ def test_pipeline_isolates_per_item_failures(monkeypatch):
     assert report.persisted == 1
     assert report.failed == 1
     assert report.failures[0].source_url == "bad"
+
+
+# --- redaction must not silently strip timestamps (regression) ---
+
+def test_captions_survive_redaction_when_the_model_reflows_them(monkeypatch):
+    """Captions carry hard line breaks mid-sentence; the model reflows them onto one line.
+
+    A literal containment test fails for every segment of a real transcript, which strips
+    every timestamp from the item while still reporting a successful ingest.
+    """
+    from app.dataeng import redact as redact_mod
+    from app.models import SourceItem, SourceType, TranscriptSegment
+
+    segments = [
+        TranscriptSegment(start=2.13, text="Coming up on Bloomberg this weekend.\nStrikes unfold."),
+        TranscriptSegment(start=6.0, text="President Trump reverses course\novernight."),
+    ]
+    item = SourceItem(
+        source_type=SourceType.YOUTUBE, title="t",
+        url="https://www.youtube.com/watch?v=v1",
+        text=" ".join(s.text for s in segments), segments=segments,
+    )
+    reflowed = (
+        "Coming up on Bloomberg this weekend. Strikes unfold. "
+        "President Trump reverses course overnight."
+    )
+    monkeypatch.setattr(
+        redact_mod, "converse_structured",
+        lambda schema, system, user, **kw: schema(clean_text=reflowed),
+    )
+    monkeypatch.setattr(redact_mod, "get_prompt", lambda key, **v: "p")
+
+    result = redact_mod.redact(item)
+
+    assert [s.start for s in result.segments] == [2.13, 6.0]
+
+
+def test_redaction_still_drops_segments_the_model_removed(monkeypatch):
+    """Whitespace tolerance must not become 'keep everything'."""
+    from app.dataeng import redact as redact_mod
+    from app.models import SourceItem, SourceType, TranscriptSegment
+
+    segments = [
+        TranscriptSegment(start=1.0, text="real market commentary here"),
+        TranscriptSegment(start=2.0, text="this episode is sponsored by a mattress company"),
+    ]
+    item = SourceItem(
+        source_type=SourceType.YOUTUBE, title="t",
+        url="https://www.youtube.com/watch?v=v1",
+        text=" ".join(s.text for s in segments), segments=segments,
+    )
+    monkeypatch.setattr(
+        redact_mod, "converse_structured",
+        lambda schema, system, user, **kw: schema(clean_text="real market commentary here"),
+    )
+    monkeypatch.setattr(redact_mod, "get_prompt", lambda key, **v: "p")
+
+    result = redact_mod.redact(item)
+
+    assert [s.start for s in result.segments] == [1.0]   # the ad read is gone

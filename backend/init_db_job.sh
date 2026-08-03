@@ -16,7 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_gcloud_lib.sh"
 
 # --- Config (mirror deploy.sh) -----------------------------------------------
 PROJECT_ID="${PROJECT_ID:-your-project-id}"
-REGION="${REGION:-us-central1}"
+REGION="${REGION:-asia-southeast1}"        # must match deploy.sh — that's where everything is
 SERVICE="${SERVICE:-council-api}"          # image + service account come from this service
 SQL_INSTANCE="${SQL_INSTANCE:-council-db}"
 JOB="${JOB:-init-db}"

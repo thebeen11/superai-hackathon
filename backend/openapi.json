@@ -666,6 +666,375 @@
         }
       }
     },
+    "/api/sources/youtube/channels": {
+      "get": {
+        "summary": "List Youtube Channels Endpoint",
+        "description": "Every subscribed channel (tombstoned ones excluded), newest first.",
+        "operationId": "list_youtube_channels_endpoint",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/YoutubeChannel"
+                  },
+                  "type": "array",
+                  "title": "Response List Youtube Channels Endpoint"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Youtube Channel",
+        "description": "Subscribe to a channel. Returns as soon as the channel resolves \u2014 no ingest here.\n\nPulling the backfill takes minutes per video (four Gemini calls each, plus a judge call\nper matched ticker), so it is a separate streamed call: follow up with\n`POST /api/sources/youtube/channels/{id}/refresh/stream` to watch it run.\n\nRe-adding a tombstoned channel revives it rather than duplicating it.",
+        "operationId": "add_youtube_channel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeChannelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeChannel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/channels/{channel_id}": {
+      "put": {
+        "summary": "Update Youtube Channel",
+        "description": "Pause or resume polling for one channel.",
+        "operationId": "update_youtube_channel",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Channel Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeChannelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeChannel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Youtube Channel",
+        "description": "Unfollow a channel (tombstone \u2014 stops polling; its ingested videos are retained).",
+        "operationId": "remove_youtube_channel",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Channel Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeChannel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/channels/{channel_id}/refresh": {
+      "post": {
+        "summary": "Refresh Youtube Channel",
+        "description": "Pull one channel's new videos now, blocking until done.\n\nKept for scripted callers that want the report in the response. Interactive clients\nshould use the `/stream` variant \u2014 this one can take minutes per video.",
+        "operationId": "refresh_youtube_channel",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Channel Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeIngestReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/channels/{channel_id}/refresh/stream": {
+      "post": {
+        "summary": "Refresh Youtube Channel Stream",
+        "description": "Pull one channel's new videos, streaming progress as SSE.\n\nThe work runs on a background thread that outlives the response, so closing the tab\ndoes not abandon a half-finished ingest \u2014 reattach later via\n`GET /api/jobs/{job_id}/stream`. The job id arrives as a leading `job` frame.",
+        "operationId": "refresh_youtube_channel_stream",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Channel Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 50,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Videos to pull (default: poll limit)",
+              "title": "Limit"
+            },
+            "description": "Videos to pull (default: poll limit)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/poll": {
+      "post": {
+        "summary": "Poll Youtube Channels",
+        "description": "Poll every enabled channel \u2014 the Cloud Scheduler hook (see deploy.sh).\n\nReturns 202 immediately and runs detached: a poll over several channels can exceed\nScheduler's attempt deadline, and a timeout there would retry the whole thing and\nre-buy transcripts. Per-channel failures are recorded on the channel row (`last_error`)\nand shown in the UI; overall progress is on the returned job.",
+        "operationId": "poll_youtube_channels",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeJobRef"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/jobs": {
+      "get": {
+        "summary": "List Youtube Jobs",
+        "description": "In-flight ingests, so a client that reloads mid-run can reattach to their streams.",
+        "operationId": "list_youtube_jobs",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/YoutubeJobRef"
+                  },
+                  "type": "array",
+                  "title": "Response List Youtube Jobs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/youtube/matches": {
+      "get": {
+        "summary": "List Youtube Matches Endpoint",
+        "description": "Watchlist moments found in subscribed channels' transcripts, newest first.",
+        "operationId": "list_youtube_matches_endpoint",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Canonical symbol, e.g. $NVDA",
+              "title": "Ticker"
+            },
+            "description": "Canonical symbol, e.g. $NVDA"
+          },
+          {
+            "name": "channel_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/YoutubeMatch"
+                  },
+                  "title": "Response List Youtube Matches Endpoint"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/agents": {
       "get": {
         "summary": "List Agents",
@@ -1046,8 +1415,46 @@
     "/dataeng/jobs/{job_id}/stream": {
       "get": {
         "summary": "Dataeng Job Stream",
-        "description": "Reconnect to a job: replay its progress so far, then stream live to completion.",
+        "description": "Reconnect to a job: replay its progress so far, then stream live to completion.\n\nKept at this path for existing clients; `/api/jobs/{id}/stream` is the same thing under\na name that isn't specific to Data Engineering.",
         "operationId": "dataeng_job_stream",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/stream": {
+      "get": {
+        "summary": "Job Stream",
+        "description": "Attach to any background job: replay its progress, then stream live to completion.",
+        "operationId": "job_stream",
         "parameters": [
           {
             "name": "job_id",
@@ -2867,6 +3274,287 @@
           "enabled"
         ],
         "title": "WatchlistUpdate"
+      },
+      "YoutubeChannel": {
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "thumbnail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail"
+          },
+          "subscriber_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscriber Count"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
+          "added_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added At"
+          },
+          "last_polled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Polled At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel_id",
+          "name"
+        ],
+        "title": "YoutubeChannel",
+        "description": "A channel the Commander subscribed to on the Sources page."
+      },
+      "YoutubeChannelCreate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Channel URL, @handle, or UC\u2026 id \u2014 anything Supadata can resolve"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "YoutubeChannelCreate"
+      },
+      "YoutubeChannelUpdate": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "False pauses polling for this channel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "YoutubeChannelUpdate"
+      },
+      "YoutubeIngestReport": {
+        "properties": {
+          "channels": {
+            "type": "integer",
+            "title": "Channels",
+            "default": 0
+          },
+          "videos_seen": {
+            "type": "integer",
+            "title": "Videos Seen",
+            "default": 0
+          },
+          "persisted": {
+            "type": "integer",
+            "title": "Persisted",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched",
+            "default": 0
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "title": "YoutubeIngestReport",
+        "description": "Outcome of ingesting one channel (or a whole poll) \u2014 surfaced, never silently dropped."
+      },
+      "YoutubeJobRef": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "YoutubeJobRef",
+        "description": "A running (or just-finished) ingest, so a client can attach to its progress stream.\n\nIngest takes minutes per video, so it never runs inside a request. The caller gets one\nof these back and follows `GET /api/jobs/{job_id}/stream`; a client that reloads\nmid-ingest finds the same job again through `GET /api/sources/youtube/jobs`."
+      },
+      "YoutubeMatch": {
+        "properties": {
+          "video_url": {
+            "type": "string",
+            "title": "Video Url"
+          },
+          "video_id": {
+            "type": "string",
+            "title": "Video Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "quote": {
+            "type": "string",
+            "title": "Quote"
+          },
+          "timestamp_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp Start"
+          },
+          "relevance": {
+            "type": "number",
+            "title": "Relevance",
+            "default": 0.0
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Name"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "matched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Matched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_url",
+          "video_id",
+          "channel_id",
+          "ticker",
+          "quote"
+        ],
+        "title": "YoutubeMatch",
+        "description": "One watchlist-relevant moment in one video \u2014 the persisted evidence unit.\n\n`timestamp_start` is resolved with `council.grounding.best_offset`, the same routine the\nanalysts use, so a match deep-links to the exact second the ticker was discussed."
       }
     }
   }

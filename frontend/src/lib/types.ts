@@ -277,6 +277,66 @@ export interface Source {
   items: number;
 }
 
+/**
+ * A YouTube channel the Commander follows (Sources → YouTube).
+ *
+ * Unlike {@link Source}, which is derived from whatever the council happened to read, a
+ * channel is a *standing* subscription: it keeps producing videos until it's paused.
+ */
+export interface YoutubeChannel {
+  channelId: string;
+  /** What the user typed when subscribing ("@Bloomberg", a URL, a UC… id). */
+  handle?: string;
+  name: string;
+  thumbnail?: string;
+  subscriberCount?: number;
+  /** False = polling paused; the channel stays in the list. */
+  enabled: boolean;
+  deleted: boolean;
+  addedAt?: string;
+  lastPolledAt?: string;
+  /** Last ingest failure, shown inline so a broken channel is never silently dead. */
+  lastError?: string;
+  /** Videos of this channel already ingested. */
+  videoCount: number;
+}
+
+/** One moment in a video that discusses a watchlist ticker — YouTube's evidence unit. */
+export interface YoutubeMatch {
+  videoUrl: string;
+  videoId: string;
+  channelId: string;
+  /** Canonical symbol, e.g. "$NVDA". */
+  ticker: string;
+  quote: string;
+  /** Seconds into the video, so the link opens at the moment it was said. */
+  timestampStart?: number;
+  /** 0..1 — how squarely the moment is about the ticker, not just a name-drop. */
+  relevance: number;
+  title: string;
+  channelName?: string;
+  publishedAt?: string;
+  matchedAt: string;
+}
+
+/** A background ingest in flight, so a reloaded page can reattach to its progress stream. */
+export interface YoutubeJobRef {
+  jobId: string;
+  /** Undefined for a whole-poll job covering every channel. */
+  channelId?: string;
+  status: string;
+}
+
+/** What one channel ingest (or a whole poll) actually found. */
+export interface YoutubeIngestReport {
+  channels: number;
+  videosSeen: number;
+  persisted: number;
+  failed: number;
+  matched: number;
+  errors: string[];
+}
+
 /** One document the council actually read — the auditable unit behind every claim. */
 export interface SourceDoc {
   url: string;

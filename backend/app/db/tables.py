@@ -108,3 +108,86 @@ class WatchlistOverrideRow(Base):
     enabled = Column(Boolean, nullable=False, default=True)         # False = scanning paused
     deleted = Column(Boolean, nullable=False, default=False)        # True = removed (tombstone)
     updated_at = Column(DateTime(timezone=True), nullable=False)    # UTC of last change
+
+
+class YoutubeChannelRow(Base):
+    """A YouTube channel the Commander subscribed to (Sources → YouTube).
+
+    Unlike `watchlist_overrides` — where absence of a row means "tracked by default" — a row
+    here IS the subscription: no row means the channel was never added. `deleted=true` is a
+    tombstone rather than a hard delete so re-adding the same channel restores its history
+    instead of re-ingesting videos already in `cleaned_items`.
+    """
+
+    __tablename__ = "youtube_channels"
+
+    channel_id = Column(String, primary_key=True)                   # canonical "UC…" id
+    handle = Column(String, nullable=True)                          # what the user typed
+    name = Column(Text, nullable=False)
+    thumbnail = Column(Text, nullable=True)
+    subscriber_count = Column(Integer, nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True)         # False = polling paused
+    deleted = Column(Boolean, nullable=False, default=False)        # True = unsubscribed
+    added_at = Column(DateTime(timezone=True), nullable=False)      # UTC when subscribed
+    last_polled_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(Text, nullable=True)                        # last ingest failure
+
+
+class YoutubeVideoRow(Base):
+    """Every video we have already pulled a transcript for, per channel.
+
+    This is a *credit ledger*, not a copy of `cleaned_items`. Supadata bills per transcript,
+    so a poll must never re-fetch a video it has already seen — including one whose transcript
+    the Data Engineering guardrail later rejected (that video is not in `cleaned_items`, but
+    re-fetching it every 6 hours would burn a credit every time). It also carries the
+    channel→video link, which `cleaned_items` does not record.
+    """
+
+    __tablename__ = "youtube_videos"
+
+    video_id = Column(String, primary_key=True)
+    channel_id = Column(String, nullable=False)
+    video_url = Column(Text, nullable=False)
+    title = Column(Text, nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    persisted = Column(Boolean, nullable=False, default=False)      # survived the pipeline
+    fetched_at = Column(DateTime(timezone=True), nullable=False)
+
+
+Index("idx_youtube_videos_channel", YoutubeVideoRow.channel_id)
+
+
+class YoutubeMatchRow(Base):
+    """One watchlist-relevant moment in one video — the persisted evidence unit.
+
+    `video_url` references `cleaned_items.source_url` by value, not by foreign key (this
+    schema keeps every cross-table link by value — see `predictions`, `council_snapshots`).
+    A purge of `cleaned_items` therefore leaves orphan matches behind; they are harmless
+    (the row carries its own title/quote/timestamp) but will point at a URL with no
+    corresponding document.
+    """
+
+    __tablename__ = "youtube_matches"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    video_url = Column(Text, nullable=False)                        # == cleaned_items.source_url
+    video_id = Column(String, nullable=False)
+    channel_id = Column(String, nullable=False)
+    ticker = Column(String, nullable=False)                         # canonical "$NVDA"
+    quote = Column(Text, nullable=False)
+    timestamp_start = Column(Float, nullable=True)                  # seconds into the video
+    relevance = Column(Float, nullable=False, default=0.0)          # 0..1
+    title = Column(Text, nullable=False)
+    channel_name = Column(Text, nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    matched_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        # One moment per (video, ticker): re-running a match updates it rather than piling up.
+        UniqueConstraint("video_id", "ticker", name="uq_youtube_match_video_ticker"),
+    )
+
+
+Index("idx_youtube_matches_ticker", YoutubeMatchRow.ticker)
+Index("idx_youtube_matches_channel", YoutubeMatchRow.channel_id)
+Index("idx_youtube_matches_matched_at", YoutubeMatchRow.matched_at)

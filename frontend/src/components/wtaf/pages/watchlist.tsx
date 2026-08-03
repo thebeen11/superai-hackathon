@@ -1,16 +1,16 @@
 "use client";
 /* ============ WTAF — Watchlist (list + ticker detail routes) ============ */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, MiniBar, EmptyState } from "../primitives";
-import { PageHead, PageButton } from "../shared";
+import { PageHead, PageButton, ScanToggle, IconButton } from "../shared";
 import { DebateCard } from "../command-center/debate-card";
-import { EvidenceList } from "../source-link";
+import { EvidenceList, SourceLink } from "../source-link";
 import { fmtChange, fmtPrice, hasQuote } from "@/lib/format";
-import { deleteWatchlistItem, setWatchlistActive } from "@/lib/api/wtaf";
-import type { WatchItem } from "@/lib/types";
+import { deleteWatchlistItem, getYoutubeMatches, setWatchlistActive } from "@/lib/api/wtaf";
+import type { WatchItem, YoutubeMatch } from "@/lib/types";
 
 const PAGE_SIZE = 25;
 
@@ -140,48 +140,6 @@ export function WatchlistPage() {
   );
 }
 
-/** On/off pill for per-ticker scanning (pattern mirrors the Agent Console mental-model switch). */
-function ScanToggle({ on, pending, onToggle }: { on: boolean; pending: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={pending}
-      aria-pressed={on}
-      title={on ? "Scanning on — click to pause" : "Scanning paused — click to resume"}
-      style={{
-        width: 34, height: 19, borderRadius: 99, flexShrink: 0, position: "relative",
-        border: "1px solid " + (on ? "color-mix(in oklch, var(--orange-bright) 55%, transparent)" : "var(--stroke-hi)"),
-        background: on ? "color-mix(in oklch, var(--orange-bright) 26%, transparent)" : "var(--panel-2)",
-        cursor: pending ? "default" : "pointer", opacity: pending ? 0.5 : 1, transition: "background .15s",
-      }}
-    >
-      <span style={{ position: "absolute", top: 2, left: on ? 16 : 2, width: 13, height: 13, borderRadius: 99, background: on ? "var(--orange-bright)" : "var(--t-faint)", boxShadow: on ? "0 0 8px var(--orange-bright)" : "none", transition: "left .15s" }} />
-    </button>
-  );
-}
-
-/** Small square glyph button for the delete / confirm actions. */
-function IconButton({ children, title, onClick, disabled, danger }: { children: ReactNode; title: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      style={{
-        width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 13, lineHeight: 1, borderRadius: 7, flexShrink: 0,
-        background: "var(--panel-2)", border: "1px solid " + (danger ? "color-mix(in oklch, var(--down) 45%, transparent)" : "var(--stroke)"),
-        color: danger ? "var(--down)" : "var(--t-mid)",
-        cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.4 : 1, transition: "opacity .15s",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 export function TickerDetailPage({ ticker }: { ticker: string }) {
   const d = useWtafData();
   const { onOpenDebate } = useShellActions();
@@ -281,8 +239,61 @@ export function TickerDetailPage({ ticker }: { ticker: string }) {
           </div>
           )}
         </Card>
+
+        <YoutubeMoments ticker={sym} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Moments from followed YouTube channels that discuss this ticker.
+ *
+ * Fetched here rather than folded into the snapshot: subscriptions are their own resource,
+ * and a ticker page should still render if the YouTube source is unconfigured.
+ */
+function YoutubeMoments({ ticker }: { ticker: string }) {
+  const [matches, setMatches] = useState<YoutubeMatch[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    getYoutubeMatches({ ticker, limit: 12 })
+      .then((m) => live && setMatches(m))
+      .catch(() => live && setMatches([]));
+    return () => {
+      live = false;
+    };
+  }, [ticker]);
+
+  // Nothing to say and nothing loading — don't take up a card slot.
+  if (matches !== null && matches.length === 0) return null;
+
+  return (
+    <Card
+      title="From your YouTube channels"
+      sub={matches?.length ? `${matches.length} moment${matches.length === 1 ? "" : "s"}` : undefined}
+      className="span5"
+      loading={matches === null}
+    >
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {(matches ?? []).map((m, i) => (
+          <div
+            key={`${m.videoId}-${m.ticker}`}
+            style={{
+              padding: "10px 0",
+              borderBottom: i < (matches?.length ?? 0) - 1 ? "1px solid var(--stroke)" : "none",
+            }}
+          >
+            <SourceLink
+              evidence={{ quote: m.quote, sourceUrl: m.videoUrl, timestampStart: m.timestampStart }}
+            />
+            <div className="mono" style={{ fontSize: 10, color: "var(--t-faint)", marginTop: 3 }}>
+              {[m.channelName, m.title].filter(Boolean).join(" · ")}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

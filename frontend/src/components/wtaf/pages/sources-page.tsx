@@ -10,8 +10,51 @@ import type { SourceDoc } from "@/lib/types";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
 import { Card, EmptyState } from "../primitives";
 import { PageHead, PageButton } from "../shared";
+import { SourcesYoutube } from "./sources-youtube";
 
 const PAGE_SIZE = 25;
+
+/**
+ * Sub-tabs are local state, not routes: the Overview tab reads the global snapshot while
+ * YouTube owns its own fetch, and neither needs to be linkable on its own.
+ */
+const SOURCE_TABS = ["Overview", "YouTube"] as const;
+type SourceTab = (typeof SOURCE_TABS)[number];
+
+/** Underline tab bar — same treatment as the Agent Console. */
+function TabBar({ tab, onTab }: { tab: SourceTab; onTab: (t: SourceTab) => void }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 4,
+        marginBottom: 16,
+        borderBottom: "1px solid var(--stroke)",
+      }}
+    >
+      {SOURCE_TABS.map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onTab(t)}
+          style={{
+            padding: "9px 12px",
+            fontSize: 12,
+            fontWeight: tab === t ? 600 : 400,
+            background: "transparent",
+            border: "none",
+            borderBottom: "2px solid " + (tab === t ? "var(--blue-bright)" : "transparent"),
+            color: tab === t ? "var(--t-hi)" : "var(--t-lo)",
+            cursor: "pointer",
+            marginBottom: -1,
+          }}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function fmtDate(iso?: string): string {
   if (!iso) return "—";
@@ -141,6 +184,7 @@ export function SourcesPage() {
   const sources = d.sources;
   const docs = d.sourceDocs;
 
+  const [tab, setTab] = useState<SourceTab>("Overview");
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(docs.length / PAGE_SIZE));
   // Clamp during render so a shrinking list (e.g. after re-discovery) never lands on an empty page.
@@ -150,7 +194,16 @@ export function SourcesPage() {
 
   return (
     <div>
-      <PageHead title="Data Sources" sub="everything the council read · click any row to verify" />
+      <PageHead
+        title="Data Sources"
+        sub={
+          tab === "YouTube"
+            ? "channels you follow · every new video is read for you"
+            : "everything the council read · click any row to verify"
+        }
+      />
+      <TabBar tab={tab} onTab={setTab} />
+      {tab === "YouTube" ? <SourcesYoutube /> : (
       <div className="grid12">
         <Card
           title="Channels"
@@ -199,6 +252,7 @@ export function SourcesPage() {
           )}
         </Card>
       </div>
+      )}
     </div>
   );
 }

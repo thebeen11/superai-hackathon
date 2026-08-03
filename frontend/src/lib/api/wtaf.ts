@@ -5,8 +5,17 @@
  * Today they fall back to mock data (USE_MOCK); when the backend is ready,
  * only the `apiFetch(...)` lines below matter and the mock branches drop away.
  */
-import type { ContextPreview, WtafData, Source, WatchlistEntry } from "../types";
-import { wtafMock } from "../mock-data";
+import type {
+  ContextPreview,
+  WtafData,
+  Source,
+  WatchlistEntry,
+  YoutubeChannel,
+  YoutubeIngestReport,
+  YoutubeJobRef,
+  YoutubeMatch,
+} from "../types";
+import { wtafMock, youtubeChannelsMock, youtubeMatchesMock } from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import {
   agentEffectivePrompt,
@@ -260,4 +269,205 @@ export function deleteWatchlistItem(ticker: string): Promise<WatchlistEntry> {
   return apiFetch<WatchlistEntry>(`/api/watchlists/${encodeURIComponent(ticker)}`, {
     method: "DELETE",
   });
+}
+
+/* ============ Sources → YouTube — channel subscriptions ============ */
+
+/** Backend rows are snake_case; the rest of the app speaks camelCase. */
+type RawChannel = {
+  channel_id: string;
+  handle?: string | null;
+  name: string;
+  thumbnail?: string | null;
+  subscriber_count?: number | null;
+  enabled: boolean;
+  deleted: boolean;
+  added_at?: string | null;
+  last_polled_at?: string | null;
+  last_error?: string | null;
+  video_count: number;
+};
+
+type RawMatch = {
+  video_url: string;
+  video_id: string;
+  channel_id: string;
+  ticker: string;
+  quote: string;
+  timestamp_start?: number | null;
+  relevance: number;
+  title: string;
+  channel_name?: string | null;
+  published_at?: string | null;
+  matched_at: string;
+};
+
+type RawReport = {
+  channels: number;
+  videos_seen: number;
+  persisted: number;
+  failed: number;
+  matched: number;
+  errors: string[];
+};
+
+function toChannel(r: RawChannel): YoutubeChannel {
+  return {
+    channelId: r.channel_id,
+    handle: r.handle ?? undefined,
+    name: r.name,
+    thumbnail: r.thumbnail ?? undefined,
+    subscriberCount: r.subscriber_count ?? undefined,
+    enabled: r.enabled,
+    deleted: r.deleted,
+    addedAt: r.added_at ?? undefined,
+    lastPolledAt: r.last_polled_at ?? undefined,
+    lastError: r.last_error ?? undefined,
+    videoCount: r.video_count,
+  };
+}
+
+function toMatch(r: RawMatch): YoutubeMatch {
+  return {
+    videoUrl: r.video_url,
+    videoId: r.video_id,
+    channelId: r.channel_id,
+    ticker: r.ticker,
+    quote: r.quote,
+    timestampStart: r.timestamp_start ?? undefined,
+    relevance: r.relevance,
+    title: r.title,
+    channelName: r.channel_name ?? undefined,
+    publishedAt: r.published_at ?? undefined,
+    matchedAt: r.matched_at,
+  };
+}
+
+/**
+ * Map the backend's snake_case ingest report to camelCase.
+ *
+ * Exported because the streamed variant bypasses `apiFetch` entirely — `streamSse` hands
+ * back the raw `result` frame, so the caller must map it here rather than trusting a
+ * camelCase type annotation over snake_case data.
+ */
+export function toYoutubeIngestReport(r: RawReport): YoutubeIngestReport {
+  return {
+    channels: r.channels,
+    videosSeen: r.videos_seen,
+    persisted: r.persisted,
+    failed: r.failed,
+    matched: r.matched,
+    errors: r.errors ?? [],
+  };
+}
+
+/** Followed channels, newest first. Backend: GET /api/sources/youtube/channels */
+export async function getYoutubeChannels(): Promise<YoutubeChannel[]> {
+  if (USE_MOCK) return mockResolve(youtubeChannelsMock);
+  const rows = await apiFetch<RawChannel[]>("/api/sources/youtube/channels");
+  return rows.map(toChannel);
+}
+
+/**
+ * Follow a channel. Returns as soon as it resolves — nothing is fetched yet.
+ *
+ * `id` is anything Supadata resolves — a URL, an @handle, or a UC… id. Pulling the videos
+ * is a separate background job: stream {@link youtubeRefreshStreamPath} through
+ * `runLiveJob`. Backend: POST /api/sources/youtube/channels
+ */
+export async function addYoutubeChannelSubscription(id: string): Promise<YoutubeChannel> {
+  if (USE_MOCK) {
+    return mockResolve({
+      channelId: `UC${id}`,
+      handle: id,
+      name: id.replace(/^@/, ""),
+      enabled: true,
+      deleted: false,
+      videoCount: 0,
+    });
+  }
+  const raw = await apiFetch<RawChannel>("/api/sources/youtube/channels", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+  return toChannel(raw);
+}
+
+/**
+ * SSE path that ingests one channel's new videos, reporting progress as it goes.
+ *
+ * Ingest takes minutes per video, so it never runs inside a request. Feed this to
+ * `runLiveJob` from the provider; the work continues server-side even if the stream drops.
+ */
+export function youtubeRefreshStreamPath(channelId: string, limit?: number): string {
+  const qs = limit ? `?limit=${limit}` : "";
+  return `/api/sources/youtube/channels/${encodeURIComponent(channelId)}/refresh/stream${qs}`;
+}
+
+/** Attach to a background job already in flight (after a reload). Backend: GET /api/jobs/:id/stream */
+export function jobStreamPath(jobId: string): string {
+  return `/api/jobs/${encodeURIComponent(jobId)}/stream`;
+}
+
+/** Ingests currently running, so a reloaded page can reattach. Backend: GET /api/sources/youtube/jobs */
+export function getRunningYoutubeJobs(): Promise<YoutubeJobRef[]> {
+  if (USE_MOCK) return mockResolve([]);
+  return apiFetch<{ job_id: string; channel_id: string | null; status: string }[]>(
+    "/api/sources/youtube/jobs",
+  ).then((rows) =>
+    rows.map((r) => ({ jobId: r.job_id, channelId: r.channel_id ?? undefined, status: r.status })),
+  );
+}
+
+/** Pause or resume polling. Backend: PUT /api/sources/youtube/channels/:id */
+export async function setYoutubeChannelEnabled(
+  channelId: string,
+  enabled: boolean,
+): Promise<YoutubeChannel> {
+  if (USE_MOCK) {
+    const c = youtubeChannelsMock.find((x) => x.channelId === channelId)!;
+    return mockResolve({ ...c, enabled });
+  }
+  const raw = await apiFetch<RawChannel>(
+    `/api/sources/youtube/channels/${encodeURIComponent(channelId)}`,
+    { method: "PUT", body: JSON.stringify({ enabled }) },
+  );
+  return toChannel(raw);
+}
+
+/** Unfollow a channel (tombstone). Backend: DELETE /api/sources/youtube/channels/:id */
+export async function deleteYoutubeChannel(channelId: string): Promise<YoutubeChannel> {
+  if (USE_MOCK) {
+    const c = youtubeChannelsMock.find((x) => x.channelId === channelId)!;
+    return mockResolve({ ...c, deleted: true, enabled: false });
+  }
+  const raw = await apiFetch<RawChannel>(
+    `/api/sources/youtube/channels/${encodeURIComponent(channelId)}`,
+    { method: "DELETE" },
+  );
+  return toChannel(raw);
+}
+
+/**
+ * Watchlist moments found in followed channels' transcripts.
+ * Backend: GET /api/sources/youtube/matches
+ */
+export async function getYoutubeMatches(opts?: {
+  ticker?: string;
+  channelId?: string;
+  limit?: number;
+}): Promise<YoutubeMatch[]> {
+  if (USE_MOCK) {
+    const all = youtubeMatchesMock;
+    return mockResolve(opts?.ticker ? all.filter((m) => m.ticker === opts.ticker) : all);
+  }
+  const params = new URLSearchParams();
+  if (opts?.ticker) params.set("ticker", opts.ticker);
+  if (opts?.channelId) params.set("channel_id", opts.channelId);
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  const rows = await apiFetch<RawMatch[]>(
+    `/api/sources/youtube/matches${qs ? `?${qs}` : ""}`,
+  );
+  return rows.map(toMatch);
 }

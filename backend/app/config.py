@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     youtube_api_key: str | None = None
     discovery_max_results_per_source: int = 5
 
+    # --- Supadata (YouTube channel subscriptions: metadata + transcripts) ---
+    # Used only by the channel-subscription source; the query-driven `/discover`
+    # YouTube branch still uses YOUTUBE_API_KEY + youtube-transcript-api.
+    # Billing is per credit (1 transcript = 1 credit, 1 metadata lookup = 1 credit) and
+    # the free tier is 100 credits/month at 1 req/s — hence the conservative defaults.
+    supadata_api_key: str | None = None
+    supadata_base_url: str = "https://api.supadata.ai/v1"
+    youtube_channel_backfill: int = 5           # videos pulled when a channel is added
+    youtube_poll_limit: int = 10                # newest videos inspected per poll
+    youtube_transcript_chunk_size: int = 1000   # chars per evidence-sized chunk
+    youtube_poll_enabled: bool = True
+    youtube_poll_interval_minutes: int = 1440   # 24h
+
     # --- Gemini on Vertex AI (reasoning) ---
     # Auth is via Application Default Credentials (ADC) — no API keys. On Cloud Run the
     # service account is used automatically; locally run `gcloud auth application-default

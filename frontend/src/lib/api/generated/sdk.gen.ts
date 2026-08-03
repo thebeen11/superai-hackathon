@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListWatchlistsData, ListWatchlistsResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses } from './types.gen';
+import type { AddYoutubeChannelData, AddYoutubeChannelErrors, AddYoutubeChannelResponses, AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, JobStreamData, JobStreamErrors, JobStreamResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListWatchlistsData, ListWatchlistsResponses, ListYoutubeChannelsEndpointData, ListYoutubeChannelsEndpointResponses, ListYoutubeJobsData, ListYoutubeJobsResponses, ListYoutubeMatchesEndpointData, ListYoutubeMatchesEndpointErrors, ListYoutubeMatchesEndpointResponses, PollYoutubeChannelsData, PollYoutubeChannelsResponses, RefreshYoutubeChannelData, RefreshYoutubeChannelErrors, RefreshYoutubeChannelResponses, RefreshYoutubeChannelStreamData, RefreshYoutubeChannelStreamErrors, RefreshYoutubeChannelStreamResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, RemoveYoutubeChannelData, RemoveYoutubeChannelErrors, RemoveYoutubeChannelResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses, UpdateYoutubeChannelData, UpdateYoutubeChannelErrors, UpdateYoutubeChannelResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -151,6 +151,101 @@ export const updateWatchlist = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * List Youtube Channels Endpoint
+ *
+ * Every subscribed channel (tombstoned ones excluded), newest first.
+ */
+export const listYoutubeChannelsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<ListYoutubeChannelsEndpointData, ThrowOnError>): RequestResult<ListYoutubeChannelsEndpointResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListYoutubeChannelsEndpointResponses, unknown, ThrowOnError>({ url: '/api/sources/youtube/channels', ...options });
+
+/**
+ * Add Youtube Channel
+ *
+ * Subscribe to a channel. Returns as soon as the channel resolves — no ingest here.
+ *
+ * Pulling the backfill takes minutes per video (four Gemini calls each, plus a judge call
+ * per matched ticker), so it is a separate streamed call: follow up with
+ * `POST /api/sources/youtube/channels/{id}/refresh/stream` to watch it run.
+ *
+ * Re-adding a tombstoned channel revives it rather than duplicating it.
+ */
+export const addYoutubeChannel = <ThrowOnError extends boolean = false>(options: Options<AddYoutubeChannelData, ThrowOnError>): RequestResult<AddYoutubeChannelResponses, AddYoutubeChannelErrors, ThrowOnError> => (options.client ?? client).post<AddYoutubeChannelResponses, AddYoutubeChannelErrors, ThrowOnError>({
+    url: '/api/sources/youtube/channels',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove Youtube Channel
+ *
+ * Unfollow a channel (tombstone — stops polling; its ingested videos are retained).
+ */
+export const removeYoutubeChannel = <ThrowOnError extends boolean = false>(options: Options<RemoveYoutubeChannelData, ThrowOnError>): RequestResult<RemoveYoutubeChannelResponses, RemoveYoutubeChannelErrors, ThrowOnError> => (options.client ?? client).delete<RemoveYoutubeChannelResponses, RemoveYoutubeChannelErrors, ThrowOnError>({ url: '/api/sources/youtube/channels/{channel_id}', ...options });
+
+/**
+ * Update Youtube Channel
+ *
+ * Pause or resume polling for one channel.
+ */
+export const updateYoutubeChannel = <ThrowOnError extends boolean = false>(options: Options<UpdateYoutubeChannelData, ThrowOnError>): RequestResult<UpdateYoutubeChannelResponses, UpdateYoutubeChannelErrors, ThrowOnError> => (options.client ?? client).put<UpdateYoutubeChannelResponses, UpdateYoutubeChannelErrors, ThrowOnError>({
+    url: '/api/sources/youtube/channels/{channel_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Refresh Youtube Channel
+ *
+ * Pull one channel's new videos now, blocking until done.
+ *
+ * Kept for scripted callers that want the report in the response. Interactive clients
+ * should use the `/stream` variant — this one can take minutes per video.
+ */
+export const refreshYoutubeChannel = <ThrowOnError extends boolean = false>(options: Options<RefreshYoutubeChannelData, ThrowOnError>): RequestResult<RefreshYoutubeChannelResponses, RefreshYoutubeChannelErrors, ThrowOnError> => (options.client ?? client).post<RefreshYoutubeChannelResponses, RefreshYoutubeChannelErrors, ThrowOnError>({ url: '/api/sources/youtube/channels/{channel_id}/refresh', ...options });
+
+/**
+ * Refresh Youtube Channel Stream
+ *
+ * Pull one channel's new videos, streaming progress as SSE.
+ *
+ * The work runs on a background thread that outlives the response, so closing the tab
+ * does not abandon a half-finished ingest — reattach later via
+ * `GET /api/jobs/{job_id}/stream`. The job id arrives as a leading `job` frame.
+ */
+export const refreshYoutubeChannelStream = <ThrowOnError extends boolean = false>(options: Options<RefreshYoutubeChannelStreamData, ThrowOnError>): RequestResult<RefreshYoutubeChannelStreamResponses, RefreshYoutubeChannelStreamErrors, ThrowOnError> => (options.client ?? client).post<RefreshYoutubeChannelStreamResponses, RefreshYoutubeChannelStreamErrors, ThrowOnError>({ url: '/api/sources/youtube/channels/{channel_id}/refresh/stream', ...options });
+
+/**
+ * Poll Youtube Channels
+ *
+ * Poll every enabled channel — the Cloud Scheduler hook (see deploy.sh).
+ *
+ * Returns 202 immediately and runs detached: a poll over several channels can exceed
+ * Scheduler's attempt deadline, and a timeout there would retry the whole thing and
+ * re-buy transcripts. Per-channel failures are recorded on the channel row (`last_error`)
+ * and shown in the UI; overall progress is on the returned job.
+ */
+export const pollYoutubeChannels = <ThrowOnError extends boolean = false>(options?: Options<PollYoutubeChannelsData, ThrowOnError>): RequestResult<PollYoutubeChannelsResponses, unknown, ThrowOnError> => (options?.client ?? client).post<PollYoutubeChannelsResponses, unknown, ThrowOnError>({ url: '/api/sources/youtube/poll', ...options });
+
+/**
+ * List Youtube Jobs
+ *
+ * In-flight ingests, so a client that reloads mid-run can reattach to their streams.
+ */
+export const listYoutubeJobs = <ThrowOnError extends boolean = false>(options?: Options<ListYoutubeJobsData, ThrowOnError>): RequestResult<ListYoutubeJobsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListYoutubeJobsResponses, unknown, ThrowOnError>({ url: '/api/sources/youtube/jobs', ...options });
+
+/**
+ * List Youtube Matches Endpoint
+ *
+ * Watchlist moments found in subscribed channels' transcripts, newest first.
+ */
+export const listYoutubeMatchesEndpoint = <ThrowOnError extends boolean = false>(options?: Options<ListYoutubeMatchesEndpointData, ThrowOnError>): RequestResult<ListYoutubeMatchesEndpointResponses, ListYoutubeMatchesEndpointErrors, ThrowOnError> => (options?.client ?? client).get<ListYoutubeMatchesEndpointResponses, ListYoutubeMatchesEndpointErrors, ThrowOnError>({ url: '/api/sources/youtube/matches', ...options });
+
+/**
  * List Agents
  *
  * The agent roster in council order (Tier 1 → Tier 5).
@@ -251,8 +346,18 @@ export const dataengJobs = <ThrowOnError extends boolean = false>(options?: Opti
  * Dataeng Job Stream
  *
  * Reconnect to a job: replay its progress so far, then stream live to completion.
+ *
+ * Kept at this path for existing clients; `/api/jobs/{id}/stream` is the same thing under
+ * a name that isn't specific to Data Engineering.
  */
 export const dataengJobStream = <ThrowOnError extends boolean = false>(options: Options<DataengJobStreamData, ThrowOnError>): RequestResult<DataengJobStreamResponses, DataengJobStreamErrors, ThrowOnError> => (options.client ?? client).get<DataengJobStreamResponses, DataengJobStreamErrors, ThrowOnError>({ url: '/dataeng/jobs/{job_id}/stream', ...options });
+
+/**
+ * Job Stream
+ *
+ * Attach to any background job: replay its progress, then stream live to completion.
+ */
+export const jobStream = <ThrowOnError extends boolean = false>(options: Options<JobStreamData, ThrowOnError>): RequestResult<JobStreamResponses, JobStreamErrors, ThrowOnError> => (options.client ?? client).get<JobStreamResponses, JobStreamErrors, ThrowOnError>({ url: '/api/jobs/{job_id}/stream', ...options });
 
 /**
  * Run Council Endpoint

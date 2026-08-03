@@ -34,12 +34,19 @@ const ANDIE_BY_DESK: Record<string, { id: string; name: string }> = {
 export function routeEvent(evt: ProgressEvent): Routed {
   const { stage, data, message } = evt;
 
+  // `youtube.match` is the tail of the video pipeline — it reads a transcript this agent
+  // just ingested and reports which watchlist moments it found ("$NVDA evidence at 298s").
+  if (stage === "youtube.match") {
+    return { agentId: "wilfred-video", agentName: "Wilfred-Video", tierKey: "discovery" };
+  }
+
   if (stage === "refine" || stage.startsWith("discover")) {
     // Per-source events use a dotted stage (`discover.youtube` / `discover.web`); the
-    // rare skip-on-error event instead carries `source_type`. Route on either.
+    // channel-subscription branch nests one deeper (`discover.youtube.channel`), so match
+    // on prefix. The rare skip-on-error event instead carries `source_type`.
     const src = typeof data.source_type === "string" ? data.source_type : "";
-    if (stage === "discover.youtube" || src === "youtube") return { agentId: "wilfred-video", agentName: "Wilfred-Video", tierKey: "discovery" };
-    if (stage === "discover.web" || src === "web") return { agentId: "wilfred-news", agentName: "Wilfred-News", tierKey: "discovery" };
+    if (stage.startsWith("discover.youtube") || src === "youtube") return { agentId: "wilfred-video", agentName: "Wilfred-Video", tierKey: "discovery" };
+    if (stage.startsWith("discover.web") || src === "web") return { agentId: "wilfred-news", agentName: "Wilfred-News", tierKey: "discovery" };
     return { agentId: null, agentName: "Wilfred", tierKey: "discovery" };
   }
 

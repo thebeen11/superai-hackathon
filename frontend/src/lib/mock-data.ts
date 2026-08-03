@@ -1,5 +1,5 @@
 /* ============ WTAF — mock data layer ============ */
-import type { WtafData } from "./types";
+import type { WtafData, YoutubeChannel, YoutubeMatch } from "./types";
 
 const sentimentWave = [
   0.42, 0.45, 0.5, 0.58, 0.55, 0.6, 0.72, 0.68, 0.74, 0.82, 0.78, 0.7, 0.66,
@@ -408,3 +408,62 @@ export const wtafMock: WtafData = {
     },
   ],
 };
+
+/* ============ Sources → YouTube ============
+ *
+ * Kept out of `wtafMock` on purpose: the YouTube tab fetches its own data rather than
+ * riding the global snapshot, so these are separate fixtures for the USE_MOCK path.
+ */
+export const youtubeChannelsMock: YoutubeChannel[] = [
+  {
+    channelId: "UCmockSilicon",
+    handle: "@siliconsignals",
+    name: "Silicon Signals",
+    subscriberCount: 412000,
+    enabled: true,
+    deleted: false,
+    addedAt: "2026-07-28T09:12:00Z",
+    lastPolledAt: "2026-08-02T06:00:00Z",
+    videoCount: 6,
+  },
+  {
+    channelId: "UCmockMacro",
+    handle: "@macrolens",
+    name: "Macro Lens",
+    subscriberCount: 88000,
+    enabled: false,
+    deleted: false,
+    addedAt: "2026-07-30T15:40:00Z",
+    lastPolledAt: "2026-08-01T18:00:00Z",
+    videoCount: 3,
+  },
+];
+
+export const youtubeMatchesMock: YoutubeMatch[] = [
+  {
+    videoUrl: "https://www.youtube.com/watch?v=mockSilicon1",
+    videoId: "mockSilicon1",
+    channelId: "UCmockSilicon",
+    ticker: "$NVDA",
+    quote: "they are power-constrained, not demand-constrained",
+    timestampStart: 2537,
+    relevance: 0.88,
+    title: "The real bottleneck in the AI buildout",
+    channelName: "Silicon Signals",
+    publishedAt: "2026-08-01",
+    matchedAt: "2026-08-01T12:00:00Z",
+  },
+  {
+    videoUrl: "https://www.youtube.com/watch?v=mockSilicon1",
+    videoId: "mockSilicon1",
+    channelId: "UCmockSilicon",
+    ticker: "$VRT",
+    quote: "cooling and electrical included",
+    timestampStart: 2601,
+    relevance: 0.61,
+    title: "The real bottleneck in the AI buildout",
+    channelName: "Silicon Signals",
+    publishedAt: "2026-08-01",
+    matchedAt: "2026-08-01T12:00:00Z",
+  },
+];

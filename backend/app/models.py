@@ -170,6 +170,75 @@ class ContextPreview(BaseModel):
     score: float            # 0..1 relevance to the tracker concept
 
 
+# --- YouTube channel subscriptions (Sources → YouTube) ---
+#
+# A subscribed channel is a *standing* source: unlike a one-off `/discover` query, it keeps
+# producing items. Its videos flow through the same Data Engineering pipeline as everything
+# else, so from `cleaned_items` onward a subscription video is indistinguishable from a
+# search hit — the only extra is `YoutubeMatch`, which records the specific moment in a
+# transcript that discusses a watchlist ticker.
+
+
+class YoutubeChannel(BaseModel):
+    """A channel the Commander subscribed to on the Sources page."""
+
+    channel_id: str                        # canonical "UC…" id from Supadata
+    handle: str | None = None              # what the user typed ("@Bloomberg", a URL, …)
+    name: str
+    thumbnail: str | None = None
+    subscriber_count: int | None = None
+    enabled: bool = True                   # False = polling paused
+    deleted: bool = False                  # tombstone (its cleaned_items are retained)
+    added_at: datetime | None = None
+    last_polled_at: datetime | None = None
+    last_error: str | None = None          # last ingest failure, surfaced in the UI
+    video_count: int = 0                   # videos of this channel already in cleaned_items
+
+
+class YoutubeMatch(BaseModel):
+    """One watchlist-relevant moment in one video — the persisted evidence unit.
+
+    `timestamp_start` is resolved with `council.grounding.best_offset`, the same routine the
+    analysts use, so a match deep-links to the exact second the ticker was discussed.
+    """
+
+    video_url: str                         # == cleaned_items.source_url
+    video_id: str
+    channel_id: str
+    ticker: str                            # canonical "$NVDA"
+    quote: str
+    timestamp_start: float | None = None   # seconds into the video
+    relevance: float = 0.0                 # 0..1, how squarely the moment is about the ticker
+    title: str = ""
+    channel_name: str | None = None
+    published_at: str | None = None
+    matched_at: datetime = Field(default_factory=_now)
+
+
+class YoutubeJobRef(BaseModel):
+    """A running (or just-finished) ingest, so a client can attach to its progress stream.
+
+    Ingest takes minutes per video, so it never runs inside a request. The caller gets one
+    of these back and follows `GET /api/jobs/{job_id}/stream`; a client that reloads
+    mid-ingest finds the same job again through `GET /api/sources/youtube/jobs`.
+    """
+
+    job_id: str
+    channel_id: str | None = None   # None for a whole-poll job
+    status: str = "running"         # running | done | error
+
+
+class YoutubeIngestReport(BaseModel):
+    """Outcome of ingesting one channel (or a whole poll) — surfaced, never silently dropped."""
+
+    channels: int = 0            # channels attempted
+    videos_seen: int = 0         # new videos fetched from Supadata
+    persisted: int = 0           # rows written to cleaned_items
+    failed: int = 0              # items the pipeline rejected
+    matched: int = 0             # watchlist moments recorded
+    errors: list[str] = Field(default_factory=list)
+
+
 # --- The Council (Tiers 3–5: Andie analysts, Freddy debate, Winston chairman) ---
 #
 # Every score the council emits must trace back to a real source quote (no-orphan
