@@ -6,11 +6,18 @@ keep their timestamp_start so claims stay anchored (Req 8.3).
 """
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field
 
 from ..llm import converse_structured
 from ..models import SourceItem, TranscriptSegment
 from ..prompts import get_prompt
+
+
+def _collapse(text: str) -> str:
+    """Whitespace-collapsed text, for comparing a segment against reflowed output."""
+    return re.sub(r"\s+", " ", text).strip()
 
 
 class _RedactOutput(BaseModel):
@@ -33,5 +40,15 @@ def redact(item: SourceItem) -> RedactionResult:
 
     # Keep only segments whose text still appears in the cleaned output (Req 8.3),
     # preserving each segment's timestamp_start anchor.
-    surviving = [s for s in item.segments if s.text.strip() and s.text.strip() in clean]
+    #
+    # Compared with whitespace collapsed on both sides. Captions carry hard line breaks
+    # mid-sentence ("...this weekend.\nStrikes unfold.") and the model reflows them onto one
+    # line, so a literal `in` test fails for every segment of a real transcript — silently
+    # stripping every timestamp from the item while still reporting success. This is the same
+    # tolerance `guardrail._is_grounded` already applies: the exact word sequence is still
+    # required, only the whitespace between words is forgiven.
+    collapsed_clean = _collapse(clean)
+    surviving = [
+        s for s in item.segments if _collapse(s.text) and _collapse(s.text) in collapsed_clean
+    ]
     return RedactionResult(clean_text=clean, segments=surviving, is_all_noise=False)
