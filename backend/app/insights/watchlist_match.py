@@ -202,24 +202,38 @@ def _match(
 def match_items_to_watchlist(
     items: list[CleanedItem], *, channel_id: str, emit: Emit = noop_emit
 ) -> list[YoutubeMatch]:
-    """Watchlist moments across `items`. Items with no tracked ticker cost no LLM calls."""
+    """Watchlist moments across `items`. Items with no tracked ticker cost no LLM calls.
+
+    Logs each decision at INFO. "Nothing matched" is the feature's most common outcome and
+    has several innocent causes — no transcript, no tracked ticker, or a mention the judge
+    scored as a passing one — which are indistinguishable from a broken pipeline unless the
+    reason is recorded. `emit` only reaches a caller that opened an SSE stream, and the poll
+    path has none.
+    """
     matches: list[YoutubeMatch] = []
     for item in items:
         if not item.segments:
-            continue  # no transcript, no moment to point at
+            logger.info("No transcript segments on %s; nothing to anchor to", item.source_url)
+            continue
         tickers = matched_tickers(item)
         if not tickers:
+            logger.info("No watchlist ticker in %s; skipping the judge", item.source_url)
             continue
+        logger.info("Judging %s for %s", item.source_url, ", ".join(tickers))
         emit(_STAGE, f"{item.title}: checking {', '.join(tickers)}",
              status="progress", tickers=tickers, source_url=item.source_url)
         for ticker in tickers:
             # Chunks are selected per ticker, so each judge sees the passages naming its own.
             match = _match(item, ticker, channel_id, _chunks(item, ticker))
             if match is None:
+                logger.info("%s scored below the %.1f floor on %s — passing mention",
+                            ticker, _MIN_RELEVANCE, item.source_url)
                 emit(_STAGE, f"{ticker} only mentioned in passing in {item.title}",
                      status="skip", ticker=ticker, source_url=item.source_url)
                 continue
             matches.append(match)
+            logger.info("%s matched %s at %.0fs (relevance %.2f)",
+                        ticker, item.source_url, match.timestamp_start or 0.0, match.relevance)
             emit(_STAGE, f"{ticker} evidence at {match.timestamp_start or 0:.0f}s in {item.title}",
                  status="ok", ticker=ticker, source_url=item.source_url,
                  relevance=match.relevance)
