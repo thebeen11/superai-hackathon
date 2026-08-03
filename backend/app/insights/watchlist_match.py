@@ -24,6 +24,7 @@ import logging
 
 from pydantic import BaseModel
 
+from ..config import settings
 from ..council import grounding
 from ..db.repository import list_watchlist_overrides
 from ..discovery.youtube_channel import video_id_from_url
@@ -96,9 +97,41 @@ def _company_hint(ticker: str) -> str:
     return ", ".join(a.title() for a in aliases) if aliases else ticker.lstrip("$").upper()
 
 
-def _chunks(item: CleanedItem) -> list[TranscriptSegment]:
-    """The transcript chunks the judge chooses between (capped for prompt size)."""
-    return list(item.segments[:_MAX_CHUNKS])
+def _merge_segments(segments: list[TranscriptSegment], max_chars: int) -> list[TranscriptSegment]:
+    """Glue caption-sized segments into quotable chunks, keeping each chunk's start time.
+
+    Items arrive with segments at the source's caption granularity — a few words each —
+    because that is what survives redaction's verbatim check. A judge shown fragments that
+    short cannot tell what is being discussed, so they are merged here instead, where the
+    result is only ever read by the model and never persisted.
+    """
+    merged: list[TranscriptSegment] = []
+    for segment in segments:
+        if merged and len(merged[-1].text) + 1 + len(segment.text) <= max_chars:
+            # Keep the earlier start: a chunk begins where its first sentence was said.
+            merged[-1] = TranscriptSegment(
+                start=merged[-1].start, text=f"{merged[-1].text} {segment.text}"
+            )
+        else:
+            merged.append(segment)
+    return merged
+
+
+def _chunks(item: CleanedItem, ticker: str) -> list[TranscriptSegment]:
+    """The chunks the judge chooses between, prioritised by where the ticker is named.
+
+    A two-hour broadcast merges into far more chunks than fit in a prompt, and the minute
+    that discusses a given company is rarely in the first few. Chunks that name the ticker
+    or one of its aliases go first, then the rest fill the budget in order — so the judge
+    still sees surrounding context, but never misses the one passage that mattered.
+    """
+    merged = _merge_segments(item.segments, settings.youtube_transcript_chunk_size)
+    needles = {ticker.lower(), ticker.lstrip("$").lower(), *_aliases(ticker)}
+    hits = [c for c in merged if any(n in c.text.lower() for n in needles if n)]
+    rest = [c for c in merged if c not in hits]
+    # Choose by relevance, then restore chronological order: the judge reads the digest as a
+    # narrative, and a shuffled transcript reads as a different (and confusing) conversation.
+    return sorted((hits + rest)[:_MAX_CHUNKS], key=lambda c: c.start)
 
 
 def _digest(chunks: list[TranscriptSegment]) -> str:
@@ -172,8 +205,7 @@ def match_items_to_watchlist(
     """Watchlist moments across `items`. Items with no tracked ticker cost no LLM calls."""
     matches: list[YoutubeMatch] = []
     for item in items:
-        chunks = _chunks(item)
-        if not chunks:
+        if not item.segments:
             continue  # no transcript, no moment to point at
         tickers = matched_tickers(item)
         if not tickers:
@@ -181,7 +213,8 @@ def match_items_to_watchlist(
         emit(_STAGE, f"{item.title}: checking {', '.join(tickers)}",
              status="progress", tickers=tickers, source_url=item.source_url)
         for ticker in tickers:
-            match = _match(item, ticker, channel_id, chunks)
+            # Chunks are selected per ticker, so each judge sees the passages naming its own.
+            match = _match(item, ticker, channel_id, _chunks(item, ticker))
             if match is None:
                 emit(_STAGE, f"{ticker} only mentioned in passing in {item.title}",
                      status="skip", ticker=ticker, source_url=item.source_url)

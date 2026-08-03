@@ -41,43 +41,22 @@ def _entry(video_id: str = "vid1", **video) -> dict:
 
 # --- offset conversion (the ?t= deep link depends on this) ---
 
-def test_offsets_are_converted_from_milliseconds_to_seconds(monkeypatch):
-    # Chunk cap below the merge threshold so each caption stays its own segment.
-    monkeypatch.setattr(settings, "youtube_transcript_chunk_size", 10)
+def test_offsets_are_converted_from_milliseconds_to_seconds():
     segments = youtube_channel._segments(_entry()["transcript"])
     assert [s.start for s in segments] == [8.15, 9.35]
 
 
-# --- re-chunking (raw captions are too granular to be evidence) ---
+# --- segment granularity (merging here would strip every timestamp) ---
 
-def test_consecutive_captions_merge_into_evidence_sized_chunks():
+def test_segments_stay_at_caption_granularity():
+    """Merging at ingest kills timestamps: redaction only keeps segments whose text survives
+    verbatim in the LLM's cleaned output, and a merged block never does."""
     segments = youtube_channel._segments(_entry()["transcript"])
-    assert len(segments) == 1
-    assert segments[0].text == "nvidia is power constrained not demand constrained"
-    # A merged chunk keeps the start of its FIRST caption, so the link lands at the top
-    # of the thought rather than midway through it.
-    assert segments[0].start == 8.15
-
-
-def test_merge_starts_a_new_chunk_once_the_cap_is_reached(monkeypatch):
-    monkeypatch.setattr(settings, "youtube_transcript_chunk_size", 20)
-    transcript = {"content": [
-        {"text": "aaaaaaaaaa", "offset": 0},      # 10 chars
-        {"text": "bbbbbbbbb", "offset": 1000},    # +1+9 = 20 → fits
-        {"text": "cccc", "offset": 2000},         # would exceed → new chunk
-    ]}
-    segments = youtube_channel._segments(transcript)
-    assert [(s.start, s.text) for s in segments] == [
-        (0.0, "aaaaaaaaaa bbbbbbbbb"),
-        (2.0, "cccc"),
+    assert [s.text for s in segments] == [
+        "nvidia is power constrained",
+        "not demand constrained",
     ]
-
-
-def test_an_oversized_caption_is_kept_rather_than_dropped(monkeypatch):
-    monkeypatch.setattr(settings, "youtube_transcript_chunk_size", 5)
-    transcript = {"content": [{"text": "a much longer caption than the cap", "offset": 500}]}
-    segments = youtube_channel._segments(transcript)
-    assert [(s.start, s.text) for s in segments] == [(0.5, "a much longer caption than the cap")]
+    assert [s.start for s in segments] == [8.15, 9.35]
 
 
 def test_plain_text_transcript_degrades_to_one_untimed_segment():

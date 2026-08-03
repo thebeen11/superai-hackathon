@@ -57,31 +57,21 @@ def video_id_from_url(url: str) -> str:
     return tail.split("&")[0] if tail else url
 
 
-def _merge(segments: list[TranscriptSegment], max_chars: int) -> list[TranscriptSegment]:
-    """Merge consecutive segments into evidence-sized chunks, keeping each chunk's start time.
-
-    Raw captions arrive a few seconds at a time — far too granular to quote or to judge for
-    relevance. The batch endpoint (unlike the single-video one) has no `chunkSize` parameter,
-    so re-chunking here is what keeps both fetch paths at the same granularity.
-    """
-    merged: list[TranscriptSegment] = []
-    for segment in segments:
-        if merged and len(merged[-1].text) + 1 + len(segment.text) <= max_chars:
-            # Keep the earlier start: the chunk begins where its first sentence was said.
-            merged[-1] = TranscriptSegment(
-                start=merged[-1].start, text=f"{merged[-1].text} {segment.text}"
-            )
-        else:
-            merged.append(segment)
-    return merged
-
-
 def _segments(transcript: dict) -> list[TranscriptSegment]:
-    """Supadata transcript content → evidence-sized, timestamped TranscriptSegments.
+    """Supadata transcript content → fine-grained, timestamped TranscriptSegments.
 
-    Supadata reports `offset` in MILLISECONDS; `TranscriptSegment.start` is seconds, which is
-    what `sourceHref` turns into a `?t=Ns` deep link. Getting this wrong silently sends every
-    citation ~1000× too deep into the video.
+    Two things this must get right:
+
+    `offset` is in MILLISECONDS while `TranscriptSegment.start` is seconds — the unit
+    `sourceHref` turns into a `?t=Ns` deep link. Getting it wrong silently sends every
+    citation ~1000x too deep into the video.
+
+    Segments stay at the source's own caption granularity and are NOT merged here. The
+    redaction step keeps only segments whose text survives verbatim in the LLM's cleaned
+    output (`dataeng/redact.py`), and a merged ~1000-char block never survives that check —
+    the model reflows the prose — so merging at ingest silently strips every timestamp from
+    the item. Chunks big enough to judge for relevance are assembled later, at matching time,
+    from these fine-grained segments.
     """
     content = transcript.get("content")
     if isinstance(content, str):
@@ -89,13 +79,13 @@ def _segments(transcript: dict) -> list[TranscriptSegment]:
         text = content.strip()
         return [TranscriptSegment(start=0.0, text=text)] if text else []
 
-    raw: list[TranscriptSegment] = []
+    segments: list[TranscriptSegment] = []
     for chunk in content or []:
         text = (chunk.get("text") or "").strip()
         if not text:
             continue
-        raw.append(TranscriptSegment(start=float(chunk.get("offset") or 0) / 1000.0, text=text))
-    return _merge(raw, settings.youtube_transcript_chunk_size)
+        segments.append(TranscriptSegment(start=float(chunk.get("offset") or 0) / 1000.0, text=text))
+    return segments
 
 
 def _to_source_item(entry: dict, *, fallback_channel_name: str | None) -> SourceItem | None:
