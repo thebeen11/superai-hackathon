@@ -38,8 +38,22 @@ _SEQUENTIAL_GAP_S = 1.1
 
 _TIMEOUT_S = 60.0
 
-# Supadata error codes that mean "this key can't do this" rather than "this video is bad".
-_FATAL_ERRORS = {"unauthorized", "forbidden", "limit-exceeded", "upgrade-required"}
+# Supadata error codes that mean the key itself is unusable — the whole source is down.
+# Only credentials belong here. Two codes look fatal but are not:
+#
+# `upgrade-required` (HTTP 402) means "this ENDPOINT isn't on your plan" — the signal to
+# degrade to a cheaper path, not to give up. The free tier returns it for
+# /youtube/transcript/batch while /youtube/transcript works fine.
+#
+# `limit-exceeded` (HTTP 429) is the REQUEST RATE limit ("Request rate limit on current
+# plan was exceeded"), not a credit balance — the free tier allows 1 request/second, so
+# hitting it is routine. It is retried with backoff below.
+_FATAL_ERRORS = {"unauthorized", "forbidden"}
+
+# Free tier is 1 req/s. Rate-limit rejections are expected, so back off and retry rather
+# than failing the channel.
+_RATE_LIMIT_RETRIES = 4
+_RATE_LIMIT_BACKOFF_S = 1.5
 
 
 class SupadataError(Exception):
@@ -58,31 +72,57 @@ def _require_key() -> str:
 
 
 def _request(method: str, path: str, **kwargs) -> dict:
-    """One Supadata call. Raises SourceUnavailable for key/quota problems, SupadataError otherwise."""
+    """One Supadata call, retrying rate-limit rejections.
+
+    Raises SourceUnavailable when the credentials themselves are unusable, and SupadataError
+    for everything else — including a rate limit that survives every retry, so the caller can
+    skip one video or fall back to another endpoint rather than losing the whole source.
+    """
     import httpx
 
     url = f"{settings.supadata_base_url.rstrip('/')}{path}"
     headers = {"x-api-key": _require_key()}
-    try:
-        response = httpx.request(method, url, headers=headers, timeout=_TIMEOUT_S, **kwargs)
-    except httpx.HTTPError as exc:
-        raise SupadataError(f"Supadata request failed: {exc}") from exc
 
-    if response.status_code < 400:
-        return response.json()
+    for attempt in range(_RATE_LIMIT_RETRIES + 1):
+        try:
+            response = httpx.request(method, url, headers=headers, timeout=_TIMEOUT_S, **kwargs)
+        except httpx.HTTPError as exc:
+            raise SupadataError(f"Supadata request failed: {exc}") from exc
 
-    # Supadata's error envelope: {error, message, details, documentationUrl}
-    try:
-        body = response.json()
-    except ValueError:
-        body = {}
-    code = str(body.get("error") or "")
-    message = str(body.get("message") or response.text or f"HTTP {response.status_code}")
-    if code in _FATAL_ERRORS or response.status_code in (401, 403):
-        # A missing/exhausted key is the same class of problem as an unset one: the whole
-        # branch is unusable, so surface it the way every other source does.
-        raise SourceUnavailable(f"Supadata unavailable ({code or response.status_code}): {message}")
-    raise SupadataError(message, code=code, status=response.status_code)
+        if response.status_code < 400:
+            return response.json()
+
+        # Supadata's error envelope: {error, message, details, documentationUrl}
+        try:
+            body = response.json()
+        except ValueError:
+            body = {}
+        code = str(body.get("error") or "")
+        message = str(body.get("message") or response.text or f"HTTP {response.status_code}")
+
+        if code == "limit-exceeded" or response.status_code == 429:
+            if attempt < _RATE_LIMIT_RETRIES:
+                # Honour Retry-After when offered; otherwise back off exponentially.
+                retry_after = response.headers.get("Retry-After")
+                delay = (
+                    float(retry_after)
+                    if retry_after and retry_after.replace(".", "", 1).isdigit()
+                    else _RATE_LIMIT_BACKOFF_S * (2**attempt)
+                )
+                logger.debug("Supadata rate-limited on %s; retrying in %.1fs", path, delay)
+                time.sleep(delay)
+                continue
+            raise SupadataError(message, code="limit-exceeded", status=429)
+
+        if code in _FATAL_ERRORS or response.status_code in (401, 403):
+            # A rejected key is the same class of problem as an unset one: the whole branch
+            # is unusable, so surface it the way every other source does.
+            raise SourceUnavailable(
+                f"Supadata unavailable ({code or response.status_code}): {message}"
+            )
+        raise SupadataError(message, code=code, status=response.status_code)
+
+    raise SupadataError(f"Supadata request to {path} exhausted its retries")
 
 
 def get_channel(ident: str) -> dict:
@@ -163,16 +203,37 @@ def _await_batch(job_id: str, *, emit: Emit = noop_emit) -> list[dict]:
         delay = min(delay * 2, _POLL_MAX_S)
 
 
-def _transcripts_sequential(video_ids: list[str], *, emit: Emit = noop_emit) -> list[dict]:
-    """One /youtube/transcript call per video, throttled to the free-tier 1 req/s limit.
+def _video_metadata(video_id: str) -> dict:
+    """Title / upload date for one video, in the same shape a batch result's `video` block has.
 
-    The single-video endpoint returns no video metadata, so titles fall back to the id —
-    `youtube_channel` fills in the channel name from the subscription row.
+    The single-video transcript endpoint returns no metadata, so without this every video
+    ingested on the fallback path would be titled with its raw id. Costs one extra credit per
+    video, but only on the path where batch is unavailable — a paid plan gets this bundled
+    into the batch result for free. Best-effort: a failure loses the title, not the video.
     """
+    time.sleep(_SEQUENTIAL_GAP_S)
+    try:
+        meta = _request(
+            "GET", "/metadata", params={"url": f"https://www.youtube.com/watch?v={video_id}"}
+        )
+    except SupadataError as exc:
+        logger.info("No metadata for video %s: %s", video_id, exc)
+        return {}
+    return {
+        "title": meta.get("title"),
+        "uploadDate": meta.get("createdAt"),
+        "channel": {"name": (meta.get("author") or {}).get("displayName")},
+    }
+
+
+def _transcripts_sequential(video_ids: list[str], *, emit: Emit = noop_emit) -> list[dict]:
+    """One /youtube/transcript call per video, throttled to the free-tier 1 req/s limit."""
     results: list[dict] = []
-    for i, video_id in enumerate(video_ids):
-        if i:
-            time.sleep(_SEQUENTIAL_GAP_S)
+    for video_id in video_ids:
+        # Sleep before the FIRST request too, not just between them: we arrive here straight
+        # after a channel listing or a rejected batch attempt, both of which have already
+        # spent this second's budget.
+        time.sleep(_SEQUENTIAL_GAP_S)
         try:
             payload = _request(
                 "GET",
@@ -183,7 +244,9 @@ def _transcripts_sequential(video_ids: list[str], *, emit: Emit = noop_emit) -> 
             logger.warning("Skipping video %s: %s", video_id, exc)
             emit(_STAGE, f"Skipped (no transcript): {video_id}", status="skip", video_id=video_id)
             continue
-        results.append({"videoId": video_id, "transcript": payload, "video": {}})
+        results.append(
+            {"videoId": video_id, "transcript": payload, "video": _video_metadata(video_id)}
+        )
     return results
 
 

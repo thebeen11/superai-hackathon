@@ -231,7 +231,13 @@ def test_batch_start_failure_falls_back_to_sequential(monkeypatch):
     results = supadata.transcripts(["vid1", "vid2"])
 
     assert [r["videoId"] for r in results] == ["vid1", "vid2"]
-    assert calls == ["/youtube/transcript/batch", "/youtube/transcript", "/youtube/transcript"]
+    # One batch attempt, then per video: the transcript plus its metadata (the single-video
+    # endpoint carries no title of its own).
+    assert calls == [
+        "/youtube/transcript/batch",
+        "/youtube/transcript", "/metadata",
+        "/youtube/transcript", "/metadata",
+    ]
 
 
 def test_started_job_failure_does_not_re_bill_via_sequential(monkeypatch):
@@ -287,3 +293,145 @@ def test_empty_video_list_makes_no_call(monkeypatch):
         lambda *a, **k: pytest.fail("no request should be made for an empty list"),
     )
     assert supadata.transcripts([]) == []
+
+
+# --- error classification (all three regressions were found against the live API) ---
+
+def _http_error(status: int, code: str, headers: dict | None = None):
+    """A stand-in httpx.Response carrying Supadata's error envelope."""
+    class _R:
+        status_code = status
+        text = code
+        headers = {}
+        def json(self):
+            return {"error": code, "message": code.replace("-", " ").title()}
+    r = _R()
+    r.headers = headers or {}
+    return r
+
+
+def _responder(monkeypatch, sequence):
+    """Serve `sequence` of responses to successive httpx.request calls; record the paths."""
+    import httpx
+    calls: list[str] = []
+    queue = list(sequence)
+
+    def fake_request(method, url, **kw):
+        calls.append(url)
+        # Repeat the last response once the queue drains, so a test can hand over fewer
+        # responses than the retry budget without tripping an IndexError.
+        item = queue.pop(0) if len(queue) > 1 else queue[0]
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    monkeypatch.setattr(supadata.time, "sleep", lambda s: None)
+    return calls
+
+
+def _ok(payload: dict):
+    class _R:
+        status_code = 200
+        headers = {}
+        def json(self):
+            return payload
+    return _R()
+
+
+def test_upgrade_required_is_not_fatal_so_the_fallback_can_run(monkeypatch):
+    """402 means the ENDPOINT is off-plan; classing it fatal made the fallback unreachable."""
+    with pytest.raises(supadata.SupadataError) as exc:
+        _responder(monkeypatch, [_http_error(402, "upgrade-required")])
+        supadata._request("POST", "/youtube/transcript/batch")
+    assert exc.value.code == "upgrade-required"
+    assert not isinstance(exc.value, SourceUnavailable)
+
+
+def test_rate_limit_is_retried_then_succeeds(monkeypatch):
+    """429 is the free tier's 1 req/s limit, not a credit balance — back off and retry."""
+    calls = _responder(monkeypatch, [
+        _http_error(429, "limit-exceeded"),
+        _http_error(429, "limit-exceeded"),
+        _ok({"content": "fine"}),
+    ])
+    assert supadata._request("GET", "/youtube/transcript") == {"content": "fine"}
+    assert len(calls) == 3
+
+
+def test_sustained_rate_limit_is_not_fatal(monkeypatch):
+    """After the retries are spent it is still just one endpoint failing, not the whole key."""
+    _responder(monkeypatch, [_http_error(429, "limit-exceeded")] * 10)
+    with pytest.raises(supadata.SupadataError) as exc:
+        supadata._request("GET", "/youtube/transcript")
+    assert exc.value.code == "limit-exceeded"
+    assert not isinstance(exc.value, SourceUnavailable)
+
+
+def test_retry_after_header_is_honoured(monkeypatch):
+    slept: list[float] = []
+    import httpx
+    queue = [_http_error(429, "limit-exceeded", {"Retry-After": "7"}), _ok({"ok": True})]
+    monkeypatch.setattr(httpx, "request", lambda m, u, **k: queue.pop(0))
+    monkeypatch.setattr(supadata.time, "sleep", lambda s: slept.append(s))
+    supadata._request("GET", "/youtube/transcript")
+    assert slept == [7.0]
+
+
+@pytest.mark.parametrize("status,code", [(401, "unauthorized"), (403, "forbidden")])
+def test_bad_credentials_remain_fatal(monkeypatch, status, code):
+    _responder(monkeypatch, [_http_error(status, code)])
+    with pytest.raises(SourceUnavailable):
+        supadata._request("GET", "/youtube/channel")
+
+
+def test_sequential_throttles_before_its_first_request(monkeypatch):
+    """A rejected batch attempt already spent this second's budget."""
+    slept: list[float] = []
+    monkeypatch.setattr(supadata.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(
+        supadata, "_request",
+        lambda method, path, **kw: (_ for _ in ()).throw(
+            supadata.SupadataError("no batch", code="upgrade-required")
+        ) if path.endswith("/batch") else _entry()["transcript"],
+    )
+    supadata.transcripts(["vid1"])
+    assert slept and slept[0] == supadata._SEQUENTIAL_GAP_S
+
+
+def test_sequential_fills_in_title_from_the_metadata_endpoint(monkeypatch):
+    """Without this every free-tier video would be titled with its raw id."""
+    monkeypatch.setattr(supadata.time, "sleep", lambda s: None)
+
+    def fake_request(method, path, **kw):
+        if path.endswith("/batch"):
+            raise supadata.SupadataError("no batch", code="upgrade-required")
+        if path == "/metadata":
+            return {"title": "The bottleneck", "createdAt": "2026-08-01T00:00:00.000Z",
+                    "author": {"displayName": "Silicon Signals"}}
+        return _entry()["transcript"]
+
+    monkeypatch.setattr(supadata, "_request", fake_request)
+    (result,) = supadata.transcripts(["vid1"])
+    assert result["video"]["title"] == "The bottleneck"
+    assert result["video"]["channel"]["name"] == "Silicon Signals"
+
+    item = youtube_channel._to_source_item(result, fallback_channel_name=None)
+    assert item.title == "The bottleneck"
+    assert item.published_at == "2026-08-01T00:00:00.000Z"
+
+
+def test_metadata_failure_loses_the_title_not_the_video(monkeypatch):
+    monkeypatch.setattr(supadata.time, "sleep", lambda s: None)
+
+    def fake_request(method, path, **kw):
+        if path.endswith("/batch"):
+            raise supadata.SupadataError("no batch", code="upgrade-required")
+        if path == "/metadata":
+            raise supadata.SupadataError("nope", code="not-found")
+        return _entry()["transcript"]
+
+    monkeypatch.setattr(supadata, "_request", fake_request)
+    (result,) = supadata.transcripts(["vid1"])
+    assert result["video"] == {}
+    assert result["transcript"]["content"]   # the transcript still came through
