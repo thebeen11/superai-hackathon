@@ -30,7 +30,12 @@ esac
 
 # --- Config (edit these) -----------------------------------------------------
 PROJECT_ID="${PROJECT_ID:-your-project-id}"
-REGION="${REGION:-us-central1}"             # Cloud Run + Cloud SQL region
+# Cloud Run + Cloud SQL region. This is where the project's resources actually live — the
+# service, the database, and the scheduler jobs are all in asia-southeast1. Do NOT change it
+# to a region you merely prefer: `gcloud run deploy` CREATES a service when it doesn't find
+# one, so a wrong REGION silently stands up a second `council-api` on a new URL, with no
+# Cloud SQL socket, while the frontend keeps talking to the original.
+REGION="${REGION:-asia-southeast1}"
 SERVICE="${SERVICE:-council-api}"
 SQL_INSTANCE="${SQL_INSTANCE:-council-db}"
 DB_NAME="${DB_NAME:-council}"
