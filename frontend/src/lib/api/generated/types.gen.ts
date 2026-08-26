@@ -1082,6 +1082,18 @@ export type ValidationError = {
 };
 
 /**
+ * WatchlistBulkDelete
+ */
+export type WatchlistBulkDelete = {
+    /**
+     * Tickers
+     *
+     * Tickers to remove; case and a leading '$' are normalised away
+     */
+    tickers?: Array<string>;
+};
+
+/**
  * WatchlistEntry
  *
  * One watchlist override. Absence of an entry means tracked + enabled by default.
@@ -1654,6 +1666,33 @@ export type ListWatchlistsResponses = {
 };
 
 export type ListWatchlistsResponse = ListWatchlistsResponses[keyof ListWatchlistsResponses];
+
+export type BulkDeleteWatchlistsData = {
+    body: WatchlistBulkDelete;
+    path?: never;
+    query?: never;
+    url: '/api/watchlists/bulk-delete';
+};
+
+export type BulkDeleteWatchlistsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkDeleteWatchlistsError = BulkDeleteWatchlistsErrors[keyof BulkDeleteWatchlistsErrors];
+
+export type BulkDeleteWatchlistsResponses = {
+    /**
+     * Response Bulk Delete Watchlists
+     *
+     * Successful Response
+     */
+    200: Array<WatchlistEntry>;
+};
+
+export type BulkDeleteWatchlistsResponse = BulkDeleteWatchlistsResponses[keyof BulkDeleteWatchlistsResponses];
 
 export type RemoveWatchlistData = {
     body?: never;

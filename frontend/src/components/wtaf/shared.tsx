@@ -71,6 +71,35 @@ export function ScanToggle({ on, pending, onToggle, titleOn, titleOff }: {
   );
 }
 
+/**
+ * Row selection box for bulk actions. Native <input> so keyboard and a11y come for free;
+ * `indeterminate` is DOM-only (no attribute), hence the ref.
+ */
+export function RowCheckbox({ checked, indeterminate, onChange, title, disabled }: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (next: boolean) => void;
+  title: string;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type="checkbox"
+      ref={(el) => { if (el) el.indeterminate = !!indeterminate && !checked; }}
+      checked={checked}
+      onChange={(e) => onChange(e.currentTarget.checked)}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      style={{
+        width: 14, height: 14, flexShrink: 0, margin: 0,
+        accentColor: "var(--orange-bright)",
+        cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.4 : 1,
+      }}
+    />
+  );
+}
+
 /** Small square glyph button for row actions (delete, confirm, refresh). */
 export function IconButton({ children, title, onClick, disabled, danger }: {
   children: ReactNode;

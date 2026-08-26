@@ -23,6 +23,7 @@ from .crawl import (
 )
 from .dataeng import process_discovery_result
 from .db.repository import (
+    delete_watchlist_entries,
     delete_watchlist_entry,
     delete_youtube_channel,
     get_youtube_channel,
@@ -365,6 +366,18 @@ class WatchlistUpdate(BaseModel):
     enabled: bool = Field(..., description="False pauses scanning for this ticker")
 
 
+class WatchlistBulkDelete(BaseModel):
+    tickers: list[str] = Field(
+        default_factory=list,
+        description="Tickers to remove; case and a leading '$' are normalised away",
+    )
+
+
+def _normalise_ticker(raw: str) -> str:
+    """The frontend sends the bare form ('NVDA'), the corpus the canonical one ('$NVDA')."""
+    return raw.strip().lstrip("$").upper()
+
+
 @app.get("/api/watchlists", response_model=list[WatchlistEntry])
 def list_watchlists() -> list[WatchlistEntry]:
     """Every watchlist override — the frontend applies `enabled` and hides `deleted`;
@@ -372,6 +385,21 @@ def list_watchlists() -> list[WatchlistEntry]:
     return [
         WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
         for o in list_watchlist_overrides()
+    ]
+
+
+@app.post("/api/watchlists/bulk-delete", response_model=list[WatchlistEntry])
+def bulk_delete_watchlists(body: WatchlistBulkDelete) -> list[WatchlistEntry]:
+    """Remove several tickers at once (same tombstone as the single-ticker DELETE).
+
+    Declared ahead of the `{ticker}` routes so the literal path segment reads as the more
+    specific match. Like those routes it never 404s: any ticker is upsertable, so an unknown
+    one simply gets a tombstone of its own.
+    """
+    tickers = [t for t in (_normalise_ticker(r) for r in body.tickers) if t]
+    return [
+        WatchlistEntry(ticker=o.ticker, enabled=o.enabled, deleted=o.deleted)
+        for o in delete_watchlist_entries(tickers)
     ]
 
 

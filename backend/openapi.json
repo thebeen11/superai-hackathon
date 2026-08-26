@@ -578,6 +578,49 @@
         }
       }
     },
+    "/api/watchlists/bulk-delete": {
+      "post": {
+        "summary": "Bulk Delete Watchlists",
+        "description": "Remove several tickers at once (same tombstone as the single-ticker DELETE).\n\nDeclared ahead of the `{ticker}` routes so the literal path segment reads as the more\nspecific match. Like those routes it never 404s: any ticker is upsertable, so an unknown\none simply gets a tombstone of its own.",
+        "operationId": "bulk_delete_watchlists",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistBulkDelete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WatchlistEntry"
+                  },
+                  "type": "array",
+                  "title": "Response Bulk Delete Watchlists"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/watchlists/{ticker}": {
       "put": {
         "summary": "Update Watchlist",
@@ -3236,6 +3279,20 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WatchlistBulkDelete": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "description": "Tickers to remove; case and a leading '$' are normalised away"
+          }
+        },
+        "type": "object",
+        "title": "WatchlistBulkDelete"
       },
       "WatchlistEntry": {
         "properties": {

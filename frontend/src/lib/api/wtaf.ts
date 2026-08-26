@@ -271,6 +271,18 @@ export function deleteWatchlistItem(ticker: string): Promise<WatchlistEntry> {
   });
 }
 
+/**
+ * Remove several tickers in one round trip. Backend: POST /api/watchlists/bulk-delete
+ * (POST, not DELETE-with-body: the backend has no precedent for a body on DELETE.)
+ */
+export function bulkDeleteWatchlist(tickers: string[]): Promise<WatchlistEntry[]> {
+  if (USE_MOCK) return mockResolve(tickers.map((ticker) => ({ ticker, enabled: false, deleted: true })));
+  return apiFetch<WatchlistEntry[]>("/api/watchlists/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ tickers }),
+  });
+}
+
 /* ============ Sources → YouTube — channel subscriptions ============ */
 
 /** Backend rows are snake_case; the rest of the app speaks camelCase. */

@@ -313,6 +313,41 @@ def delete_watchlist_entry(ticker: str) -> WatchlistOverride:
     return _upsert_watchlist_override(ticker, {"deleted": True})
 
 
+def delete_watchlist_entries(tickers: list[str]) -> list[WatchlistOverride]:
+    """Soft-delete several tickers in one statement (bulk form of `delete_watchlist_entry`).
+
+    Callers pass tickers already normalised (upper-cased, no `$`). Duplicates are collapsed
+    here because Postgres refuses an ON CONFLICT DO UPDATE that would touch the same row
+    twice within a single multi-row INSERT.
+    """
+    unique = list(dict.fromkeys(tickers))  # dedupe, preserving the caller's order
+    if not unique:
+        return []  # `.values([])` is not valid SQL — nothing to persist
+
+    now = datetime.now(timezone.utc)
+    stmt = (
+        pg_insert(WatchlistOverrideRow)
+        .values([{"ticker": t, "deleted": True, "updated_at": now} for t in unique])
+        .on_conflict_do_update(index_elements=["ticker"], set_={"deleted": True, "updated_at": now})
+        .returning(
+            WatchlistOverrideRow.ticker,
+            WatchlistOverrideRow.enabled,
+            WatchlistOverrideRow.deleted,
+        )
+    )
+    session = get_session()
+    try:
+        rows = session.execute(stmt).all()
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist %d watchlist tombstones", len(unique))
+        raise
+    finally:
+        session.close()
+    return [WatchlistOverride(ticker=t, enabled=e, deleted=d) for t, e, d in rows]
+
+
 # --- YouTube channel subscriptions (Sources → YouTube) ----------------------
 
 
