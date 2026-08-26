@@ -72,6 +72,21 @@ class Settings(BaseSettings):
     daily_crawl_enabled: bool = False
     daily_crawl_hour_utc: int = 1  # timer fires at HH:00 UTC, crawling yesterday
 
+    # --- Telegram daily report (macro indicators) ---
+    # Sent at the end of the daily crawl, once the council has written a fresh snapshot —
+    # in prod the existing Cloud Scheduler `daily-crawl` job is therefore the trigger, and
+    # there is no separate schedule for the report. The bot must be an ADMIN of the target
+    # channel; TELEGRAM_CHAT_ID is either "@channelname" or the numeric -100... id. With
+    # either value unset the send is skipped with a recorded reason, the same posture as a
+    # missing discovery key.
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+    telegram_api_base_url: str = "https://api.telegram.org"
+    telegram_daily_report_enabled: bool = True
+    # A failed council leaves *yesterday's* snapshot as the latest one; don't re-send it as
+    # if it were today's analysis. 0 disables the check.
+    telegram_report_max_age_hours: int = 24
+
     # --- Database (RDS Postgres) ---
     database_url: str | None = None
 

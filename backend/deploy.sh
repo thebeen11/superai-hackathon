@@ -55,6 +55,11 @@ DB_PASSWORD="${DB_PASSWORD:?set DB_PASSWORD to a strong password}"
 EXA_API_KEY="${EXA_API_KEY:?set EXA_API_KEY}"
 YOUTUBE_API_KEY="${YOUTUBE_API_KEY:?set YOUTUBE_API_KEY}"
 SUPADATA_API_KEY="${SUPADATA_API_KEY:?set SUPADATA_API_KEY}"
+# Telegram daily report (macro indicators, pushed at the end of the daily crawl). OPTIONAL —
+# `:-` not `:?`, so a deploy without a bot still works; the app skips the send and logs why.
+# The bot must be an ADMIN of the channel. TELEGRAM_CHAT_ID is "@channelname" or the -100... id.
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 # Tier 4 debate sides (Bull vs Bear). Kept overridable so the chamber can be re-tiered
 # without a code change.
@@ -170,6 +175,9 @@ provision() {
   upsert_secret YOUTUBE_API_KEY  "${YOUTUBE_API_KEY}"
   upsert_secret SUPADATA_API_KEY "${SUPADATA_API_KEY}"
   upsert_secret DATABASE_URL     "${DATABASE_URL}"
+  if [[ -n "${TELEGRAM_BOT_TOKEN}" ]]; then
+    upsert_secret TELEGRAM_BOT_TOKEN "${TELEGRAM_BOT_TOKEN}"
+  fi
 
   # The Cloud Run revision runs as a service account that must read the secrets AT DEPLOY TIME,
   # so grant its roles BEFORE deploying (granting after the deploy is too late — the deploy 403s
@@ -220,14 +228,25 @@ deploy() {
   # --timeout=3600: long-lived SSE streams.
   # --add-cloudsql-instances mounts the /cloudsql socket. This is the one Cloud SQL touch
   # in this phase, and it's a Cloud Run flag, not a sqladmin write.
+  # Built up rather than inlined because the Telegram pair is optional: mounting a secret
+  # that provision() never created fails the deploy outright.
+  local env_vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL},GEMINI_BULL_MODEL=${GEMINI_BULL_MODEL},GEMINI_BEAR_MODEL=${GEMINI_BEAR_MODEL},YOUTUBE_POLL_ENABLED=false"
+  local secrets="EXA_API_KEY=EXA_API_KEY:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,SUPADATA_API_KEY=SUPADATA_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
+  if [[ -n "${TELEGRAM_BOT_TOKEN}" ]]; then
+    env_vars="${env_vars},TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}"
+    secrets="${secrets},TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest"
+  fi
+
   gcloud run deploy "${SERVICE}" \
     --source . --region "${REGION}" --allow-unauthenticated \
     --service-account="$(service_account)" \
     --add-cloudsql-instances="${CONNECTION_NAME}" \
     --min-instances=1 --max-instances=1 --no-cpu-throttling --timeout=3600 \
-    --set-env-vars="APP_ENV=prod,GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION},GEMINI_MODEL=${GEMINI_MODEL},GEMINI_BULL_MODEL=${GEMINI_BULL_MODEL},GEMINI_BEAR_MODEL=${GEMINI_BEAR_MODEL},YOUTUBE_POLL_ENABLED=false" \
-    --set-secrets="EXA_API_KEY=EXA_API_KEY:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,SUPADATA_API_KEY=SUPADATA_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest"
+    --set-env-vars="${env_vars}" \
+    --set-secrets="${secrets}"
 
+  # This one job also drives the Telegram macro-indicator report: run_daily_crawl sends it
+  # after the council, so there is deliberately no third scheduler job for it.
   echo "==> Cloud Scheduler: daily crawl (00:30 UTC, crawls yesterday's news)"
   gcloud_read run services describe "${SERVICE}" --region "${REGION}" --format='value(status.url)' \
     || die "could not read the URL of service '${SERVICE}'"

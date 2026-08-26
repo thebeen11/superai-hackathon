@@ -98,3 +98,36 @@ def test_endpoint_rejects_malformed_day():
     with pytest.raises(HTTPException) as exc:
         main.crawl_daily(day="July 6th")
     assert exc.value.status_code == 422
+
+
+# --- the daily crawl pushes the macro-indicator report after the council ---
+
+def _stub_pipeline(monkeypatch):
+    monkeypatch.setattr(crawl, "discover", lambda q, **kw: DiscoveryResult(query=q))
+    monkeypatch.setattr(
+        crawl, "process_discovery_result", lambda r, emit=None: DataEngReport(persisted=1)
+    )
+
+
+def test_run_daily_crawl_sends_the_telegram_report_after_the_council(monkeypatch):
+    order: list[str] = []
+    _stub_pipeline(monkeypatch)
+    monkeypatch.setattr(crawl, "run_council", lambda emit=None: order.append("council"))
+    monkeypatch.setattr(
+        crawl, "send_daily_indicator_report", lambda emit=None: order.append("telegram")
+    )
+
+    crawl.run_daily_crawl(date(2026, 7, 6))
+    assert order == ["council", "telegram"]
+
+
+def test_run_daily_crawl_survives_a_failing_telegram_report(monkeypatch):
+    _stub_pipeline(monkeypatch)
+    monkeypatch.setattr(crawl, "run_council", lambda emit=None: None)
+
+    def boom(emit=None):
+        raise RuntimeError("telegram down")
+
+    monkeypatch.setattr(crawl, "send_daily_indicator_report", boom)
+    report = crawl.run_daily_crawl(date(2026, 7, 6))  # must not raise
+    assert report.persisted == 1

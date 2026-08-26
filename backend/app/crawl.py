@@ -10,6 +10,10 @@ idempotent.
 The timer is process-local (same single-worker caveat as `app.jobs`); a
 scaled-to-zero Cloud Run deploy should use Cloud Scheduler instead — that is why
 `daily_crawl_enabled` defaults to off.
+
+Once the council has written its snapshot the run also pushes the Chairman's macro
+indicators to Telegram (`app.notify`), which is why this — and not `/dataeng/process` —
+is the report's only trigger: it is the one path that runs exactly once a day.
 """
 from __future__ import annotations
 
@@ -23,6 +27,7 @@ from .dataeng import process_discovery_result
 from .discovery import discover
 from .events import Emit, noop_emit
 from .models import DataEngReport
+from .notify import send_daily_indicator_report
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,21 @@ def run_council_safe(emit: Emit = noop_emit) -> None:
     except Exception as exc:  # noqa: BLE001 - council failure must not fail discovery
         logger.warning("Council run failed: %s", exc)
         emit("council", f"Council failed: {exc}", status="error", reason=str(exc))
+
+
+def send_report_safe(emit: Emit = noop_emit) -> None:
+    """Push the macro-indicator report, fault-isolated so it never breaks ingestion.
+
+    `send_daily_indicator_report` already swallows its own failures — it is called directly
+    from a CLI too, where it must return False rather than blow up. This second layer is for
+    ingestion's sake: the crawl's work is finished and persisted by the time we get here, and
+    it must not be reported as failed because a chat service was unreachable.
+    """
+    try:
+        send_daily_indicator_report(emit=emit)
+    except Exception as exc:  # noqa: BLE001 - notification failure must not fail the crawl
+        logger.warning("Telegram daily report failed: %s", exc)
+        emit("notify.telegram", f"Telegram report failed: {exc}", status="error", reason=str(exc))
 
 
 def default_crawl_day() -> date:
@@ -60,6 +80,7 @@ def run_daily_crawl(day: date | None = None, emit: Emit = noop_emit) -> DataEngR
     )
     report = process_discovery_result(result, emit=emit)
     run_council_safe(emit)
+    send_report_safe(emit)
     emit("crawl.daily", f"Daily crawl for {day:%Y-%m-%d} done: "
          f"{report.persisted} persisted, {report.failed} failed",
          status="ok", persisted=report.persisted, failed=report.failed)
