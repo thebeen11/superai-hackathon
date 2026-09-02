@@ -111,6 +111,12 @@ export const resetPrompt = <ThrowOnError extends boolean = false>(options: Optio
  * Update Prompt
  *
  * Override one prompt with user-supplied text (takes effect on the next agent run).
+ *
+ * A declared placeholder is refused if the new text drops it. Substitution is a plain
+ * token replace that never errors (`prompts.registry._fill`), so a prompt missing its
+ * `{signposts}` / `{taxonomy}` / `{sectors}` block does not fail — it quietly ships
+ * without the fixed list the downstream parser matches against, and the agent returns
+ * nothing the dashboard can render. Catching it at save time is the only honest moment.
  */
 export const updatePrompt = <ThrowOnError extends boolean = false>(options: Options<UpdatePromptData, ThrowOnError>): RequestResult<UpdatePromptResponses, UpdatePromptErrors, ThrowOnError> => (options.client ?? client).put<UpdatePromptResponses, UpdatePromptErrors, ThrowOnError>({
     url: '/api/prompts/{key}',

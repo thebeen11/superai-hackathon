@@ -333,10 +333,27 @@ def list_prompts() -> list[PromptView]:
 
 @app.put("/api/prompts/{key}", response_model=PromptView)
 def update_prompt(key: str, body: PromptUpdate) -> PromptView:
-    """Override one prompt with user-supplied text (takes effect on the next agent run)."""
+    """Override one prompt with user-supplied text (takes effect on the next agent run).
+
+    A declared placeholder is refused if the new text drops it. Substitution is a plain
+    token replace that never errors (`prompts.registry._fill`), so a prompt missing its
+    `{signposts}` / `{taxonomy}` / `{sectors}` block does not fail — it quietly ships
+    without the fixed list the downstream parser matches against, and the agent returns
+    nothing the dashboard can render. Catching it at save time is the only honest moment.
+    """
     spec = get_spec(key)
     if spec is None:
         raise HTTPException(status_code=404, detail=f"Unknown prompt key: {key!r}")
+    missing = [p for p in spec.placeholders if "{" + p + "}" not in body.text]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{spec.label} must keep its placeholder(s): "
+                + ", ".join("{" + p + "}" for p in missing)
+                + " — the text that replaces them is what the agent grades against."
+            ),
+        )
     prompt_store.set_override(key, body.text)
     return _prompt_view(spec)
 

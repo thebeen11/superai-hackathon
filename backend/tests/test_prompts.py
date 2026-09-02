@@ -215,3 +215,48 @@ def test_identity_layers_are_editable_like_any_other_prompt():
     keys = {s.key for s in list_prompt_specs()}
     assert {identity.SOUL_KEY, identity.RULES_KEY, "mental.inversion"} <= keys
     assert identity.personality_key("winston") in keys
+
+
+# --- Agent Console save guard ------------------------------------------------------
+
+
+@pytest.fixture
+def client():
+    from fastapi.testclient import TestClient
+
+    from app import main
+
+    return TestClient(main.app)
+
+
+def test_saving_a_prompt_without_its_placeholder_is_rejected(client, _isolated_store):
+    body = {"text": "You are the Macro Analyst. Grade the fixed checklist below."}
+    r = client.put("/api/prompts/council.macro", json=body)
+
+    assert r.status_code == 400
+    assert "{signposts}" in r.json()["detail"]
+    # The refusal must not half-apply: the old text is still what the agent runs on.
+    assert store.get_override("council.macro") is None
+
+
+def test_saving_a_prompt_that_keeps_its_placeholder_succeeds(client, _isolated_store):
+    text = "Grade only this checklist.\n\nCHECKLIST:\n{signposts}"
+    r = client.put("/api/prompts/council.macro", json={"text": text})
+
+    assert r.status_code == 200
+    assert r.json()["is_overridden"] is True
+    assert store.get_override("council.macro") == text
+
+
+def test_the_guard_covers_every_placeholder_prompt(client, _isolated_store):
+    # Not a macro special case — the same silent failure exists for each of these.
+    for key in ("dataeng.labels", "dataeng.themes", "insights.watchlist_match"):
+        r = client.put("/api/prompts/" + key, json={"text": "no placeholders here"})
+        assert r.status_code == 400, key
+        assert store.get_override(key) is None, key
+
+
+def test_a_placeholderless_prompt_still_saves_anything(client, _isolated_store):
+    r = client.put("/api/prompts/council.chairman", json={"text": "Be brief."})
+    assert r.status_code == 200
+    assert store.get_override("council.chairman") == "Be brief."

@@ -136,3 +136,71 @@ def test_checklist_prompt_lists_every_signpost():
     text = macro_mod.checklist_prompt()
     for key, name, _trigger in BEAR_SIGNPOSTS:
         assert key in text and name in text
+
+
+def _capture_system(monkeypatch, out: _MacroOutput) -> list[str]:
+    """Record the system prompt each mocked reasoning call is handed."""
+    seen: list[str] = []
+
+    def fake(_schema, system, _user, *a, **k):
+        seen.append(system)
+        return out
+
+    monkeypatch.setattr(macro_mod, "converse_structured", fake)
+    return seen
+
+
+def test_checklist_reaches_the_model_even_if_the_prompt_drops_the_placeholder(monkeypatch):
+    # An Agent Console edit that loses `{signposts}` fills to a no-op, so without the
+    # safety net the desk would be asked to grade a checklist it was never shown.
+    monkeypatch.setattr(
+        macro_mod, "get_prompt",
+        lambda _key, **_v: "You are the Macro Analyst. Grade the fixed checklist.",
+    )
+    seen = _capture_system(monkeypatch, _out(summary="s"))
+    run_macro_analyst([_item()])
+
+    assert len(seen) == 1
+    for key, name, _trigger in BEAR_SIGNPOSTS:
+        assert key in seen[0] and name in seen[0]
+
+
+def test_a_prompt_that_keeps_the_placeholder_is_not_appended_to(monkeypatch):
+    seen = _capture_system(monkeypatch, _out(summary="s"))
+    run_macro_analyst([_item()])
+
+    assert len(seen) == 1
+    # The checklist is present exactly once — the fill worked, so nothing was re-appended.
+    assert seen[0].count(macro_mod.checklist_prompt()) == 1
+
+
+def test_display_names_and_cosmetic_variants_resolve_to_the_right_row(monkeypatch):
+    # Same rows, spelled the way a re-worded prompt tends to get them back.
+    monkeypatch.setattr(macro_mod, "converse_structured", lambda *a, **k: _out(
+        _LLMSignpost(key="Labour Market", status="Triggered",
+                     evidence=[_LLMEvidence(quote="layoffs broadening", source_index=0)]),
+        _LLMSignpost(key="Yield-Curve", status="Watch",
+                     evidence=[_LLMEvidence(quote="inverted", source_index=0)]),
+        _LLMSignpost(key="CREDIT_SPREADS", status="Triggered",
+                     evidence=[_LLMEvidence(quote="spreads widening", source_index=0)]),
+    ))
+    report = run_macro_analyst([_item()])
+    by_key = {s.key: s for s in report.signposts}
+
+    assert by_key["unemployment"].status == "Triggered"
+    assert by_key["yield_curve"].status == "Watch"
+    assert by_key["credit_spreads"].status == "Triggered"
+    assert report.triggered == 2 and report.watch == 1
+
+
+def test_an_invented_row_name_still_matches_nothing_and_is_logged(monkeypatch, caplog):
+    monkeypatch.setattr(macro_mod, "converse_structured", lambda *a, **k: _out(
+        _LLMSignpost(key="AI Capex Digestion", status="Triggered",
+                     evidence=[_LLMEvidence(quote="capex rolling over", source_index=0)]),
+    ))
+    with caplog.at_level("WARNING"):
+        report = run_macro_analyst([_item()])
+
+    assert all(s.status == "Clear" and not s.evidenced for s in report.signposts)
+    assert all(s.rationale == "Not returned by the analyst." for s in report.signposts)
+    assert "AI Capex Digestion" in caplog.text

@@ -470,7 +470,7 @@
     "/api/prompts/{key}": {
       "put": {
         "summary": "Update Prompt",
-        "description": "Override one prompt with user-supplied text (takes effect on the next agent run).",
+        "description": "Override one prompt with user-supplied text (takes effect on the next agent run).\n\nA declared placeholder is refused if the new text drops it. Substitution is a plain\ntoken replace that never errors (`prompts.registry._fill`), so a prompt missing its\n`{signposts}` / `{taxonomy}` / `{sectors}` block does not fail \u2014 it quietly ships\nwithout the fixed list the downstream parser matches against, and the agent returns\nnothing the dashboard can render. Catching it at save time is the only honest moment.",
         "operationId": "update_prompt",
         "parameters": [
           {

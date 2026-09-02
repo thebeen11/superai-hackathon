@@ -68,6 +68,10 @@ export function LayerEditor({
 
   const draft = ctl.drafts[promptKey] ?? p.current_text;
   const dirty = draft !== p.current_text;
+  // A placeholder is the machine contract, not decoration: {signposts} carries the fixed
+  // checklist keys the backend matches the answer against. Dropping one still reads like a
+  // valid prompt, so flag it here — the backend refuses the save either way.
+  const missing = new Set(p.placeholders.filter((ph) => !draft.includes("{" + ph + "}")));
   const b = ctl.busy[promptKey];
   const locked = ctl.readOnly || !!b;
   const tone = LAYER_TONE[p.layer] ?? "var(--t-lo)";
@@ -103,10 +107,29 @@ export function LayerEditor({
             placeholders:
           </span>
           {p.placeholders.map((ph) => (
-            <span key={ph} className="chip mono" style={{ fontSize: 10.5 }}>
+            <span
+              key={ph}
+              className="chip mono"
+              style={
+                missing.has(ph)
+                  ? {
+                      fontSize: 10.5,
+                      color: "var(--down)",
+                      borderColor: "color-mix(in oklch, var(--down) 45%, transparent)",
+                    }
+                  : { fontSize: 10.5 }
+              }
+            >
               {"{" + ph + "}"}
+              {missing.has(ph) ? " · missing" : ""}
             </span>
           ))}
+          {missing.size > 0 && (
+            <span className="mono" style={{ fontSize: 10.5, color: "var(--down)" }}>
+              keep {missing.size === 1 ? "it" : "them"} in the text — the agent grades
+              against what they expand to
+            </span>
+          )}
         </div>
       )}
 

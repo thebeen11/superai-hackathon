@@ -210,20 +210,42 @@ export async function getPrompts(): Promise<PromptView[]> {
   return data ?? [];
 }
 
+/**
+ * The generated client's `throwOnError` throws the parsed error *body*, not an Error, so
+ * a FastAPI `detail` reaches a `catch (e as Error).message` as undefined. The console
+ * shows that message inline, and for a rejected prompt save the detail is the whole point
+ * — it names the placeholder that was dropped. Same preference as `errorMessage` in
+ * client.ts.
+ */
+function sdkError(e: unknown, fallback: string): Error {
+  const detail = (e as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string" && detail) return new Error(detail);
+  if (e instanceof Error) return e;
+  return new Error(fallback);
+}
+
 /** Override one prompt (takes effect on the next agent run). Backend: PUT /api/prompts/:key */
 export async function savePrompt(key: string, text: string): Promise<PromptView> {
-  const { data } = await updatePrompt({
-    path: { key },
-    body: { text },
-    throwOnError: true,
-  });
-  return data!;
+  try {
+    const { data } = await updatePrompt({
+      path: { key },
+      body: { text },
+      throwOnError: true,
+    });
+    return data!;
+  } catch (e) {
+    throw sdkError(e, `Could not save ${key}`);
+  }
 }
 
 /** Reset one prompt to its built-in default. Backend: DELETE /api/prompts/:key */
 export async function resetPromptToDefault(key: string): Promise<PromptView> {
-  const { data } = await resetPrompt({ path: { key }, throwOnError: true });
-  return data!;
+  try {
+    const { data } = await resetPrompt({ path: { key }, throwOnError: true });
+    return data!;
+  } catch (e) {
+    throw sdkError(e, `Could not reset ${key}`);
+  }
 }
 
 /** Context preview for a tracker. Backend: GET /api/trackers/:name/context */

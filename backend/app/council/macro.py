@@ -13,7 +13,9 @@ Two guardrails shape the output:
   grounded evidence is downgraded to `Clear` + `evidenced=False`. The model cannot raise
   the alarm on something it invented.
 - **Always complete.** The result is reconciled against the checklist in Python: every key
-  appears exactly once, in checklist order, whatever the model returned.
+  appears exactly once, in checklist order, whatever the model returned. The checklist is
+  also appended to the system prompt if an edited prompt dropped the `{signposts}`
+  placeholder — the keys are the parser's contract, not presentation.
 
 The composite risk score is computed here, not by the LLM, so it stays consistent with the
 statuses it summarises.
@@ -21,6 +23,7 @@ statuses it summarises.
 from __future__ import annotations
 
 import logging
+import re
 
 from pydantic import BaseModel, Field
 
@@ -52,6 +55,26 @@ class _MacroOutput(BaseModel):
 def checklist_prompt() -> str:
     """The fixed checklist, rendered for the `{signposts}` placeholder."""
     return "\n".join(f"- {key}  ({name}): {trigger}" for key, name, trigger in BEAR_SIGNPOSTS)
+
+
+def _norm(text: str) -> str:
+    """Fold a label to a comparable token: lowercase, non-alphanumerics collapsed to `_`."""
+    return re.sub(r"[^a-z0-9]+", "_", text.strip().lower()).strip("_")
+
+
+def _aliases() -> dict[str, str]:
+    """Every spelling we will accept for a checklist row → its canonical key.
+
+    The model is told to copy the key verbatim, but a re-worded prompt may get back the
+    display name (`Labour Market`) or a cosmetic variant (`Yield-Curve`). Those name the
+    same row, so resolving them is not leniency about *what* was graded — only about how
+    it was spelled. A key that matches nothing still falls through to "not returned".
+    """
+    table: dict[str, str] = {}
+    for key, name, _trigger in BEAR_SIGNPOSTS:
+        table[_norm(key)] = key
+        table.setdefault(_norm(name), key)
+    return table
 
 
 def _label(risk: float) -> str:
@@ -86,7 +109,23 @@ def _tally(signposts: list[Signpost], summary: str) -> BearSignpostReport:
 
 def _reconcile(out: _MacroOutput, items: list[CleanedItem]) -> list[Signpost]:
     """One row per checklist entry, in checklist order, each grounded or downgraded."""
-    by_key = {s.key.strip().lower(): s for s in out.signposts}
+    alias = _aliases()
+    by_key: dict[str, _LLMSignpost] = {}
+    unmatched: list[str] = []
+    for raw_row in out.signposts:
+        canonical = alias.get(_norm(raw_row.key))
+        if canonical is None:
+            unmatched.append(raw_row.key)
+        else:
+            by_key.setdefault(canonical, raw_row)
+    if unmatched:
+        # Almost always a prompt that lost the checklist, so the model invented its own
+        # row names. Without this line the tracker just renders empty with no explanation.
+        logger.warning(
+            "Macro Analyst returned %d signpost(s) matching no checklist key: %s",
+            len(unmatched), ", ".join(sorted(unmatched)),
+        )
+
     rows: list[Signpost] = []
     for key, name, _trigger in BEAR_SIGNPOSTS:
         raw = by_key.get(key)
@@ -123,6 +162,29 @@ def _fallback(summary: str) -> BearSignpostReport:
     )
 
 
+def _system_prompt() -> str:
+    """The Macro Analyst's prompt, with the checklist guaranteed to be in it.
+
+    `{signposts}` is not decoration — it is the machine contract, because `_reconcile`
+    matches on the keys it carries. A console edit that drops the placeholder fills to a
+    no-op (`prompts.registry._fill` never errors, so users can paste literal braces), and
+    the desk would silently grade a checklist it was never shown. So we append it, the
+    same way `llm/vertex.py` appends the JSON output contract outside the prompt catalogue.
+    """
+    checklist = checklist_prompt()
+    system = get_prompt("council.macro", signposts=checklist)
+    if checklist in system:
+        return system
+    logger.warning(
+        "The council.macro prompt no longer contains {signposts}; appending the checklist "
+        "so the desk still grades the fixed rows."
+    )
+    return (
+        f"{system}\n\nCHECKLIST — grade exactly these rows and only these, copying each "
+        f"`key` verbatim into your answer:\n{checklist}"
+    )
+
+
 def run_macro_analyst(
     macro_items: list[CleanedItem], emit: Emit = noop_emit
 ) -> BearSignpostReport:
@@ -136,7 +198,7 @@ def run_macro_analyst(
 
     items = macro_items[:_MAX_ITEMS]
     try:
-        system = get_prompt("council.macro", signposts=checklist_prompt())
+        system = _system_prompt()
         out = converse_structured(_MacroOutput, system, grounding.digest(items))
     except ReasoningError as exc:
         logger.warning("Macro Analyst reasoning failed: %s", exc)
