@@ -29,9 +29,10 @@ def _no_layers(monkeypatch):
 def test_all_skill_prompts_registered_with_unique_keys():
     specs = list_skill_specs()
     keys = [s.key for s in specs]
-    assert len(specs) == 13
+    assert len(specs) == 14
     assert len(set(keys)) == len(specs)
     assert "council.chairman" in keys and "insights.context" in keys
+    assert "council.thematic" in keys
     assert "council.macro" in keys and "insights.watchlist_match" in keys
     assert all(s.layer == "skill" and s.agent for s in specs)
 
@@ -57,12 +58,16 @@ def test_citing_agents_all_state_the_index_citation_contract(_no_layers):
     it silently produces un-anchored claims (which is exactly how the Chairman used to
     behave), so the contract is asserted rather than left to review.
     """
-    for key in ("council.chairman", "council.analyst", "council.macro"):
+    for key in ("council.chairman", "council.analyst", "council.macro", "council.thematic"):
         text = get_prompt(key).lower()
         assert "index" in text or "indices" in text, f"{key} does not ask for a source index"
     chairman = get_prompt("council.chairman")
     assert "SOURCES" in chairman
-    assert "basket, indicator, briefing bullet and prediction" in chairman
+    assert "indicator, briefing bullet and prediction" in chairman
+    # Baskets moved to the weekly thematic prompt, which carries the same contract.
+    thematic = get_prompt("council.thematic")
+    assert "SOURCES" in thematic
+    assert "every basket takes an 'evidence' list" in thematic
 
 
 def test_override_takes_effect(_no_layers):

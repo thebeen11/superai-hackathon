@@ -7,6 +7,8 @@
  */
 import type {
   ContextPreview,
+  Theme,
+  ThematicRunRef,
   WtafData,
   Source,
   WatchlistEntry,
@@ -15,12 +17,21 @@ import type {
   YoutubeJobRef,
   YoutubeMatch,
 } from "../types";
-import { wtafMock, youtubeChannelsMock, youtubeMatchesMock } from "../mock-data";
+import {
+  thematicRunMock,
+  thematicRunRefsMock,
+  wtafMock,
+  youtubeChannelsMock,
+  youtubeMatchesMock,
+} from "../mock-data";
 import { apiFetch, mockResolve, USE_MOCK } from "./client";
 import {
   agentEffectivePrompt,
   councilLatest,
   dataengProcess,
+  getThematicRunEndpoint,
+  latestThematicRun,
+  listThematicRunsEndpoint,
   discoverPost,
   listAgents,
   listItems,
@@ -39,7 +50,7 @@ import type {
   EffectivePrompt,
   PromptView,
 } from "./generated/types.gen";
-import { itemsToWtafData } from "./adapter";
+import { itemsToWtafData, thematicRunRefs, thematicRunToThemes } from "./adapter";
 import { streamSse, type ProgressEvent } from "./sse";
 
 /**
@@ -62,7 +73,7 @@ export async function getSnapshot(): Promise<WtafData> {
 }
 
 /**
- * Latest Tier 3–5 council snapshot (debate, baskets, indicators, ACE, briefing).
+ * Latest Tier 3–5 council snapshot (debate, indicators, ACE, briefing).
  * Returns null when no council has run yet (empty DB / fresh start) so the Tier 3–5
  * cards fall back to their "awaiting" empty states. Backend: GET /council/latest
  */
@@ -74,6 +85,42 @@ export async function getCouncil(): Promise<CouncilReport | null> {
   } catch {
     return null; // council is best-effort; never block the snapshot on it
   }
+}
+
+/**
+ * Dated Thematic Analysis runs for the run picker, newest first.
+ *
+ * Not part of `getSnapshot`: thematic runs are weekly and browsable by date, so the card
+ * owns this fetch rather than every dashboard load paying for a list it usually ignores.
+ * Backend: GET /api/thematic/runs
+ */
+export async function listThematicRuns(): Promise<ThematicRunRef[]> {
+  if (USE_MOCK) return mockResolve(thematicRunRefsMock);
+  const { data } = await listThematicRunsEndpoint({ throwOnError: true });
+  return thematicRunRefs(data ?? []);
+}
+
+/**
+ * The themes of one run — a specific id, or "latest" for the most recent.
+ *
+ * Returns null when no run exists yet, so the card shows its honest empty state rather
+ * than last week's themes or invented ones.
+ * Backend: GET /api/thematic/runs/{id} | /api/thematic/runs/latest
+ */
+export async function getThematicRun(
+  id: number | "latest" = "latest",
+): Promise<{ id: number | null; generatedAt: string; themes: Theme[] } | null> {
+  if (USE_MOCK) return mockResolve(thematicRunMock(id));
+  const { data } =
+    id === "latest"
+      ? await latestThematicRun({ throwOnError: true })
+      : await getThematicRunEndpoint({ path: { run_id: id }, throwOnError: true });
+  if (!data) return null;
+  return {
+    id: data.id ?? null,
+    generatedAt: data.generated_at ?? "",
+    themes: thematicRunToThemes(data),
+  };
 }
 
 /**

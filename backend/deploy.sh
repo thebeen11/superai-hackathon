@@ -245,8 +245,8 @@ deploy() {
     --set-env-vars="${env_vars}" \
     --set-secrets="${secrets}"
 
-  # This one job also drives the Telegram macro-indicator report: run_daily_crawl sends it
-  # after the council, so there is deliberately no third scheduler job for it.
+  # This job also drives the Telegram macro-indicator report: run_daily_crawl sends it
+  # after the council, so the report deliberately has no scheduler job of its own.
   echo "==> Cloud Scheduler: daily crawl (00:30 UTC, crawls yesterday's news)"
   gcloud_read run services describe "${SERVICE}" --region "${REGION}" --format='value(status.url)' \
     || die "could not read the URL of service '${SERVICE}'"
@@ -270,6 +270,18 @@ deploy() {
   gcloud scheduler jobs "${verb}" http youtube-poll --location "${REGION}" \
     --schedule="30 1 * * *" --time-zone="Etc/UTC" \
     --uri="${SERVICE_URL}/api/sources/youtube/poll" --http-method=POST \
+    --attempt-deadline=1800s
+
+  echo "==> Cloud Scheduler: Thematic Analysis (weekly, Mondays 03:00 UTC)"
+  # Themes move on a weekly clock, not the crawl's: a basket rebuilt every night from one
+  # day of fresh headlines is noise dressed as conviction. Monday 03:00 leaves the two
+  # daily jobs above well clear, and each run is stored as a dated Run the dashboard can
+  # read back — so this schedule sets how often the run picker gains an entry.
+  verb=create
+  gcloud scheduler jobs describe thematic-weekly --location "${REGION}" >/dev/null 2>&1 && verb=update
+  gcloud scheduler jobs "${verb}" http thematic-weekly --location "${REGION}" \
+    --schedule="0 3 * * 1" --time-zone="Etc/UTC" \
+    --uri="${SERVICE_URL}/api/thematic/run" --http-method=POST \
     --attempt-deadline=1800s
 }
 

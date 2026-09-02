@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import settings
-from .council import latest_council, resolve_ledger, run_council
+from .council import latest_council, resolve_ledger, run_council, run_thematic
 from .crawl import (
     run_council_safe as _run_council_safe,
     run_daily_crawl,
@@ -26,8 +26,11 @@ from .db.repository import (
     delete_watchlist_entries,
     delete_watchlist_entry,
     delete_youtube_channel,
+    get_latest_thematic_run,
+    get_thematic_run,
     get_youtube_channel,
     list_cleaned_items,
+    list_thematic_runs,
     list_watchlist_overrides,
     list_youtube_channels,
     list_youtube_matches,
@@ -50,6 +53,8 @@ from .models import (
     CouncilReport,
     DataEngReport,
     DiscoveryResult,
+    ThematicRun,
+    ThematicRunRef,
     YoutubeChannel,
     YoutubeIngestReport,
     YoutubeJobRef,
@@ -791,6 +796,51 @@ def council_latest() -> CouncilReport | None:
 def council_resolve() -> dict[str, int]:
     """Score predictions whose window has passed and refresh the Brier ledger."""
     return {"resolved": resolve_ledger()}
+
+
+# --- Thematic Analysis (Tier 5, weekly) -------------------------------------
+#
+# `/latest` is declared before `/{run_id}` so the literal segment wins the match, the same
+# ordering rule as /api/watchlists/bulk-delete.
+
+
+@app.post("/api/thematic/run", response_model=ThematicRun)
+def run_thematic_endpoint() -> ThematicRun:
+    """Run this week's Thematic Analysis and persist it as a dated run.
+
+    The target of the weekly `thematic-weekly` Cloud Scheduler job, and the manual trigger.
+    """
+    return run_thematic()
+
+
+@app.post("/api/thematic/run/stream")
+def run_thematic_stream():
+    """Streaming version of /api/thematic/run (progress + job reconnect)."""
+    job = create_job("thematic", "thematic")
+    return sse_stream(lambda emit: run_thematic(emit=emit), job=job)
+
+
+@app.get("/api/thematic/runs", response_model=list[ThematicRunRef])
+def list_thematic_runs_endpoint(
+    limit: int = Query(52, ge=1, le=200, description="How many runs to list, newest first"),
+) -> list[ThematicRunRef]:
+    """Dated run headers for the run picker, newest first."""
+    return list_thematic_runs(limit=limit)
+
+
+@app.get("/api/thematic/runs/latest", response_model=ThematicRun | None)
+def latest_thematic_run() -> ThematicRun | None:
+    """The most recent thematic run, or null before the first one has been made."""
+    return get_latest_thematic_run()
+
+
+@app.get("/api/thematic/runs/{run_id}", response_model=ThematicRun)
+def get_thematic_run_endpoint(run_id: int) -> ThematicRun:
+    """One past run, by id."""
+    run = get_thematic_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"No thematic run with id {run_id}")
+    return run
 
 
 @app.get("/items/stream")

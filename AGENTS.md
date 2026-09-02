@@ -101,11 +101,22 @@ Tiers map one-to-one onto packages under `backend/app/`:
 | 2 — Timo | `dataeng/` | Per item: `redact → entities → labels → themes → guardrail → persist` |
 | 3 — Andie ×3 | `council/analyst.py` | Three sector desks, disjoint sectors, ≤20 stocks each |
 | 4 — Freddy ×2 | `council/debate.py` | Bull vs Bear, 6 alternating rounds |
-| 5 — Winston | `council/chairman.py` | Fan-in: verdict, baskets, indicators, ACE, briefing, predictions |
+| 5 — Winston | `council/chairman.py` | Fan-in: verdict, indicators, ACE, briefing, predictions |
 | bypass | `council/macro.py` | `[MACRO]` items skip the analysts and go straight to Winston |
+| weekly | `council/thematic.py` | Thematic Analysis: Winston's baskets, on their own weekly clock |
 
 `council/orchestrator.py` is the DAG entry point (`run_council`) and the only place that
 assembles a `CouncilReport` + source manifest. The pipeline is strictly ordered — no partial runs.
+
+**Thematic Analysis is not part of that DAG.** `council/thematic.py` is one LLM call that reads
+the corpus directly and borrows the newest council snapshot for context; each execution is
+persisted whole and dated as a `ThematicRun` (`thematic_runs`), which is what makes past weeks
+readable — unlike `council_snapshots`, where only the newest row is ever served. Its cadence is
+the `thematic-weekly` Cloud Scheduler job in `deploy.sh` (Mondays 03:00 UTC → `POST
+/api/thematic/run`); a theme built from one day of headlines is noise, which is why it does not
+ride the nightly crawl. Every basket carries a `timeframe` — `Short Term` (1M) / `Medium Term`
+(1Q) / `Long Term` (1Y), a closed set normalised server-side. `CouncilReport.baskets` survives as
+a deprecated field so snapshots written before the split still parse.
 
 Cross-cutting pieces that new code must go through rather than around:
 
@@ -132,8 +143,9 @@ Cross-cutting pieces that new code must go through rather than around:
   shipped. Missing source API keys cause a graceful *skip with a recorded reason*, never a crash.
 
 Persistence is SQLAlchemy over Postgres (`db/tables.py`, `db/repository.py`); `cleaned_items`
-upserts are idempotent by `source_url`. Other tables: `council_snapshots`, `predictions`,
-`prompt_overrides`, `watchlist_overrides`, `youtube_channels`/`_videos`/`_matches`.
+upserts are idempotent by `source_url`. Other tables: `council_snapshots`, `thematic_runs`,
+`predictions`, `prompt_overrides`, `watchlist_overrides`,
+`youtube_channels`/`_videos`/`_matches`.
 
 ## Frontend architecture
 
@@ -146,9 +158,13 @@ upserts are idempotent by `source_url`. Other tables: `council_snapshots`, `pred
   in `lib/api/adapter.ts`, **not** the mock — an empty database must render honest empty states
   rather than fabricated numbers. Preserve that when adding cards.
 - `lib/api/wtaf.ts` is the single endpoint layer; `lib/api/adapter.ts` maps backend `CleanedItem` /
-  `CouncilReport` shapes onto the dashboard's view models; `lib/api/sse.ts` consumes the backend
-  streams. `providers/wtaf-provider.tsx` owns the snapshot plus in-flight discovery state, stashing
-  the job id in `sessionStorage` so a reload reconnects to the running job.
+  `CouncilReport` / `ThematicRun` shapes onto the dashboard's view models; `lib/api/sse.ts` consumes
+  the backend streams. `providers/wtaf-provider.tsx` owns the snapshot plus in-flight discovery
+  state, stashing the job id in `sessionStorage` so a reload reconnects to the running job.
+- **Not everything belongs in the snapshot.** A resource on its own cadence fetches itself in the
+  component that shows it, rather than making every dashboard load pay for it —
+  `command-center/themes-card.tsx` (weekly thematic runs) and `pages/sources-youtube.tsx` are the
+  two precedents.
 - `frontend/AGENTS.md` (which `frontend/CLAUDE.md` just points at): this Next.js version has
   breaking changes vs training data — consult `node_modules/next/dist/docs/` before writing
   Next-specific code.

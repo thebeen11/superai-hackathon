@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeChannelData, AddYoutubeChannelErrors, AddYoutubeChannelResponses, AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, BulkDeleteWatchlistsData, BulkDeleteWatchlistsErrors, BulkDeleteWatchlistsResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, HealthData, HealthResponses, JobStreamData, JobStreamErrors, JobStreamResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListWatchlistsData, ListWatchlistsResponses, ListYoutubeChannelsEndpointData, ListYoutubeChannelsEndpointResponses, ListYoutubeJobsData, ListYoutubeJobsResponses, ListYoutubeMatchesEndpointData, ListYoutubeMatchesEndpointErrors, ListYoutubeMatchesEndpointResponses, PollYoutubeChannelsData, PollYoutubeChannelsResponses, RefreshYoutubeChannelData, RefreshYoutubeChannelErrors, RefreshYoutubeChannelResponses, RefreshYoutubeChannelStreamData, RefreshYoutubeChannelStreamErrors, RefreshYoutubeChannelStreamResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, RemoveYoutubeChannelData, RemoveYoutubeChannelErrors, RemoveYoutubeChannelResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses, UpdateYoutubeChannelData, UpdateYoutubeChannelErrors, UpdateYoutubeChannelResponses } from './types.gen';
+import type { AddYoutubeChannelData, AddYoutubeChannelErrors, AddYoutubeChannelResponses, AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, BulkDeleteWatchlistsData, BulkDeleteWatchlistsErrors, BulkDeleteWatchlistsResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, GetThematicRunEndpointData, GetThematicRunEndpointErrors, GetThematicRunEndpointResponses, HealthData, HealthResponses, JobStreamData, JobStreamErrors, JobStreamResponses, LatestThematicRunData, LatestThematicRunResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListThematicRunsEndpointData, ListThematicRunsEndpointErrors, ListThematicRunsEndpointResponses, ListWatchlistsData, ListWatchlistsResponses, ListYoutubeChannelsEndpointData, ListYoutubeChannelsEndpointResponses, ListYoutubeJobsData, ListYoutubeJobsResponses, ListYoutubeMatchesEndpointData, ListYoutubeMatchesEndpointErrors, ListYoutubeMatchesEndpointResponses, PollYoutubeChannelsData, PollYoutubeChannelsResponses, RefreshYoutubeChannelData, RefreshYoutubeChannelErrors, RefreshYoutubeChannelResponses, RefreshYoutubeChannelStreamData, RefreshYoutubeChannelStreamErrors, RefreshYoutubeChannelStreamResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, RemoveYoutubeChannelData, RemoveYoutubeChannelErrors, RemoveYoutubeChannelResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, RunThematicEndpointData, RunThematicEndpointResponses, RunThematicStreamData, RunThematicStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses, UpdateYoutubeChannelData, UpdateYoutubeChannelErrors, UpdateYoutubeChannelResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -410,6 +410,43 @@ export const councilLatest = <ThrowOnError extends boolean = false>(options?: Op
  * Score predictions whose window has passed and refresh the Brier ledger.
  */
 export const councilResolve = <ThrowOnError extends boolean = false>(options?: Options<CouncilResolveData, ThrowOnError>): RequestResult<CouncilResolveResponses, unknown, ThrowOnError> => (options?.client ?? client).post<CouncilResolveResponses, unknown, ThrowOnError>({ url: '/council/resolve', ...options });
+
+/**
+ * Run Thematic Endpoint
+ *
+ * Run this week's Thematic Analysis and persist it as a dated run.
+ *
+ * The target of the weekly `thematic-weekly` Cloud Scheduler job, and the manual trigger.
+ */
+export const runThematicEndpoint = <ThrowOnError extends boolean = false>(options?: Options<RunThematicEndpointData, ThrowOnError>): RequestResult<RunThematicEndpointResponses, unknown, ThrowOnError> => (options?.client ?? client).post<RunThematicEndpointResponses, unknown, ThrowOnError>({ url: '/api/thematic/run', ...options });
+
+/**
+ * Run Thematic Stream
+ *
+ * Streaming version of /api/thematic/run (progress + job reconnect).
+ */
+export const runThematicStream = <ThrowOnError extends boolean = false>(options?: Options<RunThematicStreamData, ThrowOnError>): RequestResult<RunThematicStreamResponses, unknown, ThrowOnError> => (options?.client ?? client).post<RunThematicStreamResponses, unknown, ThrowOnError>({ url: '/api/thematic/run/stream', ...options });
+
+/**
+ * List Thematic Runs Endpoint
+ *
+ * Dated run headers for the run picker, newest first.
+ */
+export const listThematicRunsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<ListThematicRunsEndpointData, ThrowOnError>): RequestResult<ListThematicRunsEndpointResponses, ListThematicRunsEndpointErrors, ThrowOnError> => (options?.client ?? client).get<ListThematicRunsEndpointResponses, ListThematicRunsEndpointErrors, ThrowOnError>({ url: '/api/thematic/runs', ...options });
+
+/**
+ * Latest Thematic Run
+ *
+ * The most recent thematic run, or null before the first one has been made.
+ */
+export const latestThematicRun = <ThrowOnError extends boolean = false>(options?: Options<LatestThematicRunData, ThrowOnError>): RequestResult<LatestThematicRunResponses, unknown, ThrowOnError> => (options?.client ?? client).get<LatestThematicRunResponses, unknown, ThrowOnError>({ url: '/api/thematic/runs/latest', ...options });
+
+/**
+ * Get Thematic Run Endpoint
+ *
+ * One past run, by id.
+ */
+export const getThematicRunEndpoint = <ThrowOnError extends boolean = false>(options: Options<GetThematicRunEndpointData, ThrowOnError>): RequestResult<GetThematicRunEndpointResponses, GetThematicRunEndpointErrors, ThrowOnError> => (options.client ?? client).get<GetThematicRunEndpointResponses, GetThematicRunEndpointErrors, ThrowOnError>({ url: '/api/thematic/runs/{run_id}', ...options });
 
 /**
  * List Items Stream

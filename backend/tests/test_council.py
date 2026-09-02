@@ -21,7 +21,6 @@ from app.council.grounding import LLMEvidence as _LLMEvidence
 from app.council.chairman import (
     _ChairmanOutput,
     _LLMAce,
-    _LLMBasket,
     _LLMBriefing,
     _LLMIndicator,
     _LLMPrediction,
@@ -137,23 +136,22 @@ def test_debate_uses_two_model_families(monkeypatch):
 def test_chairman_builds_dashboard(monkeypatch):
     out = _ChairmanOutput(
         verdict="half position in MU",
-        baskets=[_LLMBasket(name="AI Buildout", stocks=["nvda"], conviction=1.5)],  # clamp
+        indicators=[_LLMIndicator(name="Rates", score=1.5, band="Positive")],  # clamp
         ace=_LLMAce(value=0.34, label="CAPITAL ABUNDANT"),
     )
     monkeypatch.setattr(chairman_mod, "converse_structured", lambda *a, **k: out)
     verdict = run_chairman([], None, [])
     assert verdict.verdict == "half position in MU"
-    assert verdict.baskets[0].conviction == 1.0       # clamped to [0, 1]
-    assert verdict.baskets[0].stocks == ["NVDA"]      # upper-cased
+    assert verdict.indicators[0].score == 1.0         # clamped to [-1, 1]
     assert verdict.ace.value == 0.34
+    # Thematic baskets moved to their own weekly run; the Chairman no longer emits them.
+    assert not hasattr(verdict, "baskets")
 
 
 def test_chairman_grounds_every_claim_kind(monkeypatch):
-    """Winston's baskets/indicators/briefing/predictions all resolve to real URLs."""
+    """Winston's indicators/briefing/predictions all resolve to real URLs."""
     macro = [_item(url="macro-url", stream=Stream.MACRO, text="the fed is on hold")]
     out = _ChairmanOutput(
-        baskets=[_LLMBasket(name="AI Buildout", stocks=["nvda"],
-                            evidence=[_LLMEvidence(quote="on hold", source_index=0)])],
         indicators=[_LLMIndicator(name="Rates", score=0.3, band="Positive", rationale="steady",
                                   evidence=[_LLMEvidence(quote="on hold", source_index=0)])],
         briefing=[_LLMBriefing(tone="up", text="Fed steady",
@@ -163,7 +161,7 @@ def test_chairman_grounds_every_claim_kind(monkeypatch):
     )
     monkeypatch.setattr(chairman_mod, "converse_structured", lambda *a, **k: out)
     v = run_chairman([], None, macro)
-    for claim in (v.baskets[0], v.indicators[0], v.briefing[0], v.predictions[0]):
+    for claim in (v.indicators[0], v.briefing[0], v.predictions[0]):
         assert [e.source_url for e in claim.evidence] == ["macro-url"]
     assert v.indicators[0].rationale == "steady"
 
@@ -188,7 +186,7 @@ def test_chairman_keeps_claims_whose_citation_does_not_resolve(monkeypatch):
 
 
 def test_citable_corpus_includes_desk_cited_micro_sources():
-    """A basket comes out of the debate, so Winston must be able to cite the desks' sources."""
+    """Winston rules on the debate, so he must be able to cite the desks' own sources."""
     macro = [_item(url="macro-url", stream=Stream.MACRO)]
     micro = [_item(url="micro-cited"), _item(url="micro-unused")]
     notes = [SectorNote(desk="TMT", stocks=[
@@ -213,7 +211,6 @@ def test_run_council_empty_corpus_saves_empty_snapshot(monkeypatch):
 def test_run_council_runs_full_dag(monkeypatch):
     from app.models import (
         BearSignpostReport, BriefingItem, DebateRecord, DebateSideMeta, SectorNote,
-        ThemeBasket,
     )
     from app.council.chairman import ChairmanVerdict
 
@@ -241,10 +238,9 @@ def test_run_council_runs_full_dag(monkeypatch):
         calls.append("chairman")
         assert all(i.stream == Stream.MACRO for i in macro)  # macro bypass routes MACRO here
         assert macro_report is not None and macro_report.triggered == 2  # tracker handed up
-        # Winston needs the desks' micro sources too, or a basket could never cite anything.
+        # Winston needs the desks' micro sources too, or he could never cite anything.
         assert micro_items is not None and all(i.stream == Stream.MICRO for i in micro_items)
-        return ChairmanVerdict(verdict="ruling", baskets=[ThemeBasket(name="x")],
-                               briefing=[BriefingItem(tone="up", text="y")])
+        return ChairmanVerdict(verdict="ruling", briefing=[BriefingItem(tone="up", text="y")])
 
     monkeypatch.setattr(orch, "run_analysts", fake_analysts)
     monkeypatch.setattr(orch, "run_debate", fake_debate)
@@ -256,7 +252,8 @@ def test_run_council_runs_full_dag(monkeypatch):
     assert report.macro.triggered == 2                           # tracker persisted
     assert report.debate.verdict == "ruling"
     assert report.debate.transcript[-1].who == "winston"         # verdict stitched in
-    assert report.baskets[0].name == "x"
+    assert report.briefing[0].text == "y"
+    assert not report.baskets      # thematic baskets are a separate weekly run now
     assert report.source_count == 2
 
 
@@ -319,6 +316,8 @@ def test_legacy_snapshot_with_string_indicator_evidence_still_loads():
         ],
         # Written before these fields existed at all.
         "briefing": [{"tone": "up", "text": "Fed steady"}],
+        # Written before the baskets moved to their own weekly run — the field is kept on
+        # CouncilReport precisely so rows like this one still parse.
         "baskets": [{"name": "AI Buildout"}],
         "predictions": [{"claim": "no cut", "by": "Macro Lens", "resolve": "01 SEP"}],
         "source_count": 12,

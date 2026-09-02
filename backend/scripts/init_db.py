@@ -34,7 +34,8 @@ def main() -> None:
             conn.execute(
                 text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {coltype}")
             )
-    print("Schema created (cleaned_items + council_snapshots + predictions + prompt_overrides + indexes).")
+    print("Schema created (cleaned_items + council_snapshots + thematic_runs + predictions "
+          "+ prompt_overrides + indexes).")
     print(f"Additive columns ensured: {', '.join(f'{t}.{c}' for t, c, _ in _ADDITIVE_COLUMNS)}.")
 
 

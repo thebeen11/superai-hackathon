@@ -1,5 +1,5 @@
 /* ============ WTAF — mock data layer ============ */
-import type { WtafData, YoutubeChannel, YoutubeMatch } from "./types";
+import type { Theme, ThematicRunRef, WtafData, YoutubeChannel, YoutubeMatch } from "./types";
 
 const sentimentWave = [
   0.42, 0.45, 0.5, 0.58, 0.55, 0.6, 0.72, 0.68, 0.74, 0.82, 0.78, 0.7, 0.66,
@@ -274,54 +274,6 @@ export const wtafMock: WtafData = {
     score: +0.86,
   },
 
-  themes: [
-    {
-      name: "AI Data-Centre Buildout",
-      risk: "Med",
-      horizon: "12M",
-      ret: +31.4,
-      stocks: ["NVDA", "AVGO", "VRT", "SMCI", "MSFT"],
-      strat: "Own the power/cooling + compute supply chain feeding hyperscaler capex.",
-      conviction: 0.82,
-      verdict: "Bull holds — full weight",
-      hold: "6–12M",
-      evidence: [
-        { quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 },
-        { quote: "capex guidance went up across all four hyperscalers", sourceUrl: "https://example.com/compound-capex" },
-      ],
-    },
-    {
-      name: "Disinflation Beneficiaries",
-      risk: "Low",
-      horizon: "6M",
-      ret: +12.8,
-      stocks: ["XLF", "KRE", "IWM"],
-      strat: "Rate-sensitive small caps & banks on a confirmed Fed pivot.",
-      conviction: 0.61,
-      verdict: "Half-size — Bear rate risk",
-      hold: "6M",
-      evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }],
-    },
-    {
-      name: "Advanced Materials",
-      risk: "High",
-      horizon: "12M",
-      ret: +9.2,
-      stocks: ["MP", "ALB", "LAC"],
-      strat: "Strategic minerals for grid + battery buildout. Volatile, policy-driven.",
-      conviction: 0.48,
-      verdict: "Watch only — policy risk",
-      hold: "12M",
-      evidence: [],
-    },
-  ],
-
-  backtestThemes: [
-    "AI Data-Centre Buildout",
-    "Disinflation Beneficiaries",
-    "Advanced Materials",
-  ],
-
   ledger: [
     { rank: 1, name: "Silicon Signal", acc: 0.81, n: 42, brier: 0.14, trend: "up" },
     { rank: 2, name: "Macro Lens", acc: 0.74, n: 38, brier: 0.19, trend: "up" },
@@ -467,3 +419,148 @@ export const youtubeMatchesMock: YoutubeMatch[] = [
     matchedAt: "2026-08-01T12:00:00Z",
   },
 ];
+
+/* --- Thematic Analysis (Tier 5, weekly) -------------------------------------
+   Three dated runs so the run picker and the timeframe filter are exercisable with no
+   backend. Newest first, matching what GET /api/thematic/runs returns. */
+
+export const thematicRunRefsMock: ThematicRunRef[] = [
+  { id: 3, generatedAt: "2026-08-31T03:00:00Z", basketCount: 3 },
+  { id: 2, generatedAt: "2026-08-24T03:00:00Z", basketCount: 3 },
+  { id: 1, generatedAt: "2026-08-17T03:00:00Z", basketCount: 2 },
+];
+
+const thematicRunsMock: Record<number, { generatedAt: string; themes: Theme[] }> = {
+  3: {
+    generatedAt: "2026-08-31T03:00:00Z",
+    themes: [
+      {
+        name: "AI Data-Centre Buildout",
+        risk: "Med",
+        timeframe: "Long Term",
+        horizon: "12M",
+        ret: +31.4,
+        stocks: ["NVDA", "AVGO", "VRT", "SMCI", "MSFT"],
+        strat: "Own the power/cooling + compute supply chain feeding hyperscaler capex.",
+        conviction: 0.82,
+        verdict: "Bull holds — full weight",
+        hold: "6–12M",
+        evidence: [
+          { quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 },
+          { quote: "capex guidance went up across all four hyperscalers", sourceUrl: "https://example.com/compound-capex" },
+        ],
+      },
+      {
+        name: "Disinflation Beneficiaries",
+        risk: "Low",
+        timeframe: "Medium Term",
+        horizon: "6M",
+        ret: +12.8,
+        stocks: ["XLF", "KRE", "IWM"],
+        strat: "Rate-sensitive small caps & banks on a confirmed Fed pivot.",
+        conviction: 0.61,
+        verdict: "Half-size — Bear rate risk",
+        hold: "6M",
+        evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }],
+      },
+      {
+        name: "Semis Seasonality Fade",
+        risk: "High",
+        timeframe: "Short Term",
+        horizon: "1M",
+        ret: 0,
+        stocks: ["AMD", "MU"],
+        strat: "August weakness in semis is a tactical trim, not a thesis change.",
+        conviction: 0.44,
+        verdict: "Tactical only",
+        hold: "1M",
+        evidence: [{ quote: "August seasonality in semis", sourceUrl: "https://example.com/capital-currents-seasonality" }],
+      },
+    ],
+  },
+  2: {
+    generatedAt: "2026-08-24T03:00:00Z",
+    themes: [
+      {
+        name: "AI Data-Centre Buildout",
+        risk: "Med",
+        timeframe: "Long Term",
+        horizon: "12M",
+        ret: +28.1,
+        stocks: ["NVDA", "AVGO", "VRT", "SMCI"],
+        strat: "Power and cooling remain the binding constraint on compute.",
+        conviction: 0.79,
+        verdict: "Bull holds",
+        hold: "6–12M",
+        evidence: [{ quote: "cooling and electrical included", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2601 }],
+      },
+      {
+        name: "Advanced Materials",
+        risk: "High",
+        timeframe: "Long Term",
+        horizon: "12M",
+        ret: +9.2,
+        stocks: ["MP", "ALB", "LAC"],
+        strat: "Strategic minerals for grid + battery buildout. Volatile, policy-driven.",
+        conviction: 0.48,
+        verdict: "Watch only — policy risk",
+        hold: "12M",
+        evidence: [],
+      },
+      {
+        name: "Curve Steepener Proxies",
+        risk: "Med",
+        timeframe: "Medium Term",
+        horizon: "3M",
+        ret: 0,
+        stocks: ["KRE", "XLF"],
+        strat: "Fourteen months of inversion has to end somewhere; banks lead when it does.",
+        conviction: 0.52,
+        verdict: "Starter position",
+        hold: "3M",
+        evidence: [{ quote: "fourteen months of curve inversion", sourceUrl: "https://example.com/macro-lens-curve" }],
+      },
+    ],
+  },
+  1: {
+    generatedAt: "2026-08-17T03:00:00Z",
+    themes: [
+      {
+        name: "AI Data-Centre Buildout",
+        risk: "Med",
+        timeframe: "Long Term",
+        horizon: "12M",
+        ret: +24.6,
+        stocks: ["NVDA", "AVGO", "SMCI"],
+        strat: "Early read on hyperscaler capex guidance.",
+        conviction: 0.71,
+        verdict: "Building",
+        hold: "12M",
+        evidence: [],
+      },
+      {
+        name: "Breadth Narrowing Hedge",
+        risk: "High",
+        timeframe: "Short Term",
+        horizon: "1M",
+        ret: 0,
+        stocks: ["IWM"],
+        strat: "Seven names are carrying the index — hedge the other 493.",
+        conviction: 0.38,
+        verdict: "Hedge only",
+        hold: "1M",
+        evidence: [{ quote: "seven names are doing all the work", sourceUrl: "https://example.com/compound-breadth" }],
+      },
+    ],
+  },
+};
+
+/** One mock run by id, or the newest. Mirrors what `getThematicRun` returns live. */
+export function thematicRunMock(
+  id: number | "latest",
+): { id: number; generatedAt: string; themes: Theme[] } | null {
+  const runId = id === "latest" ? thematicRunRefsMock[0]?.id : id;
+  const run = runId === undefined ? undefined : thematicRunsMock[runId];
+  if (run === undefined || runId === undefined) return null;
+  return { id: runId, generatedAt: run.generatedAt, themes: run.themes };
+}

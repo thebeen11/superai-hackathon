@@ -20,19 +20,16 @@ export function CommandCenter() {
 
   return (
     <div className="grid12">
-      {/* Promoted to top — themes are backend-backed (Layers 1–2) */}
-      <ThemesCard
-        themes={d.themes}
-        onOpenDebate={actions.onOpenDebate}
-        discovering={discovering}
-      />
+      {/* Winston's headline outputs lead the page — the weekly themes + the 60-sec read,
+          side by side. ThemesCard fetches its own runs (weekly, browsable by date). */}
+      <ThemesCard onOpenDebate={actions.onOpenDebate} />
+      <BriefingCard briefing={d.briefing} chairman={chairman} />
       <CatalystsCard catalysts={d.catalysts} />
       <DebateCard
         debate={d.debate}
         tiers={d.tiers}
         onOpenDebate={actions.onOpenDebate}
       />
-      <BriefingCard briefing={d.briefing} chairman={chairman} />
 
       {/* Council & analysis — sentiment & trackers are backend-backed */}
       <CouncilCard tiers={d.tiers} onOpenAgent={actions.onOpenAgent} />

@@ -27,7 +27,7 @@ export function DebateCard({
       <Card
         title="Debate Chamber"
         sub="adversarial · Bull vs Bear"
-        className="span5"
+        className="span8"
       >
         <EmptyState
           label="No debate yet"
@@ -41,7 +41,7 @@ export function DebateCard({
     <Card
       title="Debate Chamber"
       sub={`round ${db.round} / ${db.rounds}`}
-      className="span5"
+      className="span8"
       action={
         <button
           onClick={onOpenDebate}

@@ -13,11 +13,11 @@ UI can deep-link to the right second.
 from __future__ import annotations
 
 import re
-from typing import Callable, Iterable, Protocol
+from typing import Callable, Iterable, Mapping, Protocol
 
 from pydantic import BaseModel
 
-from ..models import CleanedItem, Evidence
+from ..models import CleanedItem, Evidence, SourceRef
 
 SNIPPET = 600  # chars of clean_text shown per excerpt, to bound the prompt
 
@@ -116,3 +116,36 @@ def ground(refs: Iterable[_HasEvidence], items: list[CleanedItem]) -> list[Evide
                 )
             )
     return grounded
+
+
+def source_manifest(
+    items: list[CleanedItem], cited: Mapping[str, Iterable[str]]
+) -> list[SourceRef]:
+    """One row per document a run read, tagged with the agents that quoted it.
+
+    This is the audit trail the UI's Sources page renders (§12.6). It is recorded on the
+    saved run rather than recomputed from the live corpus, so a stored run still reports
+    what it was actually based on after the corpus moves on. Documents nobody cited are
+    kept — "read but not used" is a fact worth showing, not one to hide.
+
+    `cited` maps a source URL to the agents that quoted it; build it with `attribute`.
+    """
+    return [
+        SourceRef(
+            url=it.source_url,
+            title=it.title,
+            source_type=it.source_type,
+            stream=it.stream,
+            author=it.author,
+            published_at=it.published_at,
+            themes=list(it.themes),
+            cited_by=sorted(cited.get(it.source_url, ())),
+        )
+        for it in items
+    ]
+
+
+def attribute(cited: dict[str, set[str]], agent: str, evidence: Iterable[Evidence]) -> None:
+    """Record that `agent` quoted every source in `evidence`, into a `source_manifest` map."""
+    for ev in evidence:
+        cited.setdefault(ev.source_url, set()).add(agent)

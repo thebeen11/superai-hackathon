@@ -50,6 +50,27 @@ class CouncilSnapshotRow(Base):
 Index("idx_council_snapshots_generated_at", CouncilSnapshotRow.generated_at)
 
 
+class ThematicRunRow(Base):
+    """One dated Thematic Analysis run (Tier 5, weekly).
+
+    Append-only and read back by id, unlike `council_snapshots` where only the newest row
+    is ever served: the whole point of a Run is that last week's themes stay readable.
+    `basket_count` is denormalised so the run picker can list every run without touching
+    the JSONB payload.
+    """
+
+    __tablename__ = "thematic_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run = Column(JSONB, nullable=False)                       # serialized ThematicRun
+    basket_count = Column(Integer, nullable=False, default=0)
+    source_count = Column(Integer, nullable=False, default=0)
+    generated_at = Column(DateTime(timezone=True), nullable=False)  # UTC at run time
+
+
+Index("idx_thematic_runs_generated_at", ThematicRunRow.generated_at)
+
+
 class PredictionRow(Base):
     """A single resolvable prediction, tracked over its window for the ledger (§7.3).
 

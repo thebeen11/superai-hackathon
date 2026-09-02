@@ -9,6 +9,9 @@ grades the bear-signpost checklist) and to Winston.
 The assembled `CouncilReport` is persisted as the latest snapshot. The whole thing is
 fault-isolated by callers (the discovery endpoint) so a council failure never breaks
 the upstream discovery.
+
+Thematic baskets are *not* part of this DAG. They run weekly on their own schedule —
+see `council/thematic.py`.
 """
 from __future__ import annotations
 
@@ -23,6 +26,7 @@ from ..db.repository import (
 )
 from ..events import Emit, noop_emit
 from ..models import CleanedItem, CouncilReport, DebateTurn, SourceRef, Stream
+from . import grounding
 from .analyst import run_analysts
 from .chairman import run_chairman
 from .debate import run_debate
@@ -35,42 +39,18 @@ _MAX_ITEMS = 200  # corpus cap fed into the council
 
 
 def _build_manifest(items: list[CleanedItem], report: CouncilReport) -> list[SourceRef]:
-    """One row per document the council read, tagged with the agents that quoted it.
-
-    This is the audit trail the UI's Sources page renders (§12.6). It is recorded on the
-    snapshot rather than recomputed from the live corpus, so a saved run still reports what
-    it was actually based on after the corpus moves on. Documents nobody cited are kept —
-    "read but not used" is a fact worth showing, not one to hide.
-    """
+    """The council's audit trail: who quoted what, over everything the run read (§12.6)."""
     cited: dict[str, set[str]] = {}
-
-    def _mark(agent: str, evidence) -> None:
-        for ev in evidence:
-            cited.setdefault(ev.source_url, set()).add(agent)
-
     for note in report.sector_notes:
         for stock in note.stocks:
-            _mark(f"Andie-{note.desk}", stock.evidence)
+            grounding.attribute(cited, f"Andie-{note.desk}", stock.evidence)
     if report.macro:
         for signpost in report.macro.signposts:
-            _mark("Macro Analyst", signpost.evidence)
-    for group in (report.indicators, report.baskets, report.briefing, report.predictions):
+            grounding.attribute(cited, "Macro Analyst", signpost.evidence)
+    for group in (report.indicators, report.briefing, report.predictions):
         for claim in group:
-            _mark("Winston", claim.evidence)
-
-    return [
-        SourceRef(
-            url=it.source_url,
-            title=it.title,
-            source_type=it.source_type,
-            stream=it.stream,
-            author=it.author,
-            published_at=it.published_at,
-            themes=list(it.themes),
-            cited_by=sorted(cited.get(it.source_url, ())),
-        )
-        for it in items
-    ]
+            grounding.attribute(cited, "Winston", claim.evidence)
+    return grounding.source_manifest(items, cited)
 
 
 def run_council(emit: Emit = noop_emit) -> CouncilReport:
@@ -120,7 +100,6 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
     report = CouncilReport(
         sector_notes=notes,
         debate=debate,
-        baskets=verdict.baskets,
         indicators=verdict.indicators,
         macro=macro_report,
         ace=verdict.ace,
@@ -132,7 +111,7 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
     report.sources = _build_manifest(items, report)
     save_council_snapshot(report)
     emit("council", "Council snapshot ready", status="ok",
-         baskets=len(report.baskets), briefing=len(report.briefing),
+         indicators=len(report.indicators), briefing=len(report.briefing),
          sources=len(report.sources),
          cited=sum(1 for s in report.sources if s.cited_by))
     return report

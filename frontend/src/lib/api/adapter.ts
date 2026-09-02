@@ -4,13 +4,16 @@
  * The backend implements only Layers 1–2 (Discovery + Data Engineering), so it
  * can fill the source-anchored slices of the dashboard from the persisted
  * `CleanedItem` rows: Sources, Trackers, Watchlist, Signal Volume, Indicators
- * (industry distribution), Sentiment (MACRO/MICRO mix), System health, Thematic
- * baskets (theme → tickers), Context preview. Everything downstream that needs
- * the agents themselves — the Bull/Bear debate, prediction ledger, pending
- * predictions, ACE index, chairman's briefing, upcoming catalysts, and the
- * conviction/return/verdict on baskets — comes from Tiers 3–5 (Andie / Freddy /
- * Winston), which are not built yet. Those stay empty so the UI can show an
- * explicit "awaiting Tier 3–5" state instead of fabricated numbers.
+ * (industry distribution), Sentiment (MACRO/MICRO mix), System health, Context
+ * preview. Everything downstream that needs the agents themselves — the Bull/Bear
+ * debate, prediction ledger, pending predictions, ACE index, chairman's briefing
+ * and upcoming catalysts — comes from Tiers 3–5 (Andie / Freddy / Winston). Those
+ * stay empty so the UI can show an explicit "awaiting Tier 3–5" state instead of
+ * fabricated numbers.
+ *
+ * Thematic baskets are NOT part of this snapshot. They run weekly on their own
+ * schedule and are read per-Run by the Thematic Analysis card — see
+ * `thematicRunToThemes` below and `wtaf.ts`.
  *
  * In live mode the snapshot is built on top of `emptyLiveData` (NOT the mock), so
  * an empty database renders empty states rather than mock data. `wtafMock` is used
@@ -41,18 +44,22 @@ import type {
   SourceDoc,
   SystemStatus,
   Theme,
+  ThematicRunRef,
+  Timeframe,
   Tier,
   Tracker,
   WatchItem,
   WatchlistEntry,
   WtafData,
 } from "../types";
+import { TIMEFRAMES } from "../types";
 import { tierTopology } from "../tiers";
 import type {
   CleanedItem,
   CouncilReport,
   DebateTurn as ApiDebateTurn,
   Evidence as ApiEvidence,
+  ThematicRun,
 } from "./generated/types.gen";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -117,8 +124,6 @@ export const emptyLiveData: WtafData = {
     speaker: "",
     score: 0,
   },
-  themes: [],
-  backtestThemes: [],
   signposts: null,
   ledger: [],
   predictions: [],
@@ -412,49 +417,6 @@ function deriveSystem(items: CleanedItem[], sources: Source[]): SystemStatus {
   };
 }
 
-function deriveThemes(items: CleanedItem[]): Theme[] {
-  const byTheme = new Map<
-    string,
-    { count: number; tickers: Map<string, number>; hosts: Set<string> }
-  >();
-  for (const it of items) {
-    const tickers = (it.entities ?? [])
-      .filter((e) => e.canonical.startsWith("$"))
-      .map((e) => e.canonical.replace(/^\$/, ""));
-    for (const theme of it.themes ?? []) {
-      const cur = byTheme.get(theme) ?? {
-        count: 0,
-        tickers: new Map<string, number>(),
-        hosts: new Set<string>(),
-      };
-      cur.count += 1;
-      cur.hosts.add(hostOf(it.source_url));
-      for (const tk of tickers)
-        cur.tickers.set(tk, (cur.tickers.get(tk) ?? 0) + 1);
-      byTheme.set(theme, cur);
-    }
-  }
-  return [...byTheme.entries()]
-    .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 6)
-    .map(([name, { count, tickers, hosts }]) => ({
-      name,
-      risk: "Med" as const,
-      horizon: "—",
-      ret: 0, // backtest is Tier 5 — shown as pending in the card
-      stocks: [...tickers.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([t]) => t),
-      strat: `${count} item${count === 1 ? "" : "s"} across ${hosts.size} source${hosts.size === 1 ? "" : "s"}`,
-      conviction: 0, // pending Chairman
-      verdict: "Awaiting Chairman verdict",
-      hold: "—",
-      // A theme rollup, not a Chairman call — there is no quote behind it to cite.
-      evidence: [],
-    }));
-}
-
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -522,11 +484,18 @@ function asWho(s: string): DebateTurn["who"] {
   return s === "bull" || s === "bear" || s === "winston" ? s : "winston";
 }
 
-/** Winston's baskets are the real thematic portfolios — they replace the heuristic. */
-function councilThemes(report: CouncilReport): Theme[] {
-  return (report.baskets ?? []).map((b) => ({
+/** Snap a backend timeframe onto the closed set, mirroring the server-side normaliser. */
+function asTimeframe(s: string | undefined): Timeframe {
+  const found = TIMEFRAMES.find((t) => t.toLowerCase() === (s ?? "").trim().toLowerCase());
+  return found ?? "Medium Term";
+}
+
+/** Winston's weekly baskets — the themes the Thematic Analysis card renders. */
+export function thematicRunToThemes(run: ThematicRun): Theme[] {
+  return (run.baskets ?? []).map((b) => ({
     name: b.name,
     risk: asRisk(b.risk),
+    timeframe: asTimeframe(b.timeframe),
     horizon: b.horizon || "—",
     ret: 0, // no backtest tier yet — card shows it as pending
     stocks: b.stocks ?? [],
@@ -535,6 +504,17 @@ function councilThemes(report: CouncilReport): Theme[] {
     verdict: b.verdict || undefined,
     hold: b.hold || undefined,
     evidence: evidenceList(b.evidence),
+  }));
+}
+
+/** Run headers for the picker. `generated_at` is the backend's clock, never the client's. */
+export function thematicRunRefs(
+  rows: { id: number; generated_at: string; basket_count?: number }[],
+): ThematicRunRef[] {
+  return rows.map((r) => ({
+    id: r.id,
+    generatedAt: r.generated_at,
+    basketCount: r.basket_count ?? 0,
   }));
 }
 
@@ -759,7 +739,6 @@ function activatedTiers(): Tier[] {
 /** Map a persisted CouncilReport onto the Tier 3–5 slices of the dashboard. */
 export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
   const debate = councilDebate(report);
-  const themes = councilThemes(report);
   const indicators = councilIndicators(report);
   const signposts = councilSignposts(report);
   const ace = councilAce(report);
@@ -771,7 +750,6 @@ export function councilToWtafData(report: CouncilReport): Partial<WtafData> {
   return {
     tiers: activatedTiers(),
     ...(debate ? { debate } : {}),
-    ...(themes.length ? { themes } : {}),
     ...(indicators.length ? { indicators } : {}),
     ...(signposts ? { signposts } : {}),
     ...(ace ? { ace } : {}),
@@ -801,7 +779,6 @@ export function itemsToWtafData(
   const signalVolume = deriveSignalVolume(items);
   const contextPreview = deriveContextPreview(items);
   const indicators = deriveIndicators(items);
-  const themes = deriveThemes(items);
 
   return {
     ...emptyLiveData,
@@ -814,7 +791,6 @@ export function itemsToWtafData(
     ...(signalVolume ? { signalVolume } : {}),
     ...(contextPreview ? { contextPreview } : {}),
     ...(indicators.length ? { indicators } : {}),
-    ...(themes.length ? { themes } : {}),
     sentiment: items.length ? deriveSentiment(items) : emptyLiveData.sentiment,
     system: items.length ? deriveSystem(items, sources) : emptyLiveData.system,
     // --- Tier 3–5 from the council snapshot (themes/indicators override the item

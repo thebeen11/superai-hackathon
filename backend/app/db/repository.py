@@ -18,6 +18,8 @@ from ..models import (
     ResolvedEntity,
     SourceType,
     Stream,
+    ThematicRun,
+    ThematicRunRef,
     TranscriptSegment,
     YoutubeChannel,
     YoutubeMatch,
@@ -28,6 +30,7 @@ from .tables import (
     CouncilSnapshotRow,
     PredictionRow,
     PromptOverrideRow,
+    ThematicRunRow,
     WatchlistOverrideRow,
     YoutubeChannelRow,
     YoutubeMatchRow,
@@ -190,6 +193,94 @@ def get_latest_council_snapshot() -> CouncilReport | None:
                 row.generated_at,
             )
             return None
+    finally:
+        session.close()
+
+
+# --- Thematic Analysis runs (Tier 5, weekly) --------------------------------
+#
+# Unlike council snapshots, every row here stays reachable: the run picker lists them and
+# reads any one back by id. `_thematic_run` applies the same "unparseable is absent, not
+# an error" posture as `get_latest_council_snapshot`.
+
+
+def save_thematic_run(run: ThematicRun) -> ThematicRun:
+    """Append a thematic run and return it carrying the id the database assigned."""
+    row = ThematicRunRow(
+        run=run.model_dump(mode="json"),
+        basket_count=len(run.baskets),
+        source_count=run.source_count,
+        generated_at=run.generated_at,
+    )
+    session = get_session()
+    try:
+        session.add(row)
+        session.commit()
+        run.id = row.id
+        return run
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist thematic run")
+        raise
+    finally:
+        session.close()
+
+
+def list_thematic_runs(limit: int = 52) -> list[ThematicRunRef]:
+    """Newest-first run headers for the picker. Never reads the JSONB payload."""
+    stmt = (
+        select(
+            ThematicRunRow.id,
+            ThematicRunRow.generated_at,
+            ThematicRunRow.basket_count,
+        )
+        .order_by(ThematicRunRow.generated_at.desc(), ThematicRunRow.id.desc())
+        .limit(limit)
+    )
+    session = get_session()
+    try:
+        return [
+            ThematicRunRef(id=r.id, generated_at=r.generated_at, basket_count=r.basket_count)
+            for r in session.execute(stmt).all()
+        ]
+    finally:
+        session.close()
+
+
+def _thematic_run(row: ThematicRunRow | None) -> ThematicRun | None:
+    if row is None:
+        return None
+    try:
+        run = ThematicRun.model_validate(row.run)
+    except ValidationError:
+        logger.exception(
+            "Thematic run id=%s does not match the current models; serving no run.",
+            row.id,
+        )
+        return None
+    run.id = row.id  # the payload predates its own row id on the first write
+    return run
+
+
+def get_thematic_run(run_id: int) -> ThematicRun | None:
+    """Read one run back by id, or None when it does not exist (or no longer parses)."""
+    session = get_session()
+    try:
+        return _thematic_run(session.get(ThematicRunRow, run_id))
+    finally:
+        session.close()
+
+
+def get_latest_thematic_run() -> ThematicRun | None:
+    """The most recent thematic run, or None before the first one has been made."""
+    stmt = (
+        select(ThematicRunRow)
+        .order_by(ThematicRunRow.generated_at.desc(), ThematicRunRow.id.desc())
+        .limit(1)
+    )
+    session = get_session()
+    try:
+        return _thematic_run(session.execute(stmt).scalars().first())
     finally:
         session.close()
 

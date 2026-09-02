@@ -302,11 +302,19 @@ class DebateRecord(BaseModel):
     transcript: list[DebateTurn] = Field(default_factory=list)
 
 
+# The three timeframes a basket may be filed under. Free-text `horizon`/`hold` say how
+# long Winston would *carry* the position; `timeframe` is the coarse bucket the dashboard
+# groups and filters by, so it is a closed set — anything else normalises to the middle.
+TIMEFRAMES = ("Short Term", "Medium Term", "Long Term")
+DEFAULT_TIMEFRAME = "Medium Term"
+
+
 class ThemeBasket(BaseModel):
-    """Tier 5 — a final thematic basket with the Chairman's conviction + hold period."""
+    """Tier 5 — a thematic basket with the Chairman's conviction, timeframe + hold period."""
 
     name: str
     risk: str = "Med"               # Low | Med | High
+    timeframe: str = DEFAULT_TIMEFRAME   # Short Term (1M) | Medium Term (1Q) | Long Term (1Y)
     horizon: str = "—"
     stocks: list[str] = Field(default_factory=list)
     strat: str = ""
@@ -437,6 +445,9 @@ class CouncilReport(BaseModel):
 
     sector_notes: list[SectorNote] = Field(default_factory=list)
     debate: DebateRecord | None = None
+    # Deprecated: thematic baskets moved to their own weekly run (`ThematicRun`). Kept so
+    # snapshots written before the split still validate — dropping the field would fail
+    # `model_validate` on every historical row, which `repository` reports as "no snapshot".
     baskets: list[ThemeBasket] = Field(default_factory=list)
     indicators: list[MacroIndicator] = Field(default_factory=list)
     macro: BearSignpostReport | None = None
@@ -448,3 +459,28 @@ class CouncilReport(BaseModel):
     source_count: int = 0
     generated_at: datetime = Field(default_factory=_now)
 
+
+# --- Thematic Analysis (Tier 5, weekly) --------------------------------------
+#
+# Winston's baskets run on their own cadence, not the nightly crawl's: a theme needs
+# more than one day of corpus to change meaningfully. Each execution is persisted whole
+# and dated, so the dashboard can read back what was believed on a given week rather
+# than only what is believed now.
+
+
+class ThematicRun(BaseModel):
+    """One dated Thematic Analysis run — the baskets plus the corpus they were drawn from."""
+
+    id: int | None = None           # assigned on persist; None before the row exists
+    baskets: list[ThemeBasket] = Field(default_factory=list)
+    sources: list[SourceRef] = Field(default_factory=list)  # every document read this run
+    source_count: int = 0
+    generated_at: datetime = Field(default_factory=_now)
+
+
+class ThematicRunRef(BaseModel):
+    """A run as it appears in the picker — enough to label it, without reading the payload."""
+
+    id: int
+    generated_at: datetime
+    basket_count: int = 0

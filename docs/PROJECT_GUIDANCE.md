@@ -55,8 +55,11 @@ take-profit targets. Recommendations are expressed as:
 **End outcome:**
 
 1. A **Macro Indicators** dashboard (fed by the MACRO data stream).
-2. **Thematic portfolios** of stock recommendations (e.g. "Memory Chips for the AI
-   Buildout: Micron, SK Hynix, SanDisk") each with an **estimated holding period**.
+2. **Thematic Analysis** — themed stock baskets (e.g. "Memory Chips for the AI
+   Buildout: Micron, SK Hynix, SanDisk"), each with an **estimated holding period**
+   and a **timeframe**: Short Term (~1 month), Medium Term (~1 quarter), Long Term
+   (~1 year). Produced **weekly**, not daily, and stored as dated **Runs** so past
+   weeks stay readable.
 3. **Backtest** validation: "if you invested $10,000 in this theme, how much would
    you have made over 3 / 6 / 12 months?" (buy-and-hold, no price triggers).
 
@@ -123,7 +126,7 @@ graph TD
     subgraph T5[Tier 5: Chairman]
         MacroDB -->|macro context| C1[Winston - Chairman]:::chairman
         DebateTranscript --> C1
-        C1 -->|Verdict| Portfolios[Final Thematic Portfolios + hold periods]
+        C1 -->|Verdict| Portfolios[Thematic Analysis - weekly Runs, timeframe + hold periods]
         C1 -->|Macro| Dash[Macro Indicators Dashboard]
     end
 
@@ -317,7 +320,7 @@ Sector Trends, Geopolitical Risk.
   leaderboard ranking channel/analyst accuracy (Brier-score style).
 - **Top 10 Quotes** of the week.
 - **Weekly Investment Thesis** — synthesized market outlook.
-- **Thematic + Stock-Specific Ideas** with Strategy / Risk / Timeline, plus AI
+- **Thematic + Stock-Specific Ideas** with Strategy / Risk / Timeframe / Timeline, plus AI
   follow-up questions critiquing assumptions and 2nd/3rd-order effects.
 - **Debate transcripts** — the logged Bull-vs-Bear argument behind each verdict.
 
@@ -376,8 +379,8 @@ class CompositeSignalGenerator:
 
 ## 10. UI / Page Map
 
-1. **Command Center (Dashboard)** — daily briefing, top macro shifts, thematic
-   portfolios, watchlist alerts.
+1. **Command Center (Dashboard)** — daily briefing, top macro shifts, Thematic
+   Analysis (weekly Runs, with a run picker and a timeframe filter), watchlist alerts.
 2. **Signal & Tracker Terminal** — keyword/semantic graphs + indicator heatmap.
 3. **Investment Thesis & Backtest** — themes, **View Debate Transcript**, backtest,
    What-If scenarios ("what if inflation prints 3.5% tomorrow?").

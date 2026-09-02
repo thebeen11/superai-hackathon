@@ -980,9 +980,57 @@ export type StockTake = {
 export type Stream = 'MACRO' | 'MICRO';
 
 /**
+ * ThematicRun
+ *
+ * One dated Thematic Analysis run — the baskets plus the corpus they were drawn from.
+ */
+export type ThematicRun = {
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Baskets
+     */
+    baskets?: Array<ThemeBasket>;
+    /**
+     * Sources
+     */
+    sources?: Array<SourceRef>;
+    /**
+     * Source Count
+     */
+    source_count?: number;
+    /**
+     * Generated At
+     */
+    generated_at?: string;
+};
+
+/**
+ * ThematicRunRef
+ *
+ * A run as it appears in the picker — enough to label it, without reading the payload.
+ */
+export type ThematicRunRef = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Generated At
+     */
+    generated_at: string;
+    /**
+     * Basket Count
+     */
+    basket_count?: number;
+};
+
+/**
  * ThemeBasket
  *
- * Tier 5 — a final thematic basket with the Chairman's conviction + hold period.
+ * Tier 5 — a thematic basket with the Chairman's conviction, timeframe + hold period.
  */
 export type ThemeBasket = {
     /**
@@ -993,6 +1041,10 @@ export type ThemeBasket = {
      * Risk
      */
     risk?: string;
+    /**
+     * Timeframe
+     */
+    timeframe?: string;
     /**
      * Horizon
      */
@@ -2369,6 +2421,118 @@ export type CouncilResolveResponses = {
 };
 
 export type CouncilResolveResponse = CouncilResolveResponses[keyof CouncilResolveResponses];
+
+export type RunThematicEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/thematic/run';
+};
+
+export type RunThematicEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThematicRun;
+};
+
+export type RunThematicEndpointResponse = RunThematicEndpointResponses[keyof RunThematicEndpointResponses];
+
+export type RunThematicStreamData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/thematic/run/stream';
+};
+
+export type RunThematicStreamResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ListThematicRunsEndpointData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * How many runs to list, newest first
+         */
+        limit?: number;
+    };
+    url: '/api/thematic/runs';
+};
+
+export type ListThematicRunsEndpointErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListThematicRunsEndpointError = ListThematicRunsEndpointErrors[keyof ListThematicRunsEndpointErrors];
+
+export type ListThematicRunsEndpointResponses = {
+    /**
+     * Response List Thematic Runs Endpoint
+     *
+     * Successful Response
+     */
+    200: Array<ThematicRunRef>;
+};
+
+export type ListThematicRunsEndpointResponse = ListThematicRunsEndpointResponses[keyof ListThematicRunsEndpointResponses];
+
+export type LatestThematicRunData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/thematic/runs/latest';
+};
+
+export type LatestThematicRunResponses = {
+    /**
+     * Response Latest Thematic Run
+     *
+     * Successful Response
+     */
+    200: ThematicRun | null;
+};
+
+export type LatestThematicRunResponse = LatestThematicRunResponses[keyof LatestThematicRunResponses];
+
+export type GetThematicRunEndpointData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: number;
+    };
+    query?: never;
+    url: '/api/thematic/runs/{run_id}';
+};
+
+export type GetThematicRunEndpointErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetThematicRunEndpointError = GetThematicRunEndpointErrors[keyof GetThematicRunEndpointErrors];
+
+export type GetThematicRunEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThematicRun;
+};
+
+export type GetThematicRunEndpointResponse = GetThematicRunEndpointResponses[keyof GetThematicRunEndpointResponses];
 
 export type ListItemsStreamData = {
     body?: never;

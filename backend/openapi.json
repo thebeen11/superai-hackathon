@@ -1617,6 +1617,158 @@
         }
       }
     },
+    "/api/thematic/run": {
+      "post": {
+        "summary": "Run Thematic Endpoint",
+        "description": "Run this week's Thematic Analysis and persist it as a dated run.\n\nThe target of the weekly `thematic-weekly` Cloud Scheduler job, and the manual trigger.",
+        "operationId": "run_thematic_endpoint",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThematicRun"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/thematic/run/stream": {
+      "post": {
+        "summary": "Run Thematic Stream",
+        "description": "Streaming version of /api/thematic/run (progress + job reconnect).",
+        "operationId": "run_thematic_stream",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/thematic/runs": {
+      "get": {
+        "summary": "List Thematic Runs Endpoint",
+        "description": "Dated run headers for the run picker, newest first.",
+        "operationId": "list_thematic_runs_endpoint",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "How many runs to list, newest first",
+              "default": 52,
+              "title": "Limit"
+            },
+            "description": "How many runs to list, newest first"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThematicRunRef"
+                  },
+                  "title": "Response List Thematic Runs Endpoint"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/thematic/runs/latest": {
+      "get": {
+        "summary": "Latest Thematic Run",
+        "description": "The most recent thematic run, or null before the first one has been made.",
+        "operationId": "latest_thematic_run",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ThematicRun"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Latest Thematic Run"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/thematic/runs/{run_id}": {
+      "get": {
+        "summary": "Get Thematic Run Endpoint",
+        "description": "One past run, by id.",
+        "operationId": "get_thematic_run_endpoint",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThematicRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/items/stream": {
       "get": {
         "summary": "List Items Stream",
@@ -3141,6 +3293,73 @@
         ],
         "title": "Stream"
       },
+      "ThematicRun": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "baskets": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeBasket"
+            },
+            "type": "array",
+            "title": "Baskets"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count",
+            "default": 0
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "title": "ThematicRun",
+        "description": "One dated Thematic Analysis run \u2014 the baskets plus the corpus they were drawn from."
+      },
+      "ThematicRunRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "basket_count": {
+            "type": "integer",
+            "title": "Basket Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "generated_at"
+        ],
+        "title": "ThematicRunRef",
+        "description": "A run as it appears in the picker \u2014 enough to label it, without reading the payload."
+      },
       "ThemeBasket": {
         "properties": {
           "name": {
@@ -3151,6 +3370,11 @@
             "type": "string",
             "title": "Risk",
             "default": "Med"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe",
+            "default": "Medium Term"
           },
           "horizon": {
             "type": "string",
@@ -3197,7 +3421,7 @@
           "name"
         ],
         "title": "ThemeBasket",
-        "description": "Tier 5 \u2014 a final thematic basket with the Chairman's conviction + hold period."
+        "description": "Tier 5 \u2014 a thematic basket with the Chairman's conviction, timeframe + hold period."
       },
       "ToolView": {
         "properties": {

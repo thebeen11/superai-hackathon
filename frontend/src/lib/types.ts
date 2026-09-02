@@ -199,9 +199,22 @@ export interface ContextPreview {
   score: number;
 }
 
+/** How long a theme's thesis needs to play out — the axis the card filters on. */
+export type Timeframe = "Short Term" | "Medium Term" | "Long Term";
+
+/** Human label for a timeframe, e.g. "Medium Term (1Q)". */
+export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
+  "Short Term": "1M",
+  "Medium Term": "1Q",
+  "Long Term": "1Y",
+};
+
+export const TIMEFRAMES: Timeframe[] = ["Short Term", "Medium Term", "Long Term"];
+
 export interface Theme {
   name: string;
   risk: RiskBand;
+  timeframe: Timeframe;
   horizon: string;
   ret: number;
   stocks: string[];
@@ -211,6 +224,14 @@ export interface Theme {
   verdict?: string;
   hold?: string;
   evidence: Evidence[];
+}
+
+/** One dated Thematic Analysis run, as it appears in the card's run picker. */
+export interface ThematicRunRef {
+  id: number;
+  /** ISO8601 UTC, from the backend — not the client clock. */
+  generatedAt: string;
+  basketCount: number;
 }
 
 export interface LedgerRow {
@@ -385,8 +406,6 @@ export interface WtafData {
   system: SystemStatus;
   trackers: Tracker[];
   contextPreview: ContextPreview;
-  themes: Theme[];
-  backtestThemes: string[];
   ledger: LedgerRow[];
   predictions: Prediction[];
   indicators: Indicator[];
