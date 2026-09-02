@@ -360,6 +360,10 @@ class Signpost(BaseModel):
     rationale: str = ""             # one line, grounded in the excerpts
     evidence: list[Evidence] = Field(default_factory=list)
     evidenced: bool = True          # False → nothing in the corpus speaks to it
+    # True → graded on the Macro Analyst's second pass, from material fetched for this row
+    # rather than from the crawled corpus. Defaulted, so snapshots written before the second
+    # pass existed still validate (same posture as the deprecated `CouncilReport.baskets`).
+    backfilled: bool = False
 
 
 class BearSignpostReport(BaseModel):

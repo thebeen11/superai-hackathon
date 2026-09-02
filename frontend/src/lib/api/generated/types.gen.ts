@@ -850,6 +850,10 @@ export type Signpost = {
      * Evidenced
      */
     evidenced?: boolean;
+    /**
+     * Backfilled
+     */
+    backfilled?: boolean;
 };
 
 /**

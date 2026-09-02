@@ -301,12 +301,12 @@ export const wtafMock: WtafData = {
   // The Macro Analyst's fixed bear-signpost checklist (backend: taxonomy.BEAR_SIGNPOSTS).
   signposts: {
     triggered: 2,
-    watch: 3,
+    watch: 4,
     total: 10,
-    riskScore: 0.35,
+    riskScore: 0.4,
     label: "MID CYCLE · WATCH",
     summary:
-      "Two signposts are lit — a still-inverted curve and narrow leadership — but credit and the labour market are holding. A widening in high-yield spreads would flip the picture.",
+      "Two signposts are lit — a still-inverted curve and narrow leadership — but credit and the labour market are holding. A widening in high-yield spreads would flip the picture. Second pass: 1 signpost(s) graded from 3 externally fetched source(s).",
     signposts: [
       { key: "yield_curve", name: "Yield Curve", status: "Triggered", rationale: "2s10s inverted 14 months and only partly re-steepened", evidenced: true, evidence: [{ quote: "the curve has been inverted for fourteen months now", sourceUrl: "https://example.com/macro-lens-curve" }] },
       { key: "credit_spreads", name: "Credit Spreads", status: "Clear", rationale: "high-yield spreads still near cycle tights", evidenced: true, evidence: [{ quote: "high yield is not blinking at all here", sourceUrl: "https://example.com/rate-watch-credit" }] },
@@ -316,7 +316,8 @@ export const wtafMock: WtafData = {
       { key: "breadth", name: "Market Breadth", status: "Triggered", rationale: "equal-weight badly lagging cap-weight", evidenced: true, evidence: [{ quote: "seven names are doing basically all of the work", sourceUrl: "https://example.com/compound-breadth" }] },
       { key: "policy", name: "Policy & Liquidity", status: "Watch", rationale: "QT ongoing, real rates still restrictive", evidenced: true, evidence: [{ quote: "the balance sheet is still shrinking every month", sourceUrl: "https://example.com/macro-lens-qt" }] },
       { key: "inflation", name: "Inflation Re-acceleration", status: "Clear", rationale: "core still cooling, services sticky but not turning", evidenced: true, evidence: [{ quote: "core came in at three tenths, in line", sourceUrl: "https://example.com/rate-watch-cpi" }] },
-      { key: "consumer", name: "Consumer Stress", status: "Clear", rationale: "Not evidenced in the current corpus.", evidenced: false, evidence: [] },
+      // Nothing in the corpus spoke to this row; the desk's second pass went and found it.
+      { key: "consumer", name: "Consumer Stress", status: "Watch", rationale: "card delinquencies up a fifth straight quarter; trade-down visible in staples", evidenced: true, backfilled: true, evidence: [{ quote: "credit card delinquency rates rose again in the second quarter", sourceUrl: "https://example.com/household-credit-q2" }] },
       { key: "sentiment", name: "Positioning & Euphoria", status: "Clear", rationale: "Not evidenced in the current corpus.", evidenced: false, evidence: [] },
     ],
   },
@@ -344,6 +345,8 @@ export const wtafMock: WtafData = {
     { url: "https://example.com/macro-lens-jobs", title: "Continuing claims creep higher", kind: "Web", host: "example.com", author: "Macro Lens", publishedAt: "2026-07-18", stream: "MACRO", themes: ["Labour Market"], tickers: [], citedBy: ["Macro Analyst"] },
     { url: "https://example.com/rate-watch-credit", title: "High yield is not blinking", kind: "Web", host: "example.com", author: "Rate Watch", publishedAt: "2026-07-17", stream: "MACRO", themes: ["Credit"], tickers: [], citedBy: ["Macro Analyst"] },
     { url: "https://example.com/capital-currents-valuation", title: "Twenty-two times for the index", kind: "Web", host: "example.com", author: "Capital Currents", publishedAt: "2026-07-16", stream: "MACRO", themes: ["Valuation"], tickers: [], citedBy: ["Macro Analyst"] },
+    // Fetched by the Macro Analyst's second pass, for the row the corpus left ungraded.
+    { url: "https://example.com/household-credit-q2", title: "Household debt and credit report, Q2", kind: "Web", host: "example.com", author: "Federal Reserve Bank of New York", publishedAt: "2026-07-14", stream: "MACRO", themes: ["Consumer"], tickers: [], citedBy: ["Macro Analyst"] },
     // Read, but nothing in the report leaned on it — the ledger shows this rather than hiding it.
     { url: "https://example.com/capital-currents-seasonality", title: "August seasonality in semis", kind: "Web", host: "example.com", author: "Capital Currents", publishedAt: "2026-07-15", stream: "MICRO", themes: ["Semiconductors"], tickers: ["$AMD"], citedBy: [] },
   ],

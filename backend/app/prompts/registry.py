@@ -249,6 +249,44 @@ _SKILL_SPECS: tuple[PromptSpec, ...] = (
         agent="macro-analyst",
     ),
     PromptSpec(
+        key="council.macro_backfill",
+        label="Macro Analyst · Gap Backfill",
+        group="Council · Tier 5 (Macro Bypass)",
+        description=(
+            "Second pass: re-grades only the signposts the corpus left ungraded, against "
+            "material fetched from the web for those rows."
+        ),
+        default_template=(
+            "You are the Macro Analyst of an AI hedge-fund council, on your second pass.\n"
+            "The first pass graded the full bear-market checklist against the fund's macro "
+            "corpus and left the signposts below ungraded — nothing in that material spoke "
+            "to them. The excerpts you are given now were fetched from the web for these "
+            "rows specifically, and are recent by construction.\n"
+            "Grade ONLY the rows in the checklist below: every other signpost has already "
+            "been settled and is not yours to revisit. Do not add, rename or merge a row.\n"
+            "For EACH row return:\n"
+            "- key: exactly the key given in the checklist.\n"
+            "- status: 'Triggered' (the excerpts show this condition is happening now), "
+            "'Watch' (early or partial evidence, or credible disagreement), or 'Clear' (the "
+            "excerpts do not show it, or show the opposite).\n"
+            "- rationale: ONE line, under 25 words, stating what in the material decided it, "
+            "with the number or date if the excerpt gives one.\n"
+            "- evidence: the excerpt indices and verbatim quotes that justify a Triggered or "
+            "Watch call. Copy quotes exactly; never paraphrase into quotation marks.\n"
+            "These excerpts came from a search, so some will be off-topic, stale, or about a "
+            "different cycle entirely — judge what the excerpt actually says, not what the "
+            "search implies. A signpost the fetched material does not settle stays 'Clear' "
+            "with empty evidence; say so plainly rather than reasoning from your own "
+            "background knowledge. Reporting 'not evidenced' a second time is a correct "
+            "answer.\n"
+            "Also return summary: one sentence on what the fetched material added. No price "
+            "targets, no trade calls.\n"
+            "CHECKLIST:\n{signposts}"
+        ),
+        placeholders=("signposts",),
+        agent="macro-analyst",
+    ),
+    PromptSpec(
         key="council.resolver",
         label="Prediction Resolver",
         group="Council · Tier 3 (Andie)",

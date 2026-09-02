@@ -5,11 +5,15 @@ council tests.
 """
 from __future__ import annotations
 
+import pytest
+
+from app.config import settings
 from app.council import macro as macro_mod
 from app.council.grounding import LLMEvidence as _LLMEvidence
 from app.council.macro import _LLMSignpost, _MacroOutput, run_macro_analyst
+from app.discovery.exa_source import SourceUnavailable
 from app.llm import ReasoningError
-from app.models import CleanedItem, SourceType, Stream
+from app.models import CleanedItem, SourceItem, SourceType, Stream
 from app.taxonomy import BEAR_SIGNPOSTS
 
 
@@ -204,3 +208,207 @@ def test_an_invented_row_name_still_matches_nothing_and_is_logged(monkeypatch, c
     assert all(s.status == "Clear" and not s.evidenced for s in report.signposts)
     assert all(s.rationale == "Not returned by the analyst." for s in report.signposts)
     assert "AI Capex Digestion" in caplog.text
+
+
+# --- Second pass: backfilling the rows the corpus left ungraded ------------------------
+
+
+def _hit(url="https://fred.example/2s10s", text="the 2s10s spread re-steepened to +18bp in May"):
+    """A web result the second pass would fetch for a gap."""
+    return SourceItem(source_type=SourceType.WEB, title="curve watch", url=url, text=text)
+
+
+def _graded(report, key):
+    return {s.key: s for s in report.signposts}[key]
+
+
+@pytest.fixture
+def backfill_on(monkeypatch):
+    """Small, deterministic caps so a test's expectations are about behaviour, not budget."""
+    monkeypatch.setattr(settings, "macro_backfill_enabled", True)
+    monkeypatch.setattr(settings, "macro_backfill_max_gaps", 6)
+    monkeypatch.setattr(settings, "macro_backfill_results_per_gap", 2)
+    monkeypatch.setattr(settings, "macro_backfill_max_items", 12)
+
+
+def _searches(monkeypatch, *hits, error: Exception | None = None) -> list[str]:
+    """Record every query the second pass runs; answer each with `hits` (or raise)."""
+    seen: list[str] = []
+
+    def fake(query, max_results=None, emit=None, **kwargs):
+        seen.append(query)
+        if error is not None:
+            raise error
+        return list(hits)
+
+    monkeypatch.setattr(macro_mod.exa_source, "search", fake)
+    return seen
+
+
+def _pass_one(monkeypatch, *signposts: _LLMSignpost):
+    """A first-pass report: `signposts` are graded, everything else is left ungraded."""
+    monkeypatch.setattr(macro_mod, "converse_structured", lambda *a, **k: _out(
+        *signposts, summary="Pass one summary."
+    ))
+    return run_macro_analyst([_item()])
+
+
+def test_second_pass_grades_a_gap_from_fetched_material(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch, _LLMSignpost(
+        key="unemployment", status="Watch", rationale="layoffs broadening",
+        evidence=[_LLMEvidence(quote="layoffs", source_index=0)],
+    ))
+    assert not _graded(report, "yield_curve").evidenced
+
+    queries = _searches(monkeypatch, _hit())
+    monkeypatch.setattr(macro_mod, "converse_structured", lambda *a, **k: _out(
+        _LLMSignpost(key="yield_curve", status="Triggered", rationale="re-steepening",
+                     evidence=[_LLMEvidence(quote="re-steepened to +18bp", source_index=0)]),
+        summary="ignored",
+    ))
+    merged, fetched = macro_mod.backfill_signposts(report, [_item()])
+
+    # One query per gap, built from the checklist entry itself.
+    assert len(queries) == settings.macro_backfill_max_gaps
+    assert any(q.startswith("Yield Curve latest data:") for q in queries)
+
+    row = _graded(merged, "yield_curve")
+    assert row.status == "Triggered" and row.evidenced and row.backfilled
+    assert row.evidence[0].source_url == "https://fred.example/2s10s"
+    # The tracker is re-tallied over the merged rows, and the fetched doc is handed back
+    # for the run's source manifest.
+    assert merged.triggered == 1 and merged.watch == 1
+    assert merged.risk_score == pytest.approx(1.5 / len(BEAR_SIGNPOSTS))
+    assert [it.source_url for it in fetched] == ["https://fred.example/2s10s"]
+    assert fetched[0].stream is Stream.MACRO
+    # Pass one's summary survives; the addendum is ours, not the model's.
+    assert merged.summary.startswith("Pass one summary.")
+    assert "Second pass: 1 signpost(s) graded from 1 externally fetched source(s)." in merged.summary
+
+
+def test_a_row_graded_in_the_first_pass_is_never_reopened(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch, _LLMSignpost(
+        key="yield_curve", status="Watch", rationale="inverted",
+        evidence=[_LLMEvidence(quote="inverted", source_index=0)],
+    ))
+    queries = _searches(monkeypatch, _hit())
+    # The second pass answers for a row it was not asked about.
+    monkeypatch.setattr(macro_mod, "converse_structured", lambda *a, **k: _out(
+        _LLMSignpost(key="yield_curve", status="Triggered", rationale="louder",
+                     evidence=[_LLMEvidence(quote="re-steepened", source_index=0)]),
+        summary="ignored",
+    ))
+    merged, _fetched = macro_mod.backfill_signposts(report, [])
+
+    assert all(not q.startswith("Yield Curve") for q in queries)
+    row = _graded(merged, "yield_curve")
+    assert row.status == "Watch" and row.rationale == "inverted" and not row.backfilled
+
+
+def test_an_ungrounded_second_pass_alarm_leaves_the_first_pass_row_alone(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch)
+    before = _graded(report, "yield_curve")
+    _searches(monkeypatch, _hit())
+    monkeypatch.setattr(macro_mod, "converse_structured", lambda *a, **k: _out(
+        # Cites an excerpt that does not exist → nothing survives grounding.
+        _LLMSignpost(key="yield_curve", status="Triggered", rationale="invented",
+                     evidence=[_LLMEvidence(quote="made up", source_index=42)]),
+        summary="ignored",
+    ))
+    merged, _fetched = macro_mod.backfill_signposts(report, [])
+
+    row = _graded(merged, "yield_curve")
+    assert row.status == "Clear" and not row.evidenced and not row.backfilled
+    # The gap keeps pass one's row verbatim, rather than being overwritten by a second
+    # empty one — an alarm the fetched material cannot back is not an alarm.
+    assert row is before
+    assert merged.risk_score == 0.0
+    assert "Second pass" not in merged.summary
+
+
+def test_no_exa_key_leaves_the_tracker_untouched_and_skips_the_llm(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch)
+    _searches(monkeypatch, error=SourceUnavailable("EXA_API_KEY not set"))
+
+    def boom(*_a, **_k):
+        raise AssertionError("the second pass must not reason with nothing to reason over")
+
+    monkeypatch.setattr(macro_mod, "converse_structured", boom)
+    merged, fetched = macro_mod.backfill_signposts(report, [])
+    assert merged is report and fetched == []
+
+
+def test_an_empty_hit_is_dropped_rather_than_cited(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch)
+    _searches(monkeypatch, _hit(text="   "))
+    monkeypatch.setattr(macro_mod, "converse_structured",
+                        lambda *a, **k: pytest.fail("nothing usable was fetched"))
+    merged, fetched = macro_mod.backfill_signposts(report, [])
+    assert merged is report and fetched == []
+
+
+def test_a_hit_already_in_the_corpus_is_not_fetched_twice(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch)
+    _searches(monkeypatch, _hit(url="already-known"))
+    monkeypatch.setattr(macro_mod, "converse_structured",
+                        lambda *a, **k: pytest.fail("every hit was already in the corpus"))
+    merged, fetched = macro_mod.backfill_signposts(report, [_item(url="already-known")])
+    assert merged is report and fetched == []
+
+
+def test_the_fetch_is_capped_by_gaps_and_by_items(monkeypatch, backfill_on):
+    monkeypatch.setattr(settings, "macro_backfill_max_gaps", 3)
+    monkeypatch.setattr(settings, "macro_backfill_max_items", 4)
+    report = _pass_one(monkeypatch)   # every row is a gap
+    queries: list[str] = []
+
+    def fake(query, max_results=None, emit=None, **kwargs):
+        queries.append(query)
+        return [_hit(url=f"{len(queries)}-{n}") for n in range(3)]
+
+    monkeypatch.setattr(macro_mod.exa_source, "search", fake)
+    monkeypatch.setattr(macro_mod, "converse_structured",
+                        lambda *a, **k: _out(summary="ignored"))
+    _merged, fetched = macro_mod.backfill_signposts(report, [])
+
+    assert len(queries) == 3                       # gaps capped, in checklist order
+    assert queries[0].startswith("Yield Curve")
+    assert len(fetched) == 4                       # 3 gaps x 3 hits, capped at 4 items
+
+
+def test_reasoning_failure_returns_the_first_pass_report_and_the_documents_read(
+    monkeypatch, backfill_on
+):
+    report = _pass_one(monkeypatch)
+    _searches(monkeypatch, _hit())
+
+    def boom(*_a, **_k):
+        raise ReasoningError("timeout", kind="timeout")
+
+    monkeypatch.setattr(macro_mod, "converse_structured", boom)
+    merged, fetched = macro_mod.backfill_signposts(report, [])
+    # Read but uncited: the manifest still records what the pass looked at.
+    assert merged is report and len(fetched) == 1
+
+
+def test_the_second_pass_can_be_switched_off(monkeypatch, backfill_on):
+    monkeypatch.setattr(settings, "macro_backfill_enabled", False)
+    report = _pass_one(monkeypatch)
+    queries = _searches(monkeypatch, _hit())
+    merged, fetched = macro_mod.backfill_signposts(report, [])
+    assert queries == [] and merged is report and fetched == []
+
+
+def test_the_backfill_prompt_carries_only_the_ungraded_rows(monkeypatch, backfill_on):
+    report = _pass_one(monkeypatch, _LLMSignpost(
+        key="yield_curve", status="Watch",
+        evidence=[_LLMEvidence(quote="inverted", source_index=0)],
+    ))
+    _searches(monkeypatch, _hit())
+    seen = _capture_system(monkeypatch, _out(summary="ignored"))
+    macro_mod.backfill_signposts(report, [])
+
+    assert len(seen) == 1
+    # The row pass one settled is off the table; the gaps it is asked about are on it.
+    assert "yield_curve" not in seen[0]
+    assert "credit_spreads" in seen[0] and "Credit Spreads" in seen[0]

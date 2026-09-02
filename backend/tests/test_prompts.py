@@ -29,11 +29,12 @@ def _no_layers(monkeypatch):
 def test_all_skill_prompts_registered_with_unique_keys():
     specs = list_skill_specs()
     keys = [s.key for s in specs]
-    assert len(specs) == 14
+    assert len(specs) == 15
     assert len(set(keys)) == len(specs)
     assert "council.chairman" in keys and "insights.context" in keys
     assert "council.thematic" in keys
     assert "council.macro" in keys and "insights.watchlist_match" in keys
+    assert "council.macro_backfill" in keys   # the Macro Analyst's second pass
     assert all(s.layer == "skill" and s.agent for s in specs)
 
 

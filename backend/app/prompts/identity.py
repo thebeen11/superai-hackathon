@@ -240,7 +240,9 @@ AGENTS: tuple[AgentSpec, ...] = (
         tier_label="Chairman",
         glyph="MA",
         accent="amber",
-        tools=(GEMINI, DB_ITEMS_READ),
+        # EXA_SEARCH is the second pass: when the corpus leaves a signpost ungraded, the
+        # desk goes and searches the web for that row (council/macro.py).
+        tools=(GEMINI, DB_ITEMS_READ, EXA_SEARCH),
         mental_models=("mental.inversion", "mental.base_rates", "mental.falsification"),
     ),
     AgentSpec(

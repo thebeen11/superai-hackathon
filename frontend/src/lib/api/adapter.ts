@@ -571,6 +571,7 @@ function councilSignposts(report: CouncilReport): BearSignposts | null {
     rationale: s.rationale ?? "",
     evidence: evidenceList(s.evidence),
     evidenced: s.evidenced ?? true,
+    backfilled: s.backfilled ?? false,
   }));
   return {
     signposts,

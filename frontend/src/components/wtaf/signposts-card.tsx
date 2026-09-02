@@ -53,7 +53,28 @@ function SignpostRow({
         {s.evidenced ? s.status : "no data"}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t-hi)" }}>{s.name}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t-hi)" }}>{s.name}</div>
+          {/* A row the corpus never spoke to, settled by the desk's second pass — worth
+              distinguishing from one the nightly crawl evidenced on its own. */}
+          {s.backfilled && (
+            <span
+              className="mono"
+              title="Graded on the Macro Analyst's second pass, from material fetched for this signpost"
+              style={{
+                fontSize: 9,
+                letterSpacing: 0.6,
+                color: "var(--t-faint)",
+                border: "1px solid var(--stroke)",
+                borderRadius: 3,
+                padding: "0 4px",
+                flexShrink: 0,
+              }}
+            >
+              2ND PASS
+            </span>
+          )}
+        </div>
         {s.rationale && (
           <div style={{ fontSize: 11.5, color: "var(--t-lo)", marginTop: 3, lineHeight: 1.4, textWrap: "pretty" }}>
             {s.rationale}

@@ -244,17 +244,68 @@ def test_run_council_runs_full_dag(monkeypatch):
 
     monkeypatch.setattr(orch, "run_analysts", fake_analysts)
     monkeypatch.setattr(orch, "run_debate", fake_debate)
+    def fake_backfill(report, corpus, emit=None):
+        calls.append("backfill")
+        # The second pass is stubbed here so this test stays about the DAG; its own
+        # behaviour is covered in tests/test_macro.py.
+        return report, []
+
     monkeypatch.setattr(orch, "run_macro_analyst", fake_macro)
+    monkeypatch.setattr(orch, "backfill_signposts", fake_backfill)
     monkeypatch.setattr(orch, "run_chairman", fake_chairman)
 
     report = orch.run_council()
-    assert calls == ["analysts", "debate", "macro", "chairman", "saved"]  # strict DAG order
+    # Strict DAG order — the second pass sits between the desk and the Chairman, so
+    # Winston rules on a tracker that has already been backfilled.
+    assert calls == ["analysts", "debate", "macro", "backfill", "chairman", "saved"]
     assert report.macro.triggered == 2                           # tracker persisted
     assert report.debate.verdict == "ruling"
     assert report.debate.transcript[-1].who == "winston"         # verdict stitched in
     assert report.briefing[0].text == "y"
     assert not report.baskets      # thematic baskets are a separate weekly run now
     assert report.source_count == 2
+
+
+def test_backfilled_documents_reach_winston_and_the_manifest(monkeypatch):
+    """The second pass's sources are run-scoped, so the DAG has to carry them by hand."""
+    from app.models import (
+        BearSignpostReport, DebateRecord, DebateSideMeta, SectorNote, Signpost,
+    )
+    from app.council.chairman import ChairmanVerdict
+
+    external = _item(url="fetched-by-the-second-pass", stream=Stream.MACRO)
+    monkeypatch.setattr(orch, "list_cleaned_items",
+                        lambda **k: [_item(stream=Stream.MICRO), _item(url="m", stream=Stream.MACRO)])
+    monkeypatch.setattr(orch, "save_council_snapshot", lambda r: None)
+    monkeypatch.setattr(orch, "run_analysts", lambda micro, emit=None: [SectorNote(desk="TMT")])
+    monkeypatch.setattr(orch, "run_debate", lambda notes, emit=None: DebateRecord(
+        bull=DebateSideMeta(name="b", model="m"), bear=DebateSideMeta(name="r", model="n")))
+    monkeypatch.setattr(orch, "run_macro_analyst",
+                        lambda macro, emit=None: BearSignpostReport(total=10))
+    monkeypatch.setattr(orch, "backfill_signposts", lambda report, corpus, emit=None: (
+        BearSignpostReport(total=10, triggered=1, signposts=[
+            Signpost(key="yield_curve", name="Yield Curve", status="Triggered",
+                     backfilled=True,
+                     evidence=[Evidence(quote="q", source_url=external.source_url)]),
+        ]),
+        [external],
+    ))
+
+    seen: dict = {}
+
+    def fake_chairman(notes, debate, macro, emit=None, macro_report=None, micro_items=None):
+        seen["macro_urls"] = [i.source_url for i in macro]
+        return ChairmanVerdict(verdict="ruling")
+
+    monkeypatch.setattr(orch, "run_chairman", fake_chairman)
+    report = orch.run_council()
+
+    # Winston can cite what the second pass fetched...
+    assert seen["macro_urls"] == ["m", "fetched-by-the-second-pass"]
+    # ...and the run's audit trail says the document was read, and by whom.
+    manifest = {s.url: s.cited_by for s in report.sources}
+    assert manifest["fetched-by-the-second-pass"] == ["Macro Analyst"]
+    assert report.source_count == 3
 
 
 # --- Source manifest (§12.6 audit trail) -------------------------------------

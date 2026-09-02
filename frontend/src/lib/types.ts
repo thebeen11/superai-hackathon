@@ -268,6 +268,9 @@ export interface Signpost {
   evidence: Evidence[];
   /** false → nothing in the corpus spoke to it; the row renders dimmed, not green. */
   evidenced: boolean;
+  /** true → graded on the Macro Analyst's second pass, from material fetched for this row
+   *  rather than from the crawled corpus. Older snapshots simply don't carry it. */
+  backfilled?: boolean;
 }
 
 /** A source-anchored quote backing any AI claim (no-orphan guardrail §12.6). */

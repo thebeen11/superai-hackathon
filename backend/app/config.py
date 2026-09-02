@@ -87,6 +87,19 @@ class Settings(BaseSettings):
     # if it were today's analysis. 0 disables the check.
     telegram_report_max_age_hours: int = 24
 
+    # --- Macro Analyst second pass (bear-signpost gap backfill) ---
+    # Pass 1 grades the fixed checklist against whatever `[MACRO]` material the crawl
+    # happened to bring in, so rows nothing spoke to come back unevidenced. Pass 2 searches
+    # the web for those rows specifically and re-grades only them (app/council/macro.py).
+    # The fetched documents are run-scoped: grounded, cited, recorded in the snapshot's
+    # source manifest — never written to `cleaned_items`. With no EXA_API_KEY the pass
+    # degrades to a recorded skip, the same posture as a missing discovery key.
+    macro_backfill_enabled: bool = True
+    macro_backfill_max_gaps: int = 6          # bounds Exa spend when pass 1 grades nothing
+    macro_backfill_results_per_gap: int = 2
+    macro_backfill_max_items: int = 12
+    macro_backfill_lookback_days: int = 45    # a signpost is a statement about *now*
+
     # --- Database (RDS Postgres) ---
     database_url: str | None = None
 

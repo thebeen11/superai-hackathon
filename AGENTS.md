@@ -128,6 +128,13 @@ Cross-cutting pieces that new code must go through rather than around:
   models / personality layers), fetched with `get_prompt(key, **placeholders)`. Runtime overrides
   are persisted by `prompts/store.py` and edited from the Agent Console via
   `GET/PUT/DELETE /api/prompts`. Adding a reasoning step means adding a spec, not a constant.
+- **The Macro Analyst runs twice.** Pass 1 grades the fixed checklist against the `[MACRO]`
+  corpus; `macro.backfill_signposts` then searches the web (one deterministic Exa query per
+  still-ungraded row) and re-grades *only* those rows. Backfill documents are run-scoped —
+  grounded, cited, and recorded in the snapshot's source manifest, but never written to
+  `cleaned_items`, so material fetched to answer one row of one run does not join the corpus
+  the desks and themes read. A row can only move up from unevidenced; one pass 1 grounded is
+  never re-opened, and `Signpost.backfilled` says which rows came from outside the corpus.
 - **Provenance guardrails.** `dataeng/guardrail.py` rejects items lacking a `source_url` or whose
   cleaned text isn't grounded in the source; `council/grounding.py` renders the corpus as a
   *numbered* excerpt list and maps the model's integer `source_index` back to a real URL, so a

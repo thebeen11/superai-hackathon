@@ -30,7 +30,7 @@ from . import grounding
 from .analyst import run_analysts
 from .chairman import run_chairman
 from .debate import run_debate
-from .macro import run_macro_analyst
+from .macro import backfill_signposts, run_macro_analyst
 from .resolver import resolve_due_predictions
 
 logger = logging.getLogger(__name__)
@@ -74,9 +74,14 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
     # Macro bypass — the Macro Analyst grades the bear-signpost checklist off the same
     # `[MACRO]` slice Winston sees, and hands him the tracker so his indicators agree with it.
     macro_report = run_macro_analyst(macro, emit=emit)
+    # Second pass: whatever the corpus left ungraded, the desk searches the web for and
+    # re-grades. `fetched` is run-scoped — not in `cleaned_items` — so it is carried by hand
+    # into Winston's citable corpus and into the manifest below.
+    macro_report, fetched = backfill_signposts(macro_report, macro, emit=emit)
     # Tier 5 — Winston chairman (fan-in) + macro bypass.
     verdict = run_chairman(
-        notes, debate, macro, emit=emit, macro_report=macro_report, micro_items=micro
+        notes, debate, macro + fetched, emit=emit,
+        macro_report=macro_report, micro_items=micro,
     )
 
     # Stitch the Chairman's verdict back onto the debate transcript.
@@ -97,6 +102,11 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
     except Exception:
         logger.exception("Prediction ledger scoring failed; continuing without it")
 
+    # Everything the run read: the corpus plus anything the second pass fetched (deduped —
+    # a backfill hit may already be in the corpus).
+    known = {it.source_url for it in items}
+    read = items + [it for it in fetched if it.source_url not in known]
+
     report = CouncilReport(
         sector_notes=notes,
         debate=debate,
@@ -106,9 +116,9 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
         briefing=verdict.briefing,
         predictions=verdict.predictions,
         ledger=ledger,
-        source_count=len(items),
+        source_count=len(read),
     )
-    report.sources = _build_manifest(items, report)
+    report.sources = _build_manifest(read, report)
     save_council_snapshot(report)
     emit("council", "Council snapshot ready", status="ok",
          indicators=len(report.indicators), briefing=len(report.briefing),
