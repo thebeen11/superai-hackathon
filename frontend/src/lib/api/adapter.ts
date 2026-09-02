@@ -656,7 +656,7 @@ function councilCatalysts(report: CouncilReport): Catalyst[] {
     return {
       d,
       m,
-      t: p.claim.length > 48 ? `${p.claim.slice(0, 47)}…` : p.claim,
+      t: p.claim,
       sub: `${p.by} · ${p.status ?? "pending"}`,
       tone: CATALYST_TONES[i % CATALYST_TONES.length],
     };

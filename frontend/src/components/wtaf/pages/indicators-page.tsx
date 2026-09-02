@@ -73,10 +73,10 @@ export function IndicatorsPage() {
           ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {d.catalysts.map((c, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: i < d.catalysts.length - 1 ? "1px solid var(--stroke)" : "none" }}>
-                <span className="mono" style={{ fontSize: 11, color: "var(--t-lo)", width: 46 }}>{c.d} {c.m}</span>
-                <span style={{ fontSize: 12.5, flex: 1 }}>{c.t}</span>
-                <span className="mono" style={{ fontSize: 10.5, color: "var(--t-faint)" }}>{c.sub.split(" · ")[0]}</span>
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "8px 0", borderBottom: i < d.catalysts.length - 1 ? "1px solid var(--stroke)" : "none" }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--t-lo)", width: 46, flexShrink: 0, lineHeight: 1.5 }}>{c.d} {c.m}</span>
+                <span style={{ fontSize: 12.5, flex: 1, minWidth: 0, lineHeight: 1.35, overflowWrap: "anywhere" }}>{c.t}</span>
+                <span className="mono" style={{ fontSize: 10.5, color: "var(--t-faint)", flexShrink: 0, whiteSpace: "nowrap", lineHeight: 1.6 }}>{c.sub.split(" · ")[0]}</span>
               </div>
             ))}
           </div>

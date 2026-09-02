@@ -57,14 +57,21 @@ export function CatalystsCard({ catalysts }: { catalysts: Catalyst[] }) {
               key={i}
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: 13,
                 padding: "9px 0",
                 borderBottom:
                   i < catalysts.length - 1 ? "1px solid var(--stroke)" : "none",
               }}
             >
-              <div style={{ textAlign: "center", width: 34, flexShrink: 0 }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  width: 34,
+                  flexShrink: 0,
+                  paddingTop: 1,
+                }}
+              >
                 <div
                   className="mono display"
                   style={{
@@ -83,17 +90,35 @@ export function CatalystsCard({ catalysts }: { catalysts: Catalyst[] }) {
               <div
                 style={{
                   width: 2,
-                  height: 26,
+                  flexShrink: 0,
+                  alignSelf: "stretch",
+                  minHeight: 26,
                   borderRadius: 2,
                   background: toneC[c.tone],
                   boxShadow: `0 0 8px ${toneC[c.tone]}`,
                 }}
               />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{c.t}</div>
+              {/* minWidth:0 + overflowWrap let a full claim wrap onto as many
+                  lines as it needs instead of being clipped by .card overflow */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    lineHeight: 1.35,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {c.t}
+                </div>
                 <div
                   className="mono"
-                  style={{ fontSize: 10.5, color: "var(--t-lo)", marginTop: 1 }}
+                  style={{
+                    fontSize: 10.5,
+                    color: "var(--t-lo)",
+                    marginTop: 2,
+                    overflowWrap: "anywhere",
+                  }}
                 >
                   {c.sub}
                 </div>
