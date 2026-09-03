@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
-import { useShellActions } from "@/providers/shell-ui-provider";
 import { Card, MiniBar, EmptyState } from "../primitives";
 import { PageHead, PageButton, ScanToggle, IconButton, RowCheckbox } from "../shared";
-import { DebateCard } from "../command-center/debate-card";
+import { TickerDebateCard } from "../ticker-debate-card";
 import { EvidenceList, SourceLink } from "../source-link";
 import { fmtChange, fmtPrice, hasQuote } from "@/lib/format";
 import { bulkDeleteWatchlist, deleteWatchlistItem, getYoutubeMatches, setWatchlistActive } from "@/lib/api/wtaf";
@@ -260,7 +259,6 @@ export function WatchlistPage() {
 
 export function TickerDetailPage({ ticker }: { ticker: string }) {
   const d = useWtafData();
-  const { onOpenDebate } = useShellActions();
   const item = d.watchlist.find((w) => w.t.toUpperCase() === ticker.toUpperCase());
   // Desk calls and documents are keyed on the "$NVDA" form the backend resolves entities to.
   const sym = `$${ticker.replace(/^\$/, "").toUpperCase()}`;
@@ -309,8 +307,9 @@ export function TickerDetailPage({ ticker }: { ticker: string }) {
           </div>
         </Card>
 
-        {/* Debate Chamber — reuses the app's Bull vs Bear structure */}
-        <DebateCard debate={d.debate} tiers={d.tiers} onOpenDebate={onOpenDebate} />
+        {/* Debate Chamber, scoped to this ticker — Freddy argues only $SYM, over the
+            sources that mention it. The council-wide chamber stays on the Command Center. */}
+        <TickerDebateCard key={sym} ticker={sym} tiers={d.tiers} />
 
         {/* The desk's call on this ticker, with the quotes it was grounded on. */}
         <Card title="Analyst Evidence" sub={`desk calls on ${item.t}`} className="span5">

@@ -131,6 +131,131 @@ def test_debate_uses_two_model_families(monkeypatch):
     assert used_models[0] != used_models[1]
 
 
+# --- Tier 4b: the single-ticker chamber --------------------------------------
+
+
+def _ticker_debate_env(monkeypatch, items, *, verdict="hold half", evidence=None, snapshot=None):
+    """Wire the ticker chamber up to fakes and return the list of saved runs."""
+    from app.council import ticker_debate as td
+
+    saved: list = []
+    monkeypatch.setattr(td, "list_cleaned_items", lambda **k: items)
+    monkeypatch.setattr(td, "get_latest_council_snapshot", lambda: snapshot)
+    monkeypatch.setattr(td, "save_ticker_debate_run", lambda r: (saved.append(r), r)[1])
+
+    def fake_rounds(schema, system, user, *, model_id=None, **k):
+        if "Bull" in system:
+            return schema(stance="long", argument="buy it")
+        return schema(stance="short", rebuttal="sell it")
+
+    monkeypatch.setattr(debate_mod, "converse_structured", fake_rounds)
+    monkeypatch.setattr(
+        td, "converse_structured",
+        lambda schema, system, user, **k: schema(verdict=verdict, evidence=evidence or []),
+    )
+    return td, saved
+
+
+def test_ticker_debate_argues_only_its_own_corpus(monkeypatch):
+    """The whole point of the single-emiten chamber: it reads the ticker's items, not all."""
+    seen: dict = {}
+    td, saved = _ticker_debate_env(monkeypatch, [])
+    monkeypatch.setattr(td, "list_cleaned_items",
+                        lambda **k: (seen.update(k), [_item(url="a", text="micron demand")])[1])
+
+    run = td.run_ticker_debate("mu")
+
+    assert seen["ticker"] == "$MU"           # bare input canonicalised for the entity filter
+    assert run.ticker == "$MU"
+    assert run.source_count == 1
+    assert saved == [run]                    # persisted whole, exactly once
+
+
+def test_ticker_debate_closes_with_a_winston_verdict(monkeypatch):
+    td, _ = _ticker_debate_env(monkeypatch, [_item(url="a")], verdict="half position")
+
+    run = td.run_ticker_debate("$NVDA")
+    record = run.debate
+
+    # Six alternating Freddy rounds, then Winston — the same shape the council-wide
+    # chamber produces, so the card and the transcript modal need no special case.
+    assert [t.who for t in record.transcript] == ["bull", "bear"] * 3 + ["winston"]
+    assert record.transcript[-1].round == "Verdict"
+    assert record.verdict == "half position"
+    assert record.topic == "$NVDA · Bull vs Bear"
+
+
+def test_ticker_debate_uses_the_desks_standing_call_as_context(monkeypatch):
+    """The desks already formed a view on this name; the chamber must not ignore it."""
+    from app.models import CouncilReport, SectorNote, StockTake
+
+    snapshot = CouncilReport(sector_notes=[SectorNote(
+        desk="TMT", summary="chips",
+        stocks=[StockTake(ticker="$NVDA", conviction=0.7, horizon="6M", rationale="demand"),
+                StockTake(ticker="$AAPL", conviction=-0.1, horizon="3M")],
+    )])
+    briefs: list[str] = []
+    td, _ = _ticker_debate_env(monkeypatch, [_item(url="a")], snapshot=snapshot)
+    monkeypatch.setattr(
+        debate_mod, "converse_structured",
+        lambda schema, system, user, **k: (
+            briefs.append(user),
+            schema(stance="s", argument="a") if "Bull" in system else schema(stance="s", rebuttal="r"),
+        )[1],
+    )
+
+    td.run_ticker_debate("NVDA")
+
+    assert "Desk TMT: conviction +0.70 (6M) — demand" in briefs[0]
+    assert "$AAPL" not in briefs[0]          # one name only; no drift into the desk's others
+
+
+def test_ticker_debate_with_no_matching_sources_persists_an_empty_run(monkeypatch):
+    """A ticker nothing mentions must read as 'ran, found nothing', not as a 500."""
+    td, saved = _ticker_debate_env(monkeypatch, [])
+
+    run = td.run_ticker_debate("ZZZZ")
+
+    assert saved == [run]                    # the empty run is still recorded, and dated
+    assert run.ticker == "$ZZZZ"
+    assert run.source_count == 0
+    assert run.debate.transcript == [] and run.debate.verdict == ""
+
+
+def test_ticker_verdict_citing_a_bogus_index_is_shown_unsourced(monkeypatch):
+    """An index the model invented must not become a URL (no-orphan guardrail §12.6)."""
+    td, _ = _ticker_debate_env(
+        monkeypatch, [_item(url="real")],
+        evidence=[_LLMEvidence(quote="q", source_index=0),
+                  _LLMEvidence(quote="made up", source_index=99)],
+    )
+
+    run = td.run_ticker_debate("NVDA")
+
+    assert [e.source_url for e in run.verdict_evidence] == ["real"]
+    assert run.debate.verdict            # the ruling survives, just partly un-anchored
+    assert run.sources[0].cited_by == ["Winston"]
+
+
+def test_ticker_debate_survives_a_failed_verdict(monkeypatch):
+    """The transcript is already paid for; losing it because the ruling failed is worse."""
+    from app.council import ticker_debate as td_mod
+    from app.llm import ReasoningError
+
+    td, saved = _ticker_debate_env(monkeypatch, [_item(url="a")])
+
+    def boom(*_a, **_k):
+        raise ReasoningError("no", kind="schema_validation")
+
+    monkeypatch.setattr(td_mod, "converse_structured", boom)
+
+    run = td.run_ticker_debate("NVDA")
+
+    assert len(run.debate.transcript) == 6      # six Freddy rounds kept
+    assert run.debate.verdict == ""
+    assert saved == [run]
+
+
 # --- Tier 5: Winston ---------------------------------------------------------
 
 def test_chairman_builds_dashboard(monkeypatch):

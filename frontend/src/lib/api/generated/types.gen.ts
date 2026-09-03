@@ -1080,6 +1080,63 @@ export type ThemeBasket = {
 };
 
 /**
+ * TickerDebateRun
+ *
+ * One dated single-ticker debate — the transcript plus the corpus it was drawn from.
+ */
+export type TickerDebateRun = {
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Ticker
+     */
+    ticker: string;
+    debate: DebateRecord;
+    /**
+     * Verdict Evidence
+     */
+    verdict_evidence?: Array<Evidence>;
+    /**
+     * Sources
+     */
+    sources?: Array<SourceRef>;
+    /**
+     * Source Count
+     */
+    source_count?: number;
+    /**
+     * Generated At
+     */
+    generated_at?: string;
+};
+
+/**
+ * TickerDebateRunRef
+ *
+ * A run as it appears in the picker — enough to label it, without reading the payload.
+ */
+export type TickerDebateRunRef = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Ticker
+     */
+    ticker: string;
+    /**
+     * Generated At
+     */
+    generated_at: string;
+    /**
+     * Turns
+     */
+    turns?: number;
+};
+
+/**
  * ToolView
  *
  * One executable capability an agent can call (read-only in the console).
@@ -2537,6 +2594,169 @@ export type GetThematicRunEndpointResponses = {
 };
 
 export type GetThematicRunEndpointResponse = GetThematicRunEndpointResponses[keyof GetThematicRunEndpointResponses];
+
+export type RunTickerDebateEndpointData = {
+    body?: never;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+    };
+    query?: never;
+    url: '/api/tickers/{ticker}/debate';
+};
+
+export type RunTickerDebateEndpointErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RunTickerDebateEndpointError = RunTickerDebateEndpointErrors[keyof RunTickerDebateEndpointErrors];
+
+export type RunTickerDebateEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: TickerDebateRun;
+};
+
+export type RunTickerDebateEndpointResponse = RunTickerDebateEndpointResponses[keyof RunTickerDebateEndpointResponses];
+
+export type RunTickerDebateStreamData = {
+    body?: never;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+    };
+    query?: never;
+    url: '/api/tickers/{ticker}/debate/stream';
+};
+
+export type RunTickerDebateStreamErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RunTickerDebateStreamError = RunTickerDebateStreamErrors[keyof RunTickerDebateStreamErrors];
+
+export type RunTickerDebateStreamResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ListTickerDebatesData = {
+    body?: never;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * How many runs to list, newest first
+         */
+        limit?: number;
+    };
+    url: '/api/tickers/{ticker}/debates';
+};
+
+export type ListTickerDebatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTickerDebatesError = ListTickerDebatesErrors[keyof ListTickerDebatesErrors];
+
+export type ListTickerDebatesResponses = {
+    /**
+     * Response List Ticker Debates
+     *
+     * Successful Response
+     */
+    200: Array<TickerDebateRunRef>;
+};
+
+export type ListTickerDebatesResponse = ListTickerDebatesResponses[keyof ListTickerDebatesResponses];
+
+export type LatestTickerDebateData = {
+    body?: never;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+    };
+    query?: never;
+    url: '/api/tickers/{ticker}/debates/latest';
+};
+
+export type LatestTickerDebateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LatestTickerDebateError = LatestTickerDebateErrors[keyof LatestTickerDebateErrors];
+
+export type LatestTickerDebateResponses = {
+    /**
+     * Response Latest Ticker Debate
+     *
+     * Successful Response
+     */
+    200: TickerDebateRun | null;
+};
+
+export type LatestTickerDebateResponse = LatestTickerDebateResponses[keyof LatestTickerDebateResponses];
+
+export type GetTickerDebateData = {
+    body?: never;
+    path: {
+        /**
+         * Ticker
+         */
+        ticker: string;
+        /**
+         * Run Id
+         */
+        run_id: number;
+    };
+    query?: never;
+    url: '/api/tickers/{ticker}/debates/{run_id}';
+};
+
+export type GetTickerDebateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetTickerDebateError = GetTickerDebateErrors[keyof GetTickerDebateErrors];
+
+export type GetTickerDebateResponses = {
+    /**
+     * Successful Response
+     */
+    200: TickerDebateRun;
+};
+
+export type GetTickerDebateResponse = GetTickerDebateResponses[keyof GetTickerDebateResponses];
 
 export type ListItemsStreamData = {
     body?: never;

@@ -57,8 +57,10 @@ import { tierTopology } from "../tiers";
 import type {
   CleanedItem,
   CouncilReport,
+  DebateRecord as ApiDebateRecord,
   DebateTurn as ApiDebateTurn,
   Evidence as ApiEvidence,
+  SourceRef as ApiSourceRef,
   ThematicRun,
 } from "./generated/types.gen";
 
@@ -199,6 +201,28 @@ function deriveSourceDocs(items: CleanedItem[]): SourceDoc[] {
   }));
 }
 
+/**
+ * A run's own source manifest → the document rows the UI renders.
+ *
+ * `deriveSourceDocs` reads the *live* corpus; this reads what one run actually read, with
+ * the `cited_by` it was recorded with. For a run you can re-open weeks later that is the
+ * honest ledger — the corpus underneath it has moved on since.
+ */
+export function sourceRefsToDocs(refs: ApiSourceRef[]): SourceDoc[] {
+  return refs.map((s) => ({
+    url: s.url,
+    title: s.title || s.url,
+    kind: s.source_type === "youtube" ? "YouTube" : "Web",
+    host: hostOf(s.url),
+    author: s.author ?? undefined,
+    publishedAt: s.published_at ?? undefined,
+    stream: s.stream,
+    themes: s.themes ?? [],
+    tickers: [],
+    citedBy: s.cited_by ?? [],
+  }));
+}
+
 /** Backend `Evidence` → frontend shape, keeping the timestamp the deep link needs. */
 function evidenceOf(e: ApiEvidence): Evidence {
   return {
@@ -208,7 +232,7 @@ function evidenceOf(e: ApiEvidence): Evidence {
   };
 }
 
-const evidenceList = (e: ApiEvidence[] | undefined | null): Evidence[] =>
+export const evidenceList = (e: ApiEvidence[] | undefined | null): Evidence[] =>
   (e ?? []).map(evidenceOf);
 
 function deriveTrackers(items: CleanedItem[]): Tracker[] {
@@ -518,9 +542,14 @@ export function thematicRunRefs(
   }));
 }
 
-function councilDebate(report: CouncilReport): Debate | null {
-  const d = report.debate;
-  if (!d) return null;
+/**
+ * A backend `DebateRecord` as the Debate Chamber renders it.
+ *
+ * Shared by the council-wide debate on the snapshot and a single-ticker debate run, so
+ * both chambers are one mapping — a ticker transcript that drifted from the council's
+ * would render differently in the same card.
+ */
+export function debateRecordToDebate(d: ApiDebateRecord): Debate {
   return {
     topic: d.topic ?? "",
     round: d.round ?? 0,
@@ -547,6 +576,10 @@ function councilDebate(report: CouncilReport): Debate | null {
       }),
     ),
   };
+}
+
+function councilDebate(report: CouncilReport): Debate | null {
+  return report.debate ? debateRecordToDebate(report.debate) : null;
 }
 
 function councilIndicators(report: CouncilReport): Indicator[] {

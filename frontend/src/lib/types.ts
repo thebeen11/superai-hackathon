@@ -234,6 +234,15 @@ export interface ThematicRunRef {
   basketCount: number;
 }
 
+/** One dated single-ticker debate, as the run picker on a ticker page lists it. */
+export interface TickerDebateRunRef {
+  id: number;
+  ticker: string;
+  /** ISO8601 UTC, from the backend — not the client clock. */
+  generatedAt: string;
+  turns: number;
+}
+
 export interface LedgerRow {
   rank: number;
   name: string;

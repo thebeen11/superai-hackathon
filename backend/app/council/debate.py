@@ -65,34 +65,56 @@ def _topic(notes: list[SectorNote]) -> str:
     return f"Basket debate: {', '.join(top)}" if top else "Sector outlook debate"
 
 
-def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
-    """Multi-round Bull/Bear debate over the desk notes. Verdict is added by Winston."""
+def run_rounds(
+    topic: str,
+    brief: str,
+    *,
+    bull_key: str = "council.debate.bull",
+    bear_key: str = "council.debate.bear",
+    prompt_values: dict[str, str] | None = None,
+    subject: str = "",
+    emit: Emit = noop_emit,
+) -> DebateRecord:
+    """Run the chamber's alternating turns over `brief` and log the transcript.
+
+    The protocol — who opens, how many turns, that every speaker sees the whole exchange —
+    belongs to the chamber, not to what is being argued about. So the council-wide debate
+    and the single-ticker one (`council.ticker_debate`) share this loop and differ only in
+    the `brief` they argue over and the prompts they argue with.
+
+    `brief` is the whole context block, already rendered by the caller. `subject` is an
+    optional tag for the progress messages ("$MU"), so a ticker run reads as its own in the
+    activity feed; the stage stays `council.debate` either way, which is what routes these
+    events to Freddy in the UI. The verdict is added by Winston, not here.
+    """
     bull = DebateSideMeta(name=_BULL_NAME, model=_BULL_MODEL)
     bear = DebateSideMeta(name=_BEAR_NAME, model=_BEAR_MODEL)
     plan = _ROUND_PLAN[: max(1, settings.debate_rounds)]
-    record = DebateRecord(topic=_topic(notes), round=0, rounds=len(plan), bull=bull, bear=bear)
-
-    digest = _notes_digest(notes)
+    record = DebateRecord(topic=topic, round=0, rounds=len(plan), bull=bull, bear=bear)
+    values = prompt_values or {}
+    tag = f"{subject} · " if subject else ""
 
     try:
         for i, (who, label, instruction) in enumerate(plan, start=1):
-            emit("council.debate", f"Freddy: {label}, round {i}",
+            emit("council.debate", f"Freddy: {tag}{label}, round {i}",
                  status="start" if i == 1 else "progress")
 
             is_bull = who == "bull"
             schema = _BullTurn if is_bull else _BearTurn
-            prompt_key = "council.debate.bull" if is_bull else "council.debate.bear"
+            prompt_key = bull_key if is_bull else bear_key
             model_id = settings.gemini_bull_model if is_bull else settings.gemini_bear_model
 
             # Every turn sees the whole exchange so far, so later rounds engage with what
             # was actually said instead of re-arguing the opener.
             so_far = "\n".join(f"[{t.label}] {t.text}" for t in record.transcript)
             user = (
-                f"Desk notes:\n{digest}\n\n"
+                f"{brief}\n\n"
                 f"Debate so far:\n{so_far or 'Nothing yet — you open.'}\n\n"
                 f"Round {i} of {len(plan)}: {instruction}"
             )
-            turn = converse_structured(schema, get_prompt(prompt_key), user, model_id=model_id)
+            turn = converse_structured(
+                schema, get_prompt(prompt_key, **values), user, model_id=model_id
+            )
 
             side = bull if is_bull else bear
             side.stance = turn.stance
@@ -103,5 +125,11 @@ def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
         logger.warning("Debate aborted: %s", exc)
         emit("council.debate", f"Debate degraded: {exc.kind}", status="skip")
 
-    emit("council.debate", "Freddy: debate logged", status="ok", turns=len(record.transcript))
+    emit("council.debate", f"Freddy: {tag}debate logged", status="ok",
+         turns=len(record.transcript))
     return record
+
+
+def run_debate(notes: list[SectorNote], emit: Emit = noop_emit) -> DebateRecord:
+    """Multi-round Bull/Bear debate over the desk notes. Verdict is added by Winston."""
+    return run_rounds(_topic(notes), f"Desk notes:\n{_notes_digest(notes)}", emit=emit)

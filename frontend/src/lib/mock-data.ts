@@ -1,5 +1,15 @@
 /* ============ WTAF — mock data layer ============ */
-import type { Theme, ThematicRunRef, WtafData, YoutubeChannel, YoutubeMatch } from "./types";
+import type {
+  Debate,
+  Evidence,
+  SourceDoc,
+  Theme,
+  ThematicRunRef,
+  TickerDebateRunRef,
+  WtafData,
+  YoutubeChannel,
+  YoutubeMatch,
+} from "./types";
 
 const sentimentWave = [
   0.42, 0.45, 0.5, 0.58, 0.55, 0.6, 0.72, 0.68, 0.74, 0.82, 0.78, 0.7, 0.66,
@@ -566,4 +576,109 @@ export function thematicRunMock(
   const run = runId === undefined ? undefined : thematicRunsMock[runId];
   if (run === undefined || runId === undefined) return null;
   return { id: runId, generatedAt: run.generatedAt, themes: run.themes };
+}
+
+
+/* ---- Single-ticker Debate Chamber (offline UI work) ---- */
+//
+// Keyed by ticker so /watchlist/NVDA and /watchlist/AVGO read differently in mock mode —
+// the whole point of the feature is that ticker pages stop showing one shared transcript.
+// Only NVDA is scripted; every other watchlist name returns nothing, which is what
+// exercises the empty state the live path shows before a name has ever been debated.
+
+const tickerDebateSources: SourceDoc[] = [
+  {
+    url: "https://www.youtube.com/watch?v=mockSilicon1",
+    title: "The Accelerator Buildout, Revisited",
+    kind: "YouTube",
+    host: "youtube.com",
+    author: "Silicon Signals",
+    publishedAt: "2026-08-29T00:00:00Z",
+    stream: "MICRO",
+    themes: ["Semiconductors"],
+    tickers: ["$NVDA"],
+    citedBy: ["Winston"],
+  },
+  {
+    url: "https://example.com/mock/hyperscaler-capex",
+    title: "Hyperscaler capex guides higher into Q4",
+    kind: "Web",
+    host: "example.com",
+    author: "Trade Desk Wire",
+    publishedAt: "2026-08-30T00:00:00Z",
+    stream: "MICRO",
+    themes: ["AI Infrastructure"],
+    tickers: ["$NVDA"],
+    citedBy: [],
+  },
+];
+
+const nvdaDebate: Debate = {
+  topic: "$NVDA · Bull vs Bear",
+  round: 6,
+  rounds: 6,
+  bull: {
+    name: "Freddy-Bull",
+    model: "Gemini 3.1 Pro",
+    accent: "green",
+    stance: "Capex guides are still going up and the backlog is contracted — own it into the buildout.",
+  },
+  bear: {
+    name: "Freddy-Bear",
+    model: "Gemini 3.6 Flash",
+    accent: "red",
+    stance: "One customer cohort, all in-housing their own accelerators. Size it as the single-factor bet it is.",
+  },
+  verdict:
+    "Bull's demand read holds and the sources support it. Bear's concentration point is the real risk, not valuation — full weight, reviewed on the next hyperscaler capex guide.",
+  transcript: [
+    { who: "bull", round: "R1", label: "Bull · proposes", text: "Every capex guide in the sources moves the same direction, and the constraint named repeatedly is power, not demand. Backlog here is contracted, not spot. Six-month long." },
+    { who: "bear", round: "R2", label: "Bear · attacks", text: "Contracted by whom? Four buyers, each of whom has publicly floated in-housing their accelerators. This is not a market, it is a customer list — and customer lists re-negotiate." },
+    { who: "bull", round: "R3", label: "Bull · defends", text: "Concentration is fair and I will not argue it away. But in-housing has been floated for three years and the same four buyers guided capex higher again this quarter. Intent is not capacity." },
+    { who: "bear", round: "R4", label: "Bear · presses", text: "Then name the trigger. Mine is one hyperscaler disclosing a silicon program at volume. That is a single headline, and nothing in these sources tells you it is not already in qualification." },
+    { who: "bull", round: "R5", label: "Bull · refines", text: "Accepted — full weight, six-month hold, reviewed on the next capex guide rather than on headline risk. If a program lands at volume the thesis is wrong and I will say so then." },
+    { who: "bear", round: "R6", label: "Bear · closes", text: "The one thing to weigh: the downside here is not a de-rating, it is the demand curve itself moving in-house. That does not stop at the multiple you underwrote." },
+    { who: "winston", round: "Verdict", label: "Winston · rules", text: "Bull's demand read holds and the sources support it. Bear's concentration point is the real risk, not valuation — full weight, reviewed on the next hyperscaler capex guide." },
+  ],
+};
+
+const tickerDebateVerdictEvidence: Evidence[] = [
+  {
+    quote: "they are power-constrained, not demand-constrained",
+    sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1",
+    timestampStart: 2537,
+  },
+];
+
+const tickerDebatesMock: Record<string, { refs: TickerDebateRunRef[] }> = {
+  $NVDA: {
+    refs: [
+      { id: 12, ticker: "$NVDA", generatedAt: "2026-09-02T11:04:00Z", turns: 7 },
+      { id: 8, ticker: "$NVDA", generatedAt: "2026-08-26T09:41:00Z", turns: 7 },
+    ],
+  },
+};
+
+const canonicalMockTicker = (t: string) => `$${t.replace(/^\$/, "").toUpperCase()}`;
+
+/** Dated mock debates for one ticker. Mirrors `listTickerDebateRuns` live. */
+export function tickerDebateRefsMock(ticker: string): TickerDebateRunRef[] {
+  return tickerDebatesMock[canonicalMockTicker(ticker)]?.refs ?? [];
+}
+
+/** One mock debate by id, or the newest. Mirrors what `getTickerDebateRun` returns live. */
+export function tickerDebateMock(ticker: string, id: number | "latest") {
+  const symbol = canonicalMockTicker(ticker);
+  const refs = tickerDebateRefsMock(symbol);
+  const ref = id === "latest" ? refs[0] : refs.find((r) => r.id === id);
+  if (!ref) return null;
+  return {
+    id: ref.id,
+    ticker: symbol,
+    generatedAt: ref.generatedAt,
+    debate: nvdaDebate,
+    verdictEvidence: tickerDebateVerdictEvidence,
+    sources: tickerDebateSources,
+    sourceCount: tickerDebateSources.length,
+  };
 }

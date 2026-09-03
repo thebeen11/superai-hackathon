@@ -20,6 +20,8 @@ from ..models import (
     Stream,
     ThematicRun,
     ThematicRunRef,
+    TickerDebateRun,
+    TickerDebateRunRef,
     TranscriptSegment,
     YoutubeChannel,
     YoutubeMatch,
@@ -31,6 +33,7 @@ from .tables import (
     PredictionRow,
     PromptOverrideRow,
     ThematicRunRow,
+    TickerDebateRunRow,
     WatchlistOverrideRow,
     YoutubeChannelRow,
     YoutubeMatchRow,
@@ -281,6 +284,99 @@ def get_latest_thematic_run() -> ThematicRun | None:
     session = get_session()
     try:
         return _thematic_run(session.execute(stmt).scalars().first())
+    finally:
+        session.close()
+
+
+# --- Single-ticker debates (Tier 4, on demand) ------------------------------
+#
+# Same append-only, id-addressable shape as `thematic_runs`: every read is scoped to one
+# ticker, so the picker for $MU never has to look at any other name's runs.
+
+
+def save_ticker_debate_run(run: TickerDebateRun) -> TickerDebateRun:
+    """Append a single-ticker debate and return it carrying the id the database assigned."""
+    row = TickerDebateRunRow(
+        ticker=run.ticker,
+        run=run.model_dump(mode="json"),
+        turn_count=len(run.debate.transcript),
+        source_count=run.source_count,
+        generated_at=run.generated_at,
+    )
+    session = get_session()
+    try:
+        session.add(row)
+        session.commit()
+        run.id = row.id
+        return run
+    except Exception:
+        session.rollback()
+        logger.exception("Failed to persist ticker debate for %s", run.ticker)
+        raise
+    finally:
+        session.close()
+
+
+def list_ticker_debate_runs(ticker: str, limit: int = 20) -> list[TickerDebateRunRef]:
+    """Newest-first run headers for one ticker's picker. Never reads the JSONB payload."""
+    stmt = (
+        select(
+            TickerDebateRunRow.id,
+            TickerDebateRunRow.ticker,
+            TickerDebateRunRow.generated_at,
+            TickerDebateRunRow.turn_count,
+        )
+        .where(TickerDebateRunRow.ticker == ticker)
+        .order_by(TickerDebateRunRow.generated_at.desc(), TickerDebateRunRow.id.desc())
+        .limit(limit)
+    )
+    session = get_session()
+    try:
+        return [
+            TickerDebateRunRef(
+                id=r.id, ticker=r.ticker, generated_at=r.generated_at, turns=r.turn_count
+            )
+            for r in session.execute(stmt).all()
+        ]
+    finally:
+        session.close()
+
+
+def _ticker_debate_run(row: TickerDebateRunRow | None) -> TickerDebateRun | None:
+    if row is None:
+        return None
+    try:
+        run = TickerDebateRun.model_validate(row.run)
+    except ValidationError:
+        logger.exception(
+            "Ticker debate id=%s does not match the current models; serving no run.",
+            row.id,
+        )
+        return None
+    run.id = row.id  # the payload predates its own row id on the first write
+    return run
+
+
+def get_ticker_debate_run(run_id: int) -> TickerDebateRun | None:
+    """Read one debate back by id, or None when it does not exist (or no longer parses)."""
+    session = get_session()
+    try:
+        return _ticker_debate_run(session.get(TickerDebateRunRow, run_id))
+    finally:
+        session.close()
+
+
+def get_latest_ticker_debate_run(ticker: str) -> TickerDebateRun | None:
+    """The most recent debate on a ticker, or None before one has been run."""
+    stmt = (
+        select(TickerDebateRunRow)
+        .where(TickerDebateRunRow.ticker == ticker)
+        .order_by(TickerDebateRunRow.generated_at.desc(), TickerDebateRunRow.id.desc())
+        .limit(1)
+    )
+    session = get_session()
+    try:
+        return _ticker_debate_run(session.execute(stmt).scalars().first())
     finally:
         session.close()
 

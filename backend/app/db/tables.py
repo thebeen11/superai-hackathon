@@ -71,6 +71,33 @@ class ThematicRunRow(Base):
 Index("idx_thematic_runs_generated_at", ThematicRunRow.generated_at)
 
 
+class TickerDebateRunRow(Base):
+    """One dated single-ticker debate (Tier 4, on demand).
+
+    Append-only and read back by id, the same posture as `thematic_runs`: a user runs a
+    debate on a name to compare it with the last one, so overwriting would defeat it.
+    `turn_count` is denormalised so the per-ticker run picker can list every run without
+    touching the JSONB payload, and the index is composite because every read is scoped to
+    one ticker — listing $MU's runs must not scan every other name's.
+    """
+
+    __tablename__ = "ticker_debates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String(24), nullable=False)               # canonical "$MU"
+    run = Column(JSONB, nullable=False)                       # serialized TickerDebateRun
+    turn_count = Column(Integer, nullable=False, default=0)
+    source_count = Column(Integer, nullable=False, default=0)
+    generated_at = Column(DateTime(timezone=True), nullable=False)  # UTC at run time
+
+
+Index(
+    "idx_ticker_debates_ticker_generated_at",
+    TickerDebateRunRow.ticker,
+    TickerDebateRunRow.generated_at,
+)
+
+
 class PredictionRow(Base):
     """A single resolvable prediction, tracked over its window for the ledger (§7.3).
 

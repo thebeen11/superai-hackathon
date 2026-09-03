@@ -14,7 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import settings
-from .council import latest_council, resolve_ledger, run_council, run_thematic
+from .council import (
+    latest_council,
+    resolve_ledger,
+    run_council,
+    run_thematic,
+    run_ticker_debate,
+)
 from .crawl import (
     run_council_safe as _run_council_safe,
     run_daily_crawl,
@@ -27,10 +33,13 @@ from .db.repository import (
     delete_watchlist_entry,
     delete_youtube_channel,
     get_latest_thematic_run,
+    get_latest_ticker_debate_run,
     get_thematic_run,
+    get_ticker_debate_run,
     get_youtube_channel,
     list_cleaned_items,
     list_thematic_runs,
+    list_ticker_debate_runs,
     list_watchlist_overrides,
     list_youtube_channels,
     list_youtube_matches,
@@ -55,6 +64,8 @@ from .models import (
     DiscoveryResult,
     ThematicRun,
     ThematicRunRef,
+    TickerDebateRun,
+    TickerDebateRunRef,
     YoutubeChannel,
     YoutubeIngestReport,
     YoutubeJobRef,
@@ -398,6 +409,11 @@ class WatchlistBulkDelete(BaseModel):
 def _normalise_ticker(raw: str) -> str:
     """The frontend sends the bare form ('NVDA'), the corpus the canonical one ('$NVDA')."""
     return raw.strip().lstrip("$").upper()
+
+
+def _canonical_ticker(raw: str) -> str:
+    """The '$NVDA' form `cleaned_items.entities` is keyed on, from either input form."""
+    return f"${_normalise_ticker(raw)}"
 
 
 @app.get("/api/watchlists", response_model=list[WatchlistEntry])
@@ -840,6 +856,51 @@ def get_thematic_run_endpoint(run_id: int) -> ThematicRun:
     run = get_thematic_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"No thematic run with id {run_id}")
+    return run
+
+
+# --- Single-ticker Debate Chamber (Tier 4, on demand) ------------------------
+#
+# The council-wide debate lives on /council/*; this is the same chamber pointed at one
+# name, run from that ticker's page. `/latest` is declared before `/{run_id}` so the
+# literal segment wins the match, the same ordering rule as /api/thematic/runs/latest.
+
+
+@app.post("/api/tickers/{ticker}/debate", response_model=TickerDebateRun)
+def run_ticker_debate_endpoint(ticker: str) -> TickerDebateRun:
+    """Debate one ticker over the corpus that mentions it, and persist a dated run."""
+    return run_ticker_debate(_canonical_ticker(ticker))
+
+
+@app.post("/api/tickers/{ticker}/debate/stream")
+def run_ticker_debate_stream(ticker: str):
+    """Streaming version of the ticker debate (per-round progress + job reconnect)."""
+    symbol = _canonical_ticker(ticker)
+    job = create_job("ticker-debate", symbol)
+    return sse_stream(lambda emit: run_ticker_debate(symbol, emit=emit), job=job)
+
+
+@app.get("/api/tickers/{ticker}/debates", response_model=list[TickerDebateRunRef])
+def list_ticker_debates(
+    ticker: str,
+    limit: int = Query(20, ge=1, le=200, description="How many runs to list, newest first"),
+) -> list[TickerDebateRunRef]:
+    """Dated run headers for this ticker's run picker, newest first."""
+    return list_ticker_debate_runs(_canonical_ticker(ticker), limit=limit)
+
+
+@app.get("/api/tickers/{ticker}/debates/latest", response_model=TickerDebateRun | None)
+def latest_ticker_debate(ticker: str) -> TickerDebateRun | None:
+    """The most recent debate on this ticker, or null before one has been run."""
+    return get_latest_ticker_debate_run(_canonical_ticker(ticker))
+
+
+@app.get("/api/tickers/{ticker}/debates/{run_id}", response_model=TickerDebateRun)
+def get_ticker_debate(ticker: str, run_id: int) -> TickerDebateRun:
+    """One past debate, by id. 404s when the id belongs to a different ticker."""
+    run = get_ticker_debate_run(run_id)
+    if run is None or run.ticker != _canonical_ticker(ticker):
+        raise HTTPException(status_code=404, detail=f"No debate with id {run_id} for {ticker}")
     return run
 
 

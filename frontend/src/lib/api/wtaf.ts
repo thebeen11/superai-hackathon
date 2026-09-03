@@ -7,8 +7,12 @@
  */
 import type {
   ContextPreview,
+  Debate,
+  Evidence,
+  SourceDoc,
   Theme,
   ThematicRunRef,
+  TickerDebateRunRef,
   WtafData,
   Source,
   WatchlistEntry,
@@ -20,6 +24,8 @@ import type {
 import {
   thematicRunMock,
   thematicRunRefsMock,
+  tickerDebateMock,
+  tickerDebateRefsMock,
   wtafMock,
   youtubeChannelsMock,
   youtubeMatchesMock,
@@ -30,8 +36,11 @@ import {
   councilLatest,
   dataengProcess,
   getThematicRunEndpoint,
+  getTickerDebate,
   latestThematicRun,
+  latestTickerDebate,
   listThematicRunsEndpoint,
+  listTickerDebates,
   discoverPost,
   listAgents,
   listItems,
@@ -50,7 +59,14 @@ import type {
   EffectivePrompt,
   PromptView,
 } from "./generated/types.gen";
-import { itemsToWtafData, thematicRunRefs, thematicRunToThemes } from "./adapter";
+import {
+  debateRecordToDebate,
+  evidenceList,
+  itemsToWtafData,
+  sourceRefsToDocs,
+  thematicRunRefs,
+  thematicRunToThemes,
+} from "./adapter";
 import { streamSse, type ProgressEvent } from "./sse";
 
 /**
@@ -121,6 +137,76 @@ export async function getThematicRun(
     generatedAt: data.generated_at ?? "",
     themes: thematicRunToThemes(data),
   };
+}
+
+/** One dated single-ticker debate, resolved for the ticker page's chamber. */
+export interface TickerDebate {
+  id: number | null;
+  ticker: string;
+  generatedAt: string;
+  debate: Debate;
+  /** Winston's citations for the closing verdict; empty when the ruling is un-anchored. */
+  verdictEvidence: Evidence[];
+  /** Every document the run read — cited or merely read. */
+  sources: SourceDoc[];
+  sourceCount: number;
+}
+
+/**
+ * Dated debates on one ticker for its run picker, newest first.
+ *
+ * Not part of `getSnapshot`: a ticker debate is run on demand from one ticker's page, so
+ * the card owns this fetch rather than every dashboard load paying for a list it ignores.
+ * Backend: GET /api/tickers/{ticker}/debates
+ */
+export async function listTickerDebateRuns(ticker: string): Promise<TickerDebateRunRef[]> {
+  if (USE_MOCK) return mockResolve(tickerDebateRefsMock(ticker));
+  const { data } = await listTickerDebates({ path: { ticker }, throwOnError: true });
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    ticker: r.ticker,
+    generatedAt: r.generated_at,
+    turns: r.turns ?? 0,
+  }));
+}
+
+/**
+ * One debate on a ticker — a specific id, or "latest" for the most recent.
+ *
+ * Returns null when the ticker has never been debated, so the card shows its honest empty
+ * state rather than the council-wide transcript that used to stand in for it.
+ * Backend: GET /api/tickers/{ticker}/debates/{id} | .../latest
+ */
+export async function getTickerDebateRun(
+  ticker: string,
+  id: number | "latest" = "latest",
+): Promise<TickerDebate | null> {
+  if (USE_MOCK) return mockResolve(tickerDebateMock(ticker, id));
+  const { data } =
+    id === "latest"
+      ? await latestTickerDebate({ path: { ticker }, throwOnError: true })
+      : await getTickerDebate({ path: { ticker, run_id: id }, throwOnError: true });
+  if (!data) return null;
+  return {
+    id: data.id ?? null,
+    ticker: data.ticker,
+    generatedAt: data.generated_at ?? "",
+    debate: debateRecordToDebate(data.debate),
+    verdictEvidence: evidenceList(data.verdict_evidence ?? []),
+    sources: sourceRefsToDocs(data.sources ?? []),
+    sourceCount: data.source_count ?? 0,
+  };
+}
+
+/**
+ * SSE path that runs a fresh debate on one ticker, reporting each round as it lands.
+ *
+ * Six Gemini calls plus Winston's ruling, so it never runs inside a request. Feed this to
+ * `runLiveJob`; the rounds surface in the activity feed under Freddy on the way through.
+ * Backend: POST /api/tickers/{ticker}/debate/stream
+ */
+export function tickerDebateStreamPath(ticker: string): string {
+  return `/api/tickers/${encodeURIComponent(ticker)}/debate/stream`;
 }
 
 /**

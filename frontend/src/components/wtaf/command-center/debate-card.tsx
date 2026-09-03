@@ -3,14 +3,27 @@ import type { Debate, Tier } from "@/lib/types";
 import { Card, EmptyState } from "../primitives";
 import { AgentAvatar } from "../agents";
 
-export function DebateCard({
+/** True once the chamber has actually sat — otherwise the card shows its empty state. */
+export function hasDebated(debate: Debate): boolean {
+  return debate.transcript.length > 0 || debate.verdict !== "";
+}
+
+/**
+ * The chamber itself: round progress, the two stances, Winston's verdict.
+ *
+ * Split out from the card around it because the same transcript is rendered in two
+ * places on different clocks — the council-wide debate on the Command Center, and a
+ * single-ticker debate on a ticker page, which owns its own header, run picker and
+ * trigger. Only the frame differs; a Bull/Bear exchange should read identically in both.
+ */
+export function DebateChamber({
   debate,
   tiers,
-  onOpenDebate,
+  onOpenTranscript,
 }: {
   debate: Debate;
   tiers: Tier[];
-  onOpenDebate: () => void;
+  onOpenTranscript: () => void;
 }) {
   const db = debate;
   const debateTier = tiers.find((t) => t.key === "debate")!;
@@ -21,41 +34,8 @@ export function DebateCard({
     { ag: bull, side: db.bull, c: "var(--up)" },
     { ag: bear, side: db.bear, c: "var(--down)" },
   ];
-  const hasDebate = db.transcript.length > 0 || db.verdict !== "";
-  if (!hasDebate) {
-    return (
-      <Card
-        title="Debate Chamber"
-        sub="adversarial · Bull vs Bear"
-        className="span8"
-      >
-        <EmptyState
-          label="No debate yet"
-          sub="Awaiting Tier 4 · Freddy (Bull vs Bear)"
-          minHeight={180}
-        />
-      </Card>
-    );
-  }
   return (
-    <Card
-      title="Debate Chamber"
-      sub={`round ${db.round} / ${db.rounds}`}
-      className="span8"
-      action={
-        <button
-          onClick={onOpenDebate}
-          style={{
-            fontSize: 11,
-            color: "var(--blue-bright)",
-            background: "none",
-            border: "none",
-          }}
-        >
-          View transcript →
-        </button>
-      }
-    >
+    <>
       <div
         style={{
           display: "flex",
@@ -130,7 +110,7 @@ export function DebateCard({
         ))}
       </div>
       <button
-        onClick={onOpenDebate}
+        onClick={onOpenTranscript}
         style={{
           display: "flex",
           alignItems: "flex-start",
@@ -169,6 +149,56 @@ export function DebateCard({
           </div>
         </div>
       </button>
+    </>
+  );
+}
+
+/** The Command Center's chamber — the council-wide debate off the nightly snapshot. */
+export function DebateCard({
+  debate,
+  tiers,
+  onOpenDebate,
+}: {
+  debate: Debate;
+  tiers: Tier[];
+  onOpenDebate: () => void;
+}) {
+  const db = debate;
+  if (!hasDebated(db)) {
+    return (
+      <Card
+        title="Debate Chamber"
+        sub="adversarial · Bull vs Bear"
+        className="span8"
+      >
+        <EmptyState
+          label="No debate yet"
+          sub="Awaiting Tier 4 · Freddy (Bull vs Bear)"
+          minHeight={180}
+        />
+      </Card>
+    );
+  }
+  return (
+    <Card
+      title="Debate Chamber"
+      sub={`round ${db.round} / ${db.rounds}`}
+      className="span8"
+      action={
+        <button
+          onClick={onOpenDebate}
+          style={{
+            fontSize: 11,
+            color: "var(--blue-bright)",
+            background: "none",
+            border: "none",
+          }}
+        >
+          View transcript →
+        </button>
+      }
+    >
+      <DebateChamber debate={db} tiers={tiers} onOpenTranscript={onOpenDebate} />
     </Card>
   );
 }

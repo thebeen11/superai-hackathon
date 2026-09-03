@@ -1769,6 +1769,239 @@
         }
       }
     },
+    "/api/tickers/{ticker}/debate": {
+      "post": {
+        "summary": "Run Ticker Debate Endpoint",
+        "description": "Debate one ticker over the corpus that mentions it, and persist a dated run.",
+        "operationId": "run_ticker_debate_endpoint",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TickerDebateRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tickers/{ticker}/debate/stream": {
+      "post": {
+        "summary": "Run Ticker Debate Stream",
+        "description": "Streaming version of the ticker debate (per-round progress + job reconnect).",
+        "operationId": "run_ticker_debate_stream",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tickers/{ticker}/debates": {
+      "get": {
+        "summary": "List Ticker Debates",
+        "description": "Dated run headers for this ticker's run picker, newest first.",
+        "operationId": "list_ticker_debates",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "How many runs to list, newest first",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "How many runs to list, newest first"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TickerDebateRunRef"
+                  },
+                  "title": "Response List Ticker Debates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tickers/{ticker}/debates/latest": {
+      "get": {
+        "summary": "Latest Ticker Debate",
+        "description": "The most recent debate on this ticker, or null before one has been run.",
+        "operationId": "latest_ticker_debate",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TickerDebateRun"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Latest Ticker Debate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tickers/{ticker}/debates/{run_id}": {
+      "get": {
+        "summary": "Get Ticker Debate",
+        "description": "One past debate, by id. 404s when the id belongs to a different ticker.",
+        "operationId": "get_ticker_debate",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TickerDebateRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/items/stream": {
       "get": {
         "summary": "List Items Stream",
@@ -3427,6 +3660,89 @@
         ],
         "title": "ThemeBasket",
         "description": "Tier 5 \u2014 a thematic basket with the Chairman's conviction, timeframe + hold period."
+      },
+      "TickerDebateRun": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "debate": {
+            "$ref": "#/components/schemas/DebateRecord"
+          },
+          "verdict_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Verdict Evidence"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count",
+            "default": 0
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "debate"
+        ],
+        "title": "TickerDebateRun",
+        "description": "One dated single-ticker debate \u2014 the transcript plus the corpus it was drawn from."
+      },
+      "TickerDebateRunRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "turns": {
+            "type": "integer",
+            "title": "Turns",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "generated_at"
+        ],
+        "title": "TickerDebateRunRef",
+        "description": "A run as it appears in the picker \u2014 enough to label it, without reading the payload."
       },
       "ToolView": {
         "properties": {

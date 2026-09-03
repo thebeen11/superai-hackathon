@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddYoutubeChannelData, AddYoutubeChannelErrors, AddYoutubeChannelResponses, AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, BulkDeleteWatchlistsData, BulkDeleteWatchlistsErrors, BulkDeleteWatchlistsResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, GetThematicRunEndpointData, GetThematicRunEndpointErrors, GetThematicRunEndpointResponses, HealthData, HealthResponses, JobStreamData, JobStreamErrors, JobStreamResponses, LatestThematicRunData, LatestThematicRunResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListThematicRunsEndpointData, ListThematicRunsEndpointErrors, ListThematicRunsEndpointResponses, ListWatchlistsData, ListWatchlistsResponses, ListYoutubeChannelsEndpointData, ListYoutubeChannelsEndpointResponses, ListYoutubeJobsData, ListYoutubeJobsResponses, ListYoutubeMatchesEndpointData, ListYoutubeMatchesEndpointErrors, ListYoutubeMatchesEndpointResponses, PollYoutubeChannelsData, PollYoutubeChannelsResponses, RefreshYoutubeChannelData, RefreshYoutubeChannelErrors, RefreshYoutubeChannelResponses, RefreshYoutubeChannelStreamData, RefreshYoutubeChannelStreamErrors, RefreshYoutubeChannelStreamResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, RemoveYoutubeChannelData, RemoveYoutubeChannelErrors, RemoveYoutubeChannelResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, RunThematicEndpointData, RunThematicEndpointResponses, RunThematicStreamData, RunThematicStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses, UpdateYoutubeChannelData, UpdateYoutubeChannelErrors, UpdateYoutubeChannelResponses } from './types.gen';
+import type { AddYoutubeChannelData, AddYoutubeChannelErrors, AddYoutubeChannelResponses, AgentEffectivePromptData, AgentEffectivePromptErrors, AgentEffectivePromptResponses, BulkDeleteWatchlistsData, BulkDeleteWatchlistsErrors, BulkDeleteWatchlistsResponses, CouncilLatestData, CouncilLatestResponses, CouncilResolveData, CouncilResolveResponses, CrawlDailyData, CrawlDailyErrors, CrawlDailyResponses, DataengJobsData, DataengJobsErrors, DataengJobsResponses, DataengJobStreamData, DataengJobStreamErrors, DataengJobStreamResponses, DataengProcessData, DataengProcessErrors, DataengProcessResponses, DataengProcessStreamData, DataengProcessStreamErrors, DataengProcessStreamResponses, DiscoverClarifyData, DiscoverClarifyErrors, DiscoverClarifyResponses, DiscoverClarifyStreamData, DiscoverClarifyStreamErrors, DiscoverClarifyStreamResponses, DiscoverGetData, DiscoverGetErrors, DiscoverGetResponses, DiscoverGetStreamData, DiscoverGetStreamErrors, DiscoverGetStreamResponses, DiscoverPostData, DiscoverPostErrors, DiscoverPostResponses, DiscoverPostStreamData, DiscoverPostStreamErrors, DiscoverPostStreamResponses, GetThematicRunEndpointData, GetThematicRunEndpointErrors, GetThematicRunEndpointResponses, GetTickerDebateData, GetTickerDebateErrors, GetTickerDebateResponses, HealthData, HealthResponses, JobStreamData, JobStreamErrors, JobStreamResponses, LatestThematicRunData, LatestThematicRunResponses, LatestTickerDebateData, LatestTickerDebateErrors, LatestTickerDebateResponses, ListAgentsData, ListAgentsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListItemsStreamData, ListItemsStreamErrors, ListItemsStreamResponses, ListPromptsData, ListPromptsResponses, ListThematicRunsEndpointData, ListThematicRunsEndpointErrors, ListThematicRunsEndpointResponses, ListTickerDebatesData, ListTickerDebatesErrors, ListTickerDebatesResponses, ListWatchlistsData, ListWatchlistsResponses, ListYoutubeChannelsEndpointData, ListYoutubeChannelsEndpointResponses, ListYoutubeJobsData, ListYoutubeJobsResponses, ListYoutubeMatchesEndpointData, ListYoutubeMatchesEndpointErrors, ListYoutubeMatchesEndpointResponses, PollYoutubeChannelsData, PollYoutubeChannelsResponses, RefreshYoutubeChannelData, RefreshYoutubeChannelErrors, RefreshYoutubeChannelResponses, RefreshYoutubeChannelStreamData, RefreshYoutubeChannelStreamErrors, RefreshYoutubeChannelStreamResponses, RemoveWatchlistData, RemoveWatchlistErrors, RemoveWatchlistResponses, RemoveYoutubeChannelData, RemoveYoutubeChannelErrors, RemoveYoutubeChannelResponses, ResetAgentMentalModelsData, ResetAgentMentalModelsErrors, ResetAgentMentalModelsResponses, ResetPromptData, ResetPromptErrors, ResetPromptResponses, RunCouncilEndpointData, RunCouncilEndpointResponses, RunCouncilStreamData, RunCouncilStreamResponses, RunThematicEndpointData, RunThematicEndpointResponses, RunThematicStreamData, RunThematicStreamResponses, RunTickerDebateEndpointData, RunTickerDebateEndpointErrors, RunTickerDebateEndpointResponses, RunTickerDebateStreamData, RunTickerDebateStreamErrors, RunTickerDebateStreamResponses, SetAgentMentalModelsData, SetAgentMentalModelsErrors, SetAgentMentalModelsResponses, TrackerContextEndpointData, TrackerContextEndpointErrors, TrackerContextEndpointResponses, UpdatePromptData, UpdatePromptErrors, UpdatePromptResponses, UpdateWatchlistData, UpdateWatchlistErrors, UpdateWatchlistResponses, UpdateYoutubeChannelData, UpdateYoutubeChannelErrors, UpdateYoutubeChannelResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -447,6 +447,41 @@ export const latestThematicRun = <ThrowOnError extends boolean = false>(options?
  * One past run, by id.
  */
 export const getThematicRunEndpoint = <ThrowOnError extends boolean = false>(options: Options<GetThematicRunEndpointData, ThrowOnError>): RequestResult<GetThematicRunEndpointResponses, GetThematicRunEndpointErrors, ThrowOnError> => (options.client ?? client).get<GetThematicRunEndpointResponses, GetThematicRunEndpointErrors, ThrowOnError>({ url: '/api/thematic/runs/{run_id}', ...options });
+
+/**
+ * Run Ticker Debate Endpoint
+ *
+ * Debate one ticker over the corpus that mentions it, and persist a dated run.
+ */
+export const runTickerDebateEndpoint = <ThrowOnError extends boolean = false>(options: Options<RunTickerDebateEndpointData, ThrowOnError>): RequestResult<RunTickerDebateEndpointResponses, RunTickerDebateEndpointErrors, ThrowOnError> => (options.client ?? client).post<RunTickerDebateEndpointResponses, RunTickerDebateEndpointErrors, ThrowOnError>({ url: '/api/tickers/{ticker}/debate', ...options });
+
+/**
+ * Run Ticker Debate Stream
+ *
+ * Streaming version of the ticker debate (per-round progress + job reconnect).
+ */
+export const runTickerDebateStream = <ThrowOnError extends boolean = false>(options: Options<RunTickerDebateStreamData, ThrowOnError>): RequestResult<RunTickerDebateStreamResponses, RunTickerDebateStreamErrors, ThrowOnError> => (options.client ?? client).post<RunTickerDebateStreamResponses, RunTickerDebateStreamErrors, ThrowOnError>({ url: '/api/tickers/{ticker}/debate/stream', ...options });
+
+/**
+ * List Ticker Debates
+ *
+ * Dated run headers for this ticker's run picker, newest first.
+ */
+export const listTickerDebates = <ThrowOnError extends boolean = false>(options: Options<ListTickerDebatesData, ThrowOnError>): RequestResult<ListTickerDebatesResponses, ListTickerDebatesErrors, ThrowOnError> => (options.client ?? client).get<ListTickerDebatesResponses, ListTickerDebatesErrors, ThrowOnError>({ url: '/api/tickers/{ticker}/debates', ...options });
+
+/**
+ * Latest Ticker Debate
+ *
+ * The most recent debate on this ticker, or null before one has been run.
+ */
+export const latestTickerDebate = <ThrowOnError extends boolean = false>(options: Options<LatestTickerDebateData, ThrowOnError>): RequestResult<LatestTickerDebateResponses, LatestTickerDebateErrors, ThrowOnError> => (options.client ?? client).get<LatestTickerDebateResponses, LatestTickerDebateErrors, ThrowOnError>({ url: '/api/tickers/{ticker}/debates/latest', ...options });
+
+/**
+ * Get Ticker Debate
+ *
+ * One past debate, by id. 404s when the id belongs to a different ticker.
+ */
+export const getTickerDebate = <ThrowOnError extends boolean = false>(options: Options<GetTickerDebateData, ThrowOnError>): RequestResult<GetTickerDebateResponses, GetTickerDebateErrors, ThrowOnError> => (options.client ?? client).get<GetTickerDebateResponses, GetTickerDebateErrors, ThrowOnError>({ url: '/api/tickers/{ticker}/debates/{run_id}', ...options });
 
 /**
  * List Items Stream

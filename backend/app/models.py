@@ -488,3 +488,36 @@ class ThematicRunRef(BaseModel):
     id: int
     generated_at: datetime
     basket_count: int = 0
+
+
+# --- Single-ticker Debate Chamber (Tier 4, on demand) ------------------------
+#
+# The nightly council debates one basket drawn from the top names across every desk, so
+# it says nothing about a ticker that did not make that cut. A single-emiten debate is a
+# question a user asks about one name, answered against just the corpus that mentions it.
+# Like a thematic run — and unlike `council_snapshots`, where only the newest row is ever
+# served — each execution is persisted whole and dated, so a past debate on a ticker stays
+# readable next to the one you just ran.
+
+
+class TickerDebateRun(BaseModel):
+    """One dated single-ticker debate — the transcript plus the corpus it was drawn from."""
+
+    id: int | None = None           # assigned on persist; None before the row exists
+    ticker: str                     # canonical "$MU"
+    debate: DebateRecord
+    # Winston's citations for the closing verdict. Held here rather than on `DebateRecord`
+    # so snapshots written before this feature still validate against the unchanged model.
+    verdict_evidence: list[Evidence] = Field(default_factory=list)
+    sources: list[SourceRef] = Field(default_factory=list)  # every document read this run
+    source_count: int = 0
+    generated_at: datetime = Field(default_factory=_now)
+
+
+class TickerDebateRunRef(BaseModel):
+    """A run as it appears in the picker — enough to label it, without reading the payload."""
+
+    id: int
+    ticker: str
+    generated_at: datetime
+    turns: int = 0
