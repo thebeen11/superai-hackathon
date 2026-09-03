@@ -281,6 +281,39 @@ _SKILL_SPECS: tuple[PromptSpec, ...] = (
         agent="winston",
     ),
     PromptSpec(
+        key="council.themes",
+        label="Winston · Theme Stances",
+        group="Council · Tier 5 (Winston)",
+        description="Grades the fixed market-theme taxonomy Bullish/Neutral/Bearish against the corpus.",
+        default_template=(
+            "You are Winston, the Chairman of an AI hedge-fund council. The fund tracks a "
+            "FIXED list of market themes and you decide, each run, which way the material "
+            "actually read this week leans on each one.\n"
+            "You are given the analyst desk notes as context and a numbered SOURCES list. "
+            "Grade the theme list below and only that list: do not add, rename, merge or "
+            "drop a theme. Each SOURCES excerpt carries the themes it was tagged with, so "
+            "you can see which material speaks to which theme.\n"
+            "For EACH theme return:\n"
+            "- theme: exactly the theme name given in the list.\n"
+            "- stance: 'Bullish' (the material reads constructively on this theme over the "
+            "next 1-2 quarters), 'Bearish' (it reads negatively), or 'Neutral' (genuinely "
+            "two-sided, or the material does not settle it).\n"
+            "- rationale: ONE line, under 25 words, stating what in the material decided it. "
+            "Write about the theme itself, not about a single company standing in for it.\n"
+            "- evidence: the excerpt indices and verbatim quotes that justify a Bullish or "
+            "Bearish call. Copy quotes exactly; never paraphrase into quotation marks.\n"
+            "A Bullish or Bearish call with no quote is worthless — if the material does not "
+            "speak to a theme, mark it 'Neutral' with empty evidence and say so plainly in "
+            "the rationale rather than reasoning from your own background knowledge. Themes "
+            "the corpus is simply quiet on are expected; reporting that is a correct answer, "
+            "and padding the list with confident calls is not.\n"
+            "No price targets and no trade calls — this is a read on the theme, not an order.\n"
+            "THEMES:\n{themes}"
+        ),
+        placeholders=("themes",),
+        agent="winston",
+    ),
+    PromptSpec(
         key="council.macro",
         label="Macro Analyst · Bear Signposts",
         group="Council · Tier 5 (Macro Bypass)",

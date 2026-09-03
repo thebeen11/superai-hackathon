@@ -32,6 +32,7 @@ from .db.repository import (
     delete_watchlist_entries,
     delete_watchlist_entry,
     delete_youtube_channel,
+    get_indicator_history,
     get_latest_thematic_run,
     get_latest_ticker_debate_run,
     get_thematic_run,
@@ -62,6 +63,7 @@ from .models import (
     CouncilReport,
     DataEngReport,
     DiscoveryResult,
+    IndicatorPoint,
     ThematicRun,
     ThematicRunRef,
     TickerDebateRun,
@@ -812,6 +814,19 @@ def council_latest() -> CouncilReport | None:
 def council_resolve() -> dict[str, int]:
     """Score predictions whose window has passed and refresh the Brier ledger."""
     return {"resolved": resolve_ledger()}
+
+
+@app.get("/api/indicators/history", response_model=list[IndicatorPoint])
+def list_indicator_history(
+    limit: int = Query(30, ge=1, le=365, description="Most recent council runs to read"),
+) -> list[IndicatorPoint]:
+    """Macro indicator scores across past council runs, oldest first.
+
+    Deliberately not part of the snapshot: the indicator cards are the only reader, and
+    the series only changes when the council runs, so a dashboard load should not pay for
+    it (same reasoning as the thematic run list).
+    """
+    return get_indicator_history(limit)
 
 
 # --- Thematic Analysis (Tier 5, weekly) -------------------------------------

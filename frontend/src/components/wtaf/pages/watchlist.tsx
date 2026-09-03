@@ -8,6 +8,7 @@ import { PageHead, PageButton, ScanToggle, IconButton, RowCheckbox } from "../sh
 import { TickerDebateCard } from "../ticker-debate-card";
 import { EvidenceList, SourceLink } from "../source-link";
 import { fmtChange, fmtPrice, hasQuote } from "@/lib/format";
+import { deskTakesFor } from "@/lib/stance";
 import { bulkDeleteWatchlist, deleteWatchlistItem, getYoutubeMatches, setWatchlistActive } from "@/lib/api/wtaf";
 import type { WatchItem, YoutubeMatch } from "@/lib/types";
 
@@ -262,9 +263,7 @@ export function TickerDetailPage({ ticker }: { ticker: string }) {
   const item = d.watchlist.find((w) => w.t.toUpperCase() === ticker.toUpperCase());
   // Desk calls and documents are keyed on the "$NVDA" form the backend resolves entities to.
   const sym = `$${ticker.replace(/^\$/, "").toUpperCase()}`;
-  const takes = d.deskNotes.flatMap((n) =>
-    n.stocks.filter((s) => s.ticker.toUpperCase() === sym).map((take) => ({ desk: n.desk, take })),
-  );
+  const takes = deskTakesFor(d.deskNotes, ticker);
   const tickerDocs = d.sourceDocs.filter((doc) => doc.tickers.includes(sym));
 
   if (!item) {

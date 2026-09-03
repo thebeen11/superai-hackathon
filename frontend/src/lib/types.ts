@@ -8,6 +8,8 @@ export type BriefingTone = "up" | "down" | "neutral";
 export type CatalystTone = "orange" | "blue" | "green" | "indigo";
 export type RiskBand = "Low" | "Med" | "High";
 export type IndicatorBand = "Positive" | "Neutral" | "Negative";
+/** A bull/bear reading. `UNRATED` = nothing has been called on it. See `lib/stance.ts`. */
+export type Stance = "BULLISH" | "NEUTRAL" | "BEARISH" | "UNRATED";
 export type SignpostStatus = "Triggered" | "Watch" | "Clear";
 export type Trend = "up" | "down" | "flat";
 
@@ -182,7 +184,12 @@ export interface Tracker {
   chg: number;
   channels: number;
   spark: number[];
+  /** Volume trend (up/down/flat) — how *loud* the theme is, never which way it leans. */
   tone: TrackerTone;
+  /** Winston's direction on the theme. UNRATED = the corpus said nothing about it. */
+  stance: Stance;
+  /** His one-line reason for the stance; empty when unrated. */
+  rationale: string;
 }
 
 export interface ContextPreview {
@@ -266,6 +273,13 @@ export interface Indicator {
   band: IndicatorBand;
   rationale: string;
   evidence: Evidence[];
+}
+
+/** One past council run's reading of one indicator — a point on its trend line. */
+export interface IndicatorPoint {
+  /** ISO timestamp of the council run that produced the score. */
+  at: string;
+  score: number;
 }
 
 /** One row of the Macro Analyst's fixed bear-market signpost checklist. */

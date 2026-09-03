@@ -39,6 +39,7 @@ from app.models import (
     SourceType,
     StockTake,
     Stream,
+    ThemeRead,
     TranscriptSegment,
 )
 
@@ -375,14 +376,23 @@ def test_run_council_runs_full_dag(monkeypatch):
         # behaviour is covered in tests/test_macro.py.
         return report, []
 
+    def fake_theme_reads(items, notes=None, emit=None):
+        calls.append("themes")
+        # Themes are tagged on MICRO items, so unlike the Chairman this call sees the
+        # whole corpus, not the macro bypass slice.
+        assert {i.stream for i in items} == {Stream.MICRO, Stream.MACRO}
+        return [ThemeRead(theme="Technology", stance="Bullish", rationale="r", evidenced=True)]
+
     monkeypatch.setattr(orch, "run_macro_analyst", fake_macro)
     monkeypatch.setattr(orch, "backfill_signposts", fake_backfill)
     monkeypatch.setattr(orch, "run_chairman", fake_chairman)
+    monkeypatch.setattr(orch, "run_theme_reads", fake_theme_reads)
 
     report = orch.run_council()
     # Strict DAG order — the second pass sits between the desk and the Chairman, so
     # Winston rules on a tracker that has already been backfilled.
-    assert calls == ["analysts", "debate", "macro", "backfill", "chairman", "saved"]
+    assert calls == ["analysts", "debate", "macro", "backfill", "chairman", "themes", "saved"]
+    assert report.theme_reads[0].stance == "Bullish"
     assert report.macro.triggered == 2                           # tracker persisted
     assert report.debate.verdict == "ruling"
     assert report.debate.transcript[-1].who == "winston"         # verdict stitched in
@@ -423,6 +433,7 @@ def test_backfilled_documents_reach_winston_and_the_manifest(monkeypatch):
         return ChairmanVerdict(verdict="ruling")
 
     monkeypatch.setattr(orch, "run_chairman", fake_chairman)
+    monkeypatch.setattr(orch, "run_theme_reads", lambda items, notes=None, emit=None: [])
     report = orch.run_council()
 
     # Winston can cite what the second pass fetched...
@@ -578,3 +589,34 @@ def test_repository_serves_legacy_snapshot_and_degrades_on_unreadable(monkeypatc
     with caplog.at_level("ERROR"):
         assert repo.get_latest_council_snapshot() is None
     assert "does not match the current models" in caplog.text
+
+
+def test_indicator_history_series_is_chronological_and_skips_junk(monkeypatch):
+    """The trend the indicator cards chart: oldest first, unusable readings dropped."""
+    import types
+    from app.db import repository as repo
+
+    # As the query returns them: newest first, (report, generated_at) pairs.
+    rows = [
+        ({"indicators": [{"name": "Rate Policy", "score": 0.5, "band": "Positive"},
+                         {"name": "Growth", "score": -0.2, "band": "Negative"}]},
+         "2026-09-03T03:00:00Z"),
+        # A run where Winston did not score Growth — a gap in that line, not a zero.
+        ({"indicators": [{"name": "Rate Policy", "score": 0.1, "band": "Neutral"}]},
+         "2026-09-02T03:00:00Z"),
+        # Unusable: a non-numeric score and a nameless row leave nothing to plot, and a
+        # report whose *other* fields have drifted must still yield its scores.
+        ({"indicators": [{"name": "Rate Policy", "score": "n/a"}, {"score": 0.4}],
+          "debate": "shape drift elsewhere"},
+         "2026-09-01T03:00:00Z"),
+    ]
+    monkeypatch.setattr(
+        repo, "get_session",
+        lambda: types.SimpleNamespace(execute=lambda stmt: types.SimpleNamespace(all=lambda: rows),
+                                      close=lambda: None),
+    )
+
+    points = repo.get_indicator_history()
+    assert [p.generated_at.day for p in points] == [2, 3]
+    assert points[0].scores == {"Rate Policy": 0.1}
+    assert points[1].scores == {"Rate Policy": 0.5, "Growth": -0.2}

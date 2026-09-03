@@ -43,6 +43,10 @@ SECTORS: list[str] = [
 
 UNCLASSIFIED = "Unclassified"
 
+# The stances Winston may put on a theme (app/council/theme_reads.py). Closed, and
+# deliberately the same three-way band the dashboard reads everywhere else.
+THEME_STANCES: tuple[str, ...] = ("Bullish", "Neutral", "Bearish")
+
 # The fixed bear-market signpost checklist the Macro Analyst scores every run
 # (app/council/macro.py). Deliberately closed: a *fixed* list is what makes the tracker
 # comparable run-over-run — the model grades these and only these, it never invents a

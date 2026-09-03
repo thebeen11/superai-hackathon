@@ -10,6 +10,10 @@ The assembled `CouncilReport` is persisted as the latest snapshot. The whole thi
 fault-isolated by callers (the discovery endpoint) so a council failure never breaks
 the upstream discovery.
 
+Winston also grades the fixed market-theme taxonomy in a call of its own
+(`council/theme_reads.py`), which is what gives the concept trackers a direction rather
+than just a mention count.
+
 Thematic baskets are *not* part of this DAG. They run weekly on their own schedule —
 see `council/thematic.py`.
 """
@@ -32,6 +36,7 @@ from .chairman import run_chairman
 from .debate import run_debate
 from .macro import backfill_signposts, run_macro_analyst
 from .resolver import resolve_due_predictions
+from .theme_reads import run_theme_reads
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +52,7 @@ def _build_manifest(items: list[CleanedItem], report: CouncilReport) -> list[Sou
     if report.macro:
         for signpost in report.macro.signposts:
             grounding.attribute(cited, "Macro Analyst", signpost.evidence)
-    for group in (report.indicators, report.briefing, report.predictions):
+    for group in (report.indicators, report.briefing, report.predictions, report.theme_reads):
         for claim in group:
             grounding.attribute(cited, "Winston", claim.evidence)
     return grounding.source_manifest(items, cited)
@@ -83,6 +88,10 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
         notes, debate, macro + fetched, emit=emit,
         macro_report=macro_report, micro_items=micro,
     )
+    # Winston's read on the theme taxonomy — the direction the concept trackers show.
+    # Its own call over the *whole* corpus, because themes are tagged on the micro items
+    # the Chairman's macro-biased corpus mostly leaves out (see council/theme_reads.py).
+    theme_reads = run_theme_reads(items, notes, emit=emit)
 
     # Stitch the Chairman's verdict back onto the debate transcript.
     debate.verdict = verdict.verdict
@@ -111,6 +120,7 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
         sector_notes=notes,
         debate=debate,
         indicators=verdict.indicators,
+        theme_reads=theme_reads,
         macro=macro_report,
         ace=verdict.ace,
         briefing=verdict.briefing,
@@ -122,6 +132,7 @@ def run_council(emit: Emit = noop_emit) -> CouncilReport:
     save_council_snapshot(report)
     emit("council", "Council snapshot ready", status="ok",
          indicators=len(report.indicators), briefing=len(report.briefing),
+         themes=sum(1 for t in report.theme_reads if t.evidenced),
          sources=len(report.sources),
          cited=sum(1 for s in report.sources if s.cited_by))
     return report

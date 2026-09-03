@@ -21,3 +21,14 @@ export function fmtPrice(w: Pick<WatchItem, "px">): string {
 export function fmtChange(w: Pick<WatchItem, "px" | "chg">): string {
   return hasQuote(w) ? `${w.chg >= 0 ? "+" : ""}${w.chg.toFixed(2)}%` : NO_QUOTE;
 }
+
+/**
+ * "31 AUG" in UTC — runs are stamped by the backend's clock, not the reader's, so a
+ * reader in Jakarta and one in New York name the same run the same way.
+ */
+export function fmtRunDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const month = d.toLocaleString("en", { month: "short", timeZone: "UTC" }).toUpperCase();
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${month}`;
+}

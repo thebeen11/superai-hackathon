@@ -1617,6 +1617,55 @@
         }
       }
     },
+    "/api/indicators/history": {
+      "get": {
+        "summary": "List Indicator History",
+        "description": "Macro indicator scores across past council runs, oldest first.\n\nDeliberately not part of the snapshot: the indicator cards are the only reader, and\nthe series only changes when the council runs, so a dashboard load should not pay for\nit (same reasoning as the thematic run list).",
+        "operationId": "list_indicator_history",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Most recent council runs to read",
+              "default": 30,
+              "title": "Limit"
+            },
+            "description": "Most recent council runs to read"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IndicatorPoint"
+                  },
+                  "title": "Response List Indicator History"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/thematic/run": {
       "post": {
         "summary": "Run Thematic Endpoint",
@@ -2567,6 +2616,13 @@
             "type": "array",
             "title": "Indicators"
           },
+          "theme_reads": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeRead"
+            },
+            "type": "array",
+            "title": "Theme Reads"
+          },
           "macro": {
             "anyOf": [
               {
@@ -2955,6 +3011,28 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "IndicatorPoint": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Scores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at"
+        ],
+        "title": "IndicatorPoint",
+        "description": "One council run's macro indicator scores \u2014 a single point on the trend lines.\n\nOnly the newest `council_snapshots` row is ever served as *the* snapshot, but every\nrow is a dated reading of the same fixed indicator set, so the history reads as a\ntime series. Scores are keyed by indicator name rather than a list, because the set\ncan differ run to run (an indicator Winston did not score that night is simply absent\nfrom that point, and the line breaks there rather than being drawn through a zero)."
       },
       "LedgerRow": {
         "properties": {
@@ -3660,6 +3738,42 @@
         ],
         "title": "ThemeBasket",
         "description": "Tier 5 \u2014 a thematic basket with the Chairman's conviction, timeframe + hold period."
+      },
+      "ThemeRead": {
+        "properties": {
+          "theme": {
+            "type": "string",
+            "title": "Theme"
+          },
+          "stance": {
+            "type": "string",
+            "title": "Stance",
+            "default": "Neutral"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "evidenced": {
+            "type": "boolean",
+            "title": "Evidenced",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "theme"
+        ],
+        "title": "ThemeRead",
+        "description": "Winston's stance on one theme of `taxonomy.MARKET_THEME_TAXONOMY`.\n\nThe taxonomy is fixed, so every run grades the same rows and a theme is comparable\nrun-over-run \u2014 the same reason `BEAR_SIGNPOSTS` is closed. `evidenced=False` means\nnothing in the corpus spoke to the theme, which the dashboard shows as unrated\nrather than as a neutral call."
       },
       "TickerDebateRun": {
         "properties": {

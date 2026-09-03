@@ -324,6 +324,22 @@ class ThemeBasket(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
 
 
+class ThemeRead(BaseModel):
+    """Winston's stance on one theme of `taxonomy.MARKET_THEME_TAXONOMY`.
+
+    The taxonomy is fixed, so every run grades the same rows and a theme is comparable
+    run-over-run — the same reason `BEAR_SIGNPOSTS` is closed. `evidenced=False` means
+    nothing in the corpus spoke to the theme, which the dashboard shows as unrated
+    rather than as a neutral call.
+    """
+
+    theme: str                      # must be a MARKET_THEME_TAXONOMY entry
+    stance: str = "Neutral"         # Bullish | Neutral | Bearish
+    rationale: str = ""             # one line explaining the stance
+    evidence: list[Evidence] = Field(default_factory=list)
+    evidenced: bool = True          # False → nothing in the corpus speaks to it
+
+
 class MacroIndicator(BaseModel):
     """Tier 5 — a macro indicator score for the dashboard."""
 
@@ -349,6 +365,20 @@ class MacroIndicator(BaseModel):
             legacy = data["evidence"]
             data = {**data, "rationale": data.get("rationale") or legacy, "evidence": []}
         return data
+
+
+class IndicatorPoint(BaseModel):
+    """One council run's macro indicator scores — a single point on the trend lines.
+
+    Only the newest `council_snapshots` row is ever served as *the* snapshot, but every
+    row is a dated reading of the same fixed indicator set, so the history reads as a
+    time series. Scores are keyed by indicator name rather than a list, because the set
+    can differ run to run (an indicator Winston did not score that night is simply absent
+    from that point, and the line breaks there rather than being drawn through a zero).
+    """
+
+    generated_at: datetime
+    scores: dict[str, float] = Field(default_factory=dict)
 
 
 class Signpost(BaseModel):
@@ -454,6 +484,7 @@ class CouncilReport(BaseModel):
     # `model_validate` on every historical row, which `repository` reports as "no snapshot".
     baskets: list[ThemeBasket] = Field(default_factory=list)
     indicators: list[MacroIndicator] = Field(default_factory=list)
+    theme_reads: list[ThemeRead] = Field(default_factory=list)
     macro: BearSignpostReport | None = None
     ace: AceIndex | None = None
     briefing: list[BriefingItem] = Field(default_factory=list)

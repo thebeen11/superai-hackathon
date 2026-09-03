@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ..models import (
     CleanedItem,
     CouncilReport,
+    IndicatorPoint,
     LedgerRow,
     Prediction,
     ResolvedEntity,
@@ -198,6 +199,39 @@ def get_latest_council_snapshot() -> CouncilReport | None:
             return None
     finally:
         session.close()
+
+
+def get_indicator_history(limit: int = 30) -> list[IndicatorPoint]:
+    """Macro indicator scores across the most recent council runs, oldest point first.
+
+    This is the one read that looks past the newest snapshot. A single score says where
+    the regime is; only the series says which way it is moving, which is what the
+    indicator cards chart. Just the `indicators` slice of each payload is touched — a run
+    whose report no longer validates as a whole still contributes its scores, and a point
+    that carries nothing usable is skipped rather than charted as zero.
+    """
+    stmt = (
+        select(CouncilSnapshotRow.report, CouncilSnapshotRow.generated_at)
+        .order_by(CouncilSnapshotRow.generated_at.desc(), CouncilSnapshotRow.id.desc())
+        .limit(limit)
+    )
+    session = get_session()
+    try:
+        rows = session.execute(stmt).all()
+    finally:
+        session.close()
+
+    points: list[IndicatorPoint] = []
+    for report, generated_at in rows:
+        scores: dict[str, float] = {}
+        for raw in (report or {}).get("indicators") or []:
+            name, score = (raw or {}).get("name"), (raw or {}).get("score")
+            if isinstance(name, str) and name and isinstance(score, (int, float)):
+                scores[name] = float(score)
+        if scores:
+            points.append(IndicatorPoint(generated_at=generated_at, scores=scores))
+    points.reverse()  # oldest first — the order a chart draws in
+    return points
 
 
 # --- Thematic Analysis runs (Tier 5, weekly) --------------------------------

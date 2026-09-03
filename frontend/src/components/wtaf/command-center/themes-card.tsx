@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getThematicRun, listThematicRuns } from "@/lib/api/wtaf";
+import { fmtRunDate } from "@/lib/format";
 import { TIMEFRAME_LABEL, TIMEFRAMES } from "@/lib/types";
 import type { Theme, ThematicRunRef, Timeframe } from "@/lib/types";
 import { useWtafData } from "@/providers/wtaf-provider";
@@ -8,14 +9,6 @@ import { Card, EmptyState } from "../primitives";
 import { EvidenceList } from "../source-link";
 
 type Filter = Timeframe | "All";
-
-/** "31 AUG" in UTC — runs are stamped by the backend's clock, not the reader's. */
-function runLabel(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const month = d.toLocaleString("en", { month: "short", timeZone: "UTC" }).toUpperCase();
-  return `${String(d.getUTCDate()).padStart(2, "0")} ${month}`;
-}
 
 /**
  * Thematic Analysis — Winston's weekly baskets.
@@ -87,7 +80,7 @@ export function ThemesCard({ onOpenDebate }: { onOpenDebate: () => void }) {
       >
         {runs.map((r) => (
           <option key={r.id} value={r.id}>
-            {runLabel(r.generatedAt)} · {r.basketCount} theme{r.basketCount === 1 ? "" : "s"}
+            {fmtRunDate(r.generatedAt)} · {r.basketCount} theme{r.basketCount === 1 ? "" : "s"}
           </option>
         ))}
       </select>

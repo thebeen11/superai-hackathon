@@ -325,6 +325,10 @@ export type CouncilReport = {
      * Indicators
      */
     indicators?: Array<MacroIndicator>;
+    /**
+     * Theme Reads
+     */
+    theme_reads?: Array<ThemeRead>;
     macro?: BearSignpostReport | null;
     ace?: AceIndex | null;
     /**
@@ -570,6 +574,30 @@ export type HttpValidationError = {
      * Detail
      */
     detail?: Array<ValidationError>;
+};
+
+/**
+ * IndicatorPoint
+ *
+ * One council run's macro indicator scores — a single point on the trend lines.
+ *
+ * Only the newest `council_snapshots` row is ever served as *the* snapshot, but every
+ * row is a dated reading of the same fixed indicator set, so the history reads as a
+ * time series. Scores are keyed by indicator name rather than a list, because the set
+ * can differ run to run (an indicator Winston did not score that night is simply absent
+ * from that point, and the line breaks there rather than being drawn through a zero).
+ */
+export type IndicatorPoint = {
+    /**
+     * Generated At
+     */
+    generated_at: string;
+    /**
+     * Scores
+     */
+    scores?: {
+        [key: string]: number;
+    };
 };
 
 /**
@@ -1077,6 +1105,39 @@ export type ThemeBasket = {
      * Evidence
      */
     evidence?: Array<Evidence>;
+};
+
+/**
+ * ThemeRead
+ *
+ * Winston's stance on one theme of `taxonomy.MARKET_THEME_TAXONOMY`.
+ *
+ * The taxonomy is fixed, so every run grades the same rows and a theme is comparable
+ * run-over-run — the same reason `BEAR_SIGNPOSTS` is closed. `evidenced=False` means
+ * nothing in the corpus spoke to the theme, which the dashboard shows as unrated
+ * rather than as a neutral call.
+ */
+export type ThemeRead = {
+    /**
+     * Theme
+     */
+    theme: string;
+    /**
+     * Stance
+     */
+    stance?: string;
+    /**
+     * Rationale
+     */
+    rationale?: string;
+    /**
+     * Evidence
+     */
+    evidence?: Array<Evidence>;
+    /**
+     * Evidenced
+     */
+    evidenced?: boolean;
 };
 
 /**
@@ -2482,6 +2543,40 @@ export type CouncilResolveResponses = {
 };
 
 export type CouncilResolveResponse = CouncilResolveResponses[keyof CouncilResolveResponses];
+
+export type ListIndicatorHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * Most recent council runs to read
+         */
+        limit?: number;
+    };
+    url: '/api/indicators/history';
+};
+
+export type ListIndicatorHistoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListIndicatorHistoryError = ListIndicatorHistoryErrors[keyof ListIndicatorHistoryErrors];
+
+export type ListIndicatorHistoryResponses = {
+    /**
+     * Response List Indicator History
+     *
+     * Successful Response
+     */
+    200: Array<IndicatorPoint>;
+};
+
+export type ListIndicatorHistoryResponse = ListIndicatorHistoryResponses[keyof ListIndicatorHistoryResponses];
 
 export type RunThematicEndpointData = {
     body?: never;

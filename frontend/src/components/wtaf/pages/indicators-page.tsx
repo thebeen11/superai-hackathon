@@ -2,59 +2,53 @@
 /* ============ WTAF — Macro Indicators ============ */
 import { useState } from "react";
 import { useWtaf, useWtafData } from "@/providers/wtaf-provider";
-import { Card, Ring, MiniBar, EmptyState } from "../primitives";
+import { Card, EmptyState } from "../primitives";
+import { IndicatorCards } from "../indicator-cards";
 import { SignpostsCard } from "../signposts-card";
 import { PageHead, PageButton } from "../shared";
-import { EvidenceList } from "../source-link";
-import { fmtChange, hasQuote } from "@/lib/format";
+import { deskTakesFor, stanceFor, STANCE_COLOR } from "@/lib/stance";
 
 const PAGE_SIZE = 8;
 
 export function IndicatorsPage() {
   const d = useWtafData();
   const { discovering } = useWtaf();
-  const bandC: Record<string, string> = { Positive: "var(--up)", Neutral: "var(--amber)", Negative: "var(--down)" };
 
   const [page, setPage] = useState(0);
-  const pageCount = Math.max(1, Math.ceil(d.watchlist.length / PAGE_SIZE));
+  // The stance is the point of this card, so called names lead — otherwise, with only a
+  // desk or two reporting, page 1 can be entirely UNRATED and say nothing. Sorting is
+  // stable, so mention-count order survives inside each group.
+  const stances = d.watchlist.map((w) => ({ w, ...stanceFor(deskTakesFor(d.deskNotes, w.t)) }));
+  const ranked = [
+    ...stances.filter((s) => s.stance !== "UNRATED"),
+    ...stances.filter((s) => s.stance === "UNRATED"),
+  ];
+  const pageCount = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
   // Clamp during render so a shrinking list (e.g. after re-discovery) never lands on an empty page.
   const safePage = Math.min(page, pageCount - 1);
-  const watchPage = d.watchlist.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const watchPage = ranked.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
   return (
     <div>
       <PageHead title="Macro Indicators" sub="macro regime · cycle signposts · evidence-backed" />
       <div className="grid12">
         <SignpostsCard />
-        {d.indicators.length === 0 && (
-          <Card className="span12" loading={discovering}>
-            <EmptyState label="No indicators yet" sub="Run a discovery to derive industry signals · rubric scores await Tier 3 (Andie)" />
-          </Card>
-        )}
-        {d.indicators.map((ind, i) => (
-          <Card key={i} className="span4" title={ind.name}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <Ring value={(ind.score + 1) / 2} size={78} stroke={7} from={ind.score >= 0 ? "green" : "red"} to={ind.score >= 0 ? "blue" : "orange"}>
-                <div className="mono display" style={{ fontSize: 15, fontWeight: 700, color: ind.score >= 0 ? "var(--up)" : "var(--down)" }}>{ind.score >= 0 ? "+" : ""}{ind.score.toFixed(1)}</div>
-              </Ring>
-              <div style={{ flex: 1 }}>
-                <span className="chip" style={{ color: bandC[ind.band], borderColor: `color-mix(in oklch, ${bandC[ind.band]} 40%, transparent)` }}>{ind.band}</span>
-                <div style={{ fontSize: 11.5, color: "var(--t-lo)", marginTop: 8, lineHeight: 1.4, textWrap: "pretty" }}>{ind.rationale}</div>
-                <EvidenceList items={ind.evidence} sources={d.sourceDocs} emptyLabel="not source-anchored" />
-              </div>
-            </div>
-          </Card>
-        ))}
-        <Card title="Watchlist Snapshot" sub="US equities" className="span6"
+        <IndicatorCards />
+        {/* Stance and its one-liner both come from the Andie desks' StockTake (conviction
+            -1..+1 + rationale), not from `sig` — which the live adapter fills with a
+            normalised mention count, so it says how loud a ticker is, never which way. */}
+        <Card title="Watchlist Snapshot" sub="US equities · desk conviction" className="span6"
           loading={discovering && d.watchlist.length === 0} updating={discovering && d.watchlist.length > 0}>
           {d.watchlist.length === 0 ? (
             <EmptyState label="No tickers yet" sub="run a discovery" />
           ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {watchPage.map((w, i) => (
-              <div key={w.t} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < watchPage.length - 1 ? "1px solid var(--stroke)" : "none" }}>
-                <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, width: 54 }}>{w.t}</span>
-                <div style={{ flex: 1 }}><MiniBar v={(w.sig + 1) / 2} color={w.sig >= 0 ? "var(--up)" : "var(--down)"} h={4} /></div>
-                <span className="mono" style={{ fontSize: 11.5, width: 54, textAlign: "right", color: !hasQuote(w) ? "var(--t-faint)" : w.chg >= 0 ? "var(--up)" : "var(--down)" }}>{fmtChange(w)}</span>
+            {watchPage.map(({ w, stance, rationale }, i) => (
+              <div key={w.t} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: i < watchPage.length - 1 ? "1px solid var(--stroke)" : "none" }}>
+                <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, width: 54, flexShrink: 0 }}>{w.t}</span>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 11.5, lineHeight: 1.4, textWrap: "pretty", color: rationale ? "var(--t-lo)" : "var(--t-faint)" }}>
+                  {rationale || "No desk call yet."}
+                </div>
+                <span className="chip" style={{ flexShrink: 0, color: STANCE_COLOR[stance], borderColor: `color-mix(in oklch, ${STANCE_COLOR[stance]} 40%, transparent)` }}>{stance}</span>
               </div>
             ))}
             {pageCount > 1 && (

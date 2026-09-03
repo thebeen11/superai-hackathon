@@ -33,6 +33,7 @@ import type {
   Evidence,
   Indicator,
   IndicatorBand,
+  IndicatorPoint,
   LedgerRow,
   Prediction,
   RiskBand,
@@ -53,6 +54,7 @@ import type {
   WtafData,
 } from "../types";
 import { TIMEFRAMES } from "../types";
+import { themeStance } from "../stance";
 import { tierTopology } from "../tiers";
 import type {
   CleanedItem,
@@ -235,7 +237,19 @@ function evidenceOf(e: ApiEvidence): Evidence {
 export const evidenceList = (e: ApiEvidence[] | undefined | null): Evidence[] =>
   (e ?? []).map(evidenceOf);
 
-function deriveTrackers(items: CleanedItem[]): Tracker[] {
+/**
+ * Concept trackers: one row per market theme Timo tagged.
+ *
+ * Volume (`mentions`/`spark`/`tone`) is counted here; *direction* is not derivable from
+ * this side at all — a theme has no score in the corpus, and joining a theme to the
+ * tickers that co-occur with it just re-reads whichever name dominates the crawl. So the
+ * stance is Winston's own graded read on the fixed taxonomy, looked up by theme name
+ * (`backend/app/council/theme_reads.py`), and a theme he never evidenced stays UNRATED.
+ */
+function deriveTrackers(
+  items: CleanedItem[],
+  council: CouncilReport | null | undefined,
+): Tracker[] {
   // Common day axis across all items, so every tracker's sparkline shares one grid.
   const allDays = [
     ...new Set(
@@ -244,6 +258,10 @@ function deriveTrackers(items: CleanedItem[]): Tracker[] {
         .filter((k): k is string => !!k),
     ),
   ].sort();
+
+  const reads = new Map(
+    (council?.theme_reads ?? []).map((r) => [r.theme, r] as const),
+  );
 
   const byTheme = new Map<
     string,
@@ -268,6 +286,10 @@ function deriveTrackers(items: CleanedItem[]): Tracker[] {
     (a, b) => b[1].mentions - a[1].mentions,
   );
   return rows.slice(0, 15).map(([name, { mentions, hosts, byDay }]) => {
+    const read = reads.get(name);
+    const stance = themeStance(read);
+    // An unrated theme has no reason to show either — the card says so in its own words.
+    const rationale = stance === "UNRATED" ? "" : read?.rationale ?? "";
     // Real per-day mention counts on the shared axis (zero-filled). Spark auto-normalizes.
     const series = allDays.map((day) => byDay.get(day) ?? 0);
     if (series.length < 2) {
@@ -279,6 +301,8 @@ function deriveTrackers(items: CleanedItem[]): Tracker[] {
         channels: hosts.size,
         spark: [mentions, mentions],
         tone: "flat" as const,
+        stance,
+        rationale,
       };
     }
     const mid = Math.floor(series.length / 2);
@@ -293,6 +317,8 @@ function deriveTrackers(items: CleanedItem[]): Tracker[] {
       channels: hosts.size,
       spark: series,
       tone,
+      stance,
+      rationale,
     };
   });
 }
@@ -529,6 +555,27 @@ export function thematicRunToThemes(run: ThematicRun): Theme[] {
     hold: b.hold || undefined,
     evidence: evidenceList(b.evidence),
   }));
+}
+
+/**
+ * Per-run indicator scores pivoted into one series per indicator, oldest point first.
+ *
+ * The backend sends a point per council run because that is how the runs are stored; the
+ * cards read one indicator at a time. An indicator missing from a run contributes no
+ * point to its series rather than a zero — a night Winston did not score it is a gap in
+ * the line, not a reading of neutral.
+ */
+export function indicatorHistorySeries(
+  points: { generated_at: string; scores?: { [k: string]: number } }[],
+): Record<string, IndicatorPoint[]> {
+  const series: Record<string, IndicatorPoint[]> = {};
+  for (const p of points) {
+    for (const [name, score] of Object.entries(p.scores ?? {})) {
+      if (typeof score !== "number" || Number.isNaN(score)) continue;
+      (series[name] ??= []).push({ at: p.generated_at, score });
+    }
+  }
+  return series;
 }
 
 /** Run headers for the picker. `generated_at` is the backend's clock, never the client's. */
@@ -808,7 +855,7 @@ export function itemsToWtafData(
 ): WtafData {
   const sources = deriveSources(items);
   const sourceDocs = withCitations(deriveSourceDocs(items), council);
-  const trackers = deriveTrackers(items);
+  const trackers = deriveTrackers(items, council);
   const watchlist = deriveWatchlist(items, watchlistOverrides);
   const signalVolume = deriveSignalVolume(items);
   const contextPreview = deriveContextPreview(items);

@@ -2,6 +2,7 @@
 import type {
   Debate,
   Evidence,
+  IndicatorPoint,
   SourceDoc,
   Theme,
   ThematicRunRef,
@@ -263,12 +264,16 @@ export const wtafMock: WtafData = {
     ],
   },
 
+  // Winston's theme reads, one per row — every band including UNRATED, which is what a
+  // theme the corpus stayed quiet on looks like. Note `tone` and `stance` disagreeing on
+  // "AI bubble / overvalued": mentions are falling while the read is bearish. They measure
+  // different things, and the card only shows the stance.
   trackers: [
-    { name: "AI capex super-cycle", mentions: 142, chg: +34, channels: 8, spark: [0.3, 0.4, 0.35, 0.5, 0.62, 0.58, 0.7, 0.85, 0.9], tone: "up" },
-    { name: "Rate cut · September", mentions: 96, chg: +22, channels: 6, spark: [0.2, 0.25, 0.3, 0.28, 0.4, 0.52, 0.6, 0.66, 0.74], tone: "up" },
-    { name: "AI bubble / overvalued", mentions: 61, chg: -8, channels: 5, spark: [0.7, 0.66, 0.6, 0.55, 0.5, 0.46, 0.4, 0.38, 0.34], tone: "down" },
-    { name: "Power & cooling demand", mentions: 48, chg: +19, channels: 4, spark: [0.1, 0.15, 0.2, 0.3, 0.36, 0.5, 0.58, 0.7, 0.8], tone: "up" },
-    { name: "Consumer slowdown", mentions: 29, chg: +3, channels: 3, spark: [0.4, 0.42, 0.38, 0.44, 0.46, 0.43, 0.48, 0.5, 0.49], tone: "flat" },
+    { name: "AI capex super-cycle", mentions: 142, chg: +34, channels: 8, spark: [0.3, 0.4, 0.35, 0.5, 0.62, 0.58, 0.7, 0.85, 0.9], tone: "up", stance: "BULLISH", rationale: "Hyperscaler capex revised up again; the constraint is power, not orders." },
+    { name: "Rate cut · September", mentions: 96, chg: +22, channels: 6, spark: [0.2, 0.25, 0.3, 0.28, 0.4, 0.52, 0.6, 0.66, 0.74], tone: "up", stance: "NEUTRAL", rationale: "Cut is priced; the material splits on whether it lands in September or December." },
+    { name: "AI bubble / overvalued", mentions: 61, chg: -8, channels: 5, spark: [0.7, 0.66, 0.6, 0.55, 0.5, 0.46, 0.4, 0.38, 0.34], tone: "down", stance: "BEARISH", rationale: "Breadth keeps narrowing while multiples hold — the dot-com echo the desks flagged." },
+    { name: "Power & cooling demand", mentions: 48, chg: +19, channels: 4, spark: [0.1, 0.15, 0.2, 0.3, 0.36, 0.5, 0.58, 0.7, 0.8], tone: "up", stance: "BULLISH", rationale: "Grid interconnect queues lengthening; thermal and electrical pull-through is contracted." },
+    { name: "Consumer slowdown", mentions: 29, chg: +3, channels: 3, spark: [0.4, 0.42, 0.38, 0.44, 0.46, 0.43, 0.48, 0.5, 0.49], tone: "flat", stance: "UNRATED", rationale: "" },
   ],
 
   contextPreview: {
@@ -369,6 +374,9 @@ export const wtafMock: WtafData = {
       stocks: [
         { ticker: "$NVDA", conviction: 0.78, horizon: "6-12M", rationale: "Demand visibility intact; supply is the constraint.", evidence: [{ quote: "they are power-constrained, not demand-constrained", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2537 }] },
         { ticker: "$VRT", conviction: 0.64, horizon: "12M", rationale: "Cooling and electrical pull-through from the same capex.", evidence: [{ quote: "cooling and electrical included", sourceUrl: "https://www.youtube.com/watch?v=mockSilicon1", timestampStart: 2601 }] },
+        { ticker: "$AVGO", conviction: 0.55, horizon: "6-12M", rationale: "Custom accelerator share is compounding alongside the merchant cycle.", evidence: [] },
+        { ticker: "$MSFT", conviction: 0.08, horizon: "12M", rationale: "Capex discipline cuts both ways; the call rests on the next print.", evidence: [] },
+        { ticker: "$SMCI", conviction: -0.45, horizon: "3-6M", rationale: "Margin pressure as rack assembly commoditises.", evidence: [] },
       ],
     },
   ],
@@ -432,6 +440,29 @@ export const youtubeMatchesMock: YoutubeMatch[] = [
     matchedAt: "2026-08-01T12:00:00Z",
   },
 ];
+
+/* --- Macro indicator history ------------------------------------------------
+   Eight nightly council runs, ending on the scores in `wtafMock.indicators` so the last
+   point of each line matches the number the card prints. Geopolitical Risk deteriorates
+   while the rest firm up — enough divergence to tell the lines apart. */
+
+const indicatorRuns = [
+  "2026-08-27T03:00:00Z", "2026-08-28T03:00:00Z", "2026-08-29T03:00:00Z",
+  "2026-08-30T03:00:00Z", "2026-08-31T03:00:00Z", "2026-09-01T03:00:00Z",
+  "2026-09-02T03:00:00Z", "2026-09-03T03:00:00Z",
+];
+
+const series = (scores: number[]): IndicatorPoint[] =>
+  scores.map((score, i) => ({ at: indicatorRuns[i], score }));
+
+export const indicatorHistoryMock: Record<string, IndicatorPoint[]> = {
+  "Macro Outlook": series([0.1, 0.05, 0.15, 0.25, 0.2, 0.3, 0.35, 0.4]),
+  "Inflation Traj.": series([-0.1, -0.05, 0.0, 0.05, 0.15, 0.1, 0.15, 0.2]),
+  "Rate Policy": series([0.2, 0.25, 0.2, 0.3, 0.4, 0.45, 0.4, 0.5]),
+  "Market Sentiment": series([0.35, 0.45, 0.4, 0.5, 0.55, 0.5, 0.55, 0.6]),
+  "Sector Trends": series([0.3, 0.4, 0.45, 0.55, 0.5, 0.6, 0.65, 0.7]),
+  "Geopolitical Risk": series([0.05, 0.0, -0.1, -0.05, -0.15, -0.2, -0.3, -0.3]),
+};
 
 /* --- Thematic Analysis (Tier 5, weekly) -------------------------------------
    Three dated runs so the run picker and the timeframe filter are exercisable with no

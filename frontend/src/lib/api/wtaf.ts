@@ -9,6 +9,7 @@ import type {
   ContextPreview,
   Debate,
   Evidence,
+  IndicatorPoint,
   SourceDoc,
   Theme,
   ThematicRunRef,
@@ -22,6 +23,7 @@ import type {
   YoutubeMatch,
 } from "../types";
 import {
+  indicatorHistoryMock,
   thematicRunMock,
   thematicRunRefsMock,
   tickerDebateMock,
@@ -39,6 +41,7 @@ import {
   getTickerDebate,
   latestThematicRun,
   latestTickerDebate,
+  listIndicatorHistory,
   listThematicRunsEndpoint,
   listTickerDebates,
   discoverPost,
@@ -62,6 +65,7 @@ import type {
 import {
   debateRecordToDebate,
   evidenceList,
+  indicatorHistorySeries,
   itemsToWtafData,
   sourceRefsToDocs,
   thematicRunRefs,
@@ -101,6 +105,21 @@ export async function getCouncil(): Promise<CouncilReport | null> {
   } catch {
     return null; // council is best-effort; never block the snapshot on it
   }
+}
+
+/**
+ * Macro indicator scores over past council runs, one series per indicator name.
+ *
+ * Not part of `getSnapshot`: the indicator cards are the only reader and the series only
+ * moves when the council runs, so every dashboard load should not pay for it (the same
+ * reasoning as the thematic run list). An empty object is the honest answer before the
+ * first council run — the cards then say so rather than drawing a line.
+ * Backend: GET /api/indicators/history
+ */
+export async function getIndicatorHistory(): Promise<Record<string, IndicatorPoint[]>> {
+  if (USE_MOCK) return mockResolve(indicatorHistoryMock);
+  const { data } = await listIndicatorHistory({ throwOnError: true });
+  return indicatorHistorySeries(data ?? []);
 }
 
 /**
